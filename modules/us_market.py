@@ -51,8 +51,8 @@ def get_us_market() -> dict:
             if df is None or df.empty or len(df) < 2:
                 continue
 
-            close = float(df["Close"].iloc[-1])
-            prev  = float(df["Close"].iloc[-2])
+            close = float(df["Close"].iloc[-1].iloc[0] if hasattr(df["Close"].iloc[-1], "iloc") else df["Close"].iloc[-1])
+            prev  = float(df["Close"].iloc[-2].iloc[0] if hasattr(df["Close"].iloc[-2], "iloc") else df["Close"].iloc[-2])
             chg   = close - prev
             chg_p = chg / prev * 100 if prev else 0
             date  = df.index[-1].strftime("%Y-%m-%d")
