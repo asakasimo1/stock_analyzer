@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📈 매매 성향 분석기</title>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Black+Han+Sans&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --green: #00e676;
+    --red: #ff1744;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Nanum Gothic', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(0,229,255,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(255,107,53,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,14,26,0.9);
+    backdrop-filter: blur(10px);
+  }
+  .logo {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-stats {
+    display: flex;
+    gap: 24px;
+  }
+  .hstat {
+    text-align: center;
+  }
+  .hstat-val {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 20px;
+    color: var(--accent);
+  }
+  .hstat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* MAIN LAYOUT */
+  main {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 20px;
+    padding: 28px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .card-title {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 18px;
+    text-transform: uppercase;
+  }
+
+  /* INPUT SECTION */
+  .input-card { grid-column: 1; grid-row: 1; }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 5px; }
+  input, select, textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Nanum Gothic', sans-serif;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.1);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  select option { background: var(--surface); }
+
+  .emotion-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .emotion-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Nanum Gothic', sans-serif;
+  }
+  .emotion-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .emotion-btn.active { background: rgba(0,229,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+  .btn-submit {
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--accent), #0099bb);
+    border: none;
+    border-radius: 10px;
+    color: #0a0e1a;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 15px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,255,0.3); }
+  .btn-submit:active { transform: translateY(0); }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* TRADES LIST */
+  .trades-card { grid-column: 2; grid-row: 1; }
+  .trades-list { max-height: 320px; overflow-y: auto; }
+  .trades-list::-webkit-scrollbar { width: 4px; }
+  .trades-list::-webkit-scrollbar-track { background: var(--surface2); }
+  .trades-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .trade-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .trade-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .badge-buy { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+  .badge-sell { background: rgba(255,23,68,0.15); color: var(--red); border: 1px solid rgba(255,23,68,0.3); }
+  .trade-info { flex: 1; min-width: 0; }
+  .trade-name { font-size: 13px; font-weight: 700; }
+  .trade-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .trade-reason { font-size: 11px; color: var(--accent); margin-top: 2px; font-style: italic; }
+  .trade-date { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+  /* ANALYSIS */
+  .analysis-card { grid-column: 1 / 3; grid-row: 2; }
+  .btn-analyze {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--accent2), #cc5500);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 18px;
+  }
+  .btn-analyze:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(255,107,53,0.3); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .analysis-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 120px;
+    line-height: 1.8;
+    font-size: 14px;
+  }
+  .analysis-result.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+  .dots { display: inline-flex; gap: 4px; }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  .stat-lbl { font-size: 11px; color: var(--muted); }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .neutral { color: var(--accent); }
+
+  /* ANALYSIS CONTENT STYLES */
+  .analysis-result h3 {
+    color: var(--accent);
+    font-size: 15px;
+    margin: 14px 0 8px;
+    border-left: 3px solid var(--accent);
+    padding-left: 10px;
+  }
+  .analysis-result h3:first-child { margin-top: 0; }
+  .analysis-result ul { padding-left: 18px; }
+  .analysis-result li { margin-bottom: 5px; }
+  .analysis-result strong { color: var(--accent2); }
+  .tag {
+    display: inline-block;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 12px;
+    color: var(--accent);
+    margin: 2px;
+  }
+
+  /* PULSE */
+  .pulse {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+    margin-right: 6px;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(0,230,118,0); }
+  }
+
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; padding: 16px; }
+    .trades-card { grid-column: 1; grid-row: 2; }
+    .analysis-card { grid-column: 1; grid-row: 3; }
+    header { padding: 16px 20px; flex-direction: column; gap: 12px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📈 STOCK ANALYZER</div>
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val" id="h-total">0</div>
+      <div class="hstat-label">총 매매</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="h-buy" style="color:var(--green)">0</div>
+      <div class="hstat-label">매수</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="h-sell" style="color:var(--red)">0</div>
+      <div class="hstat-label">매도</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- INPUT CARD -->
+  <div class="card input-card">
+    <div class="card-title">✏️ 매매 기록 입력</div>
+
+    <div class="form-row">
+      <div>
+        <label>날짜</label>
+        <input type="date" id="inp-date">
+      </div>
+      <div>
+        <label>종목명</label>
+        <input type="text" id="inp-stock" placeholder="예: 삼성전자">
+      </div>
+    </div>
+
+    <div class="form-row three">
+      <div>
+        <label>매수/매도</label>
+        <select id="inp-type">
+          <option value="매수">📗 매수</option>
+          <option value="매도">📕 매도</option>
+        </select>
+      </div>
+      <div>
+        <label>가격 (원)</label>
+        <input type="number" id="inp-price" placeholder="72000">
+      </div>
+      <div>
+        <label>수량 (주)</label>
+        <input type="number" id="inp-qty" placeholder="10">
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label>매매 이유</label>
+      <input type="text" id="inp-reason" placeholder="예: 52주 신저가 근처라서, 실적 발표 기대">
+    </div>
+
+    <div style="margin-bottom:14px">
+      <label>당시 심리 상태</label>
+      <div class="emotion-group" id="emotion-group">
+        <button class="emotion-btn" onclick="toggleEmotion(this)">😤 확신</button>
+        <button class="emotion-btn" onclick="toggleEmotion(this)">😰 불안</button>
+        <button class="emotion-btn" onclick="toggleEmotion(this)">🤑 탐욕</button>
+        <button class="emotion-btn" onclick="toggleEmotion(this)">😱 공포</button>
+        <button class="emotion-btn" onclick="toggleEmotion(this)">🧘 평온</button>
+        <button class="emotion-btn" onclick="toggleEmotion(this)">🎲 도박심리</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:0">
+      <label>추가 메모 (선택)</label>
+      <textarea id="inp-memo" placeholder="시장 상황, 뉴스, 특이사항 등 자유롭게 기록해보세요..."></textarea>
+    </div>
+
+    <button class="btn-submit" onclick="addTrade()">+ 매매 기록 추가</button>
+  </div>
+
+  <!-- TRADES LIST -->
+  <div class="card trades-card">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>📋 매매 내역</span>
+      <span style="font-size:11px;color:var(--muted);font-family:'Nanum Gothic'" id="trade-count">0건</span>
+    </div>
+    <div class="trades-list" id="trades-list">
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div>아직 매매 기록이 없어요</div>
+        <div style="font-size:12px;margin-top:6px">왼쪽에서 기록을 추가해보세요!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYSIS -->
+  <div class="card analysis-card">
+    <div class="card-title">🧠 AI 성향 분석</div>
+
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat-box">
+        <div class="stat-val neutral" id="s-total">0</div>
+        <div class="stat-lbl">총 매매 횟수</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val up" id="s-buy">0</div>
+        <div class="stat-lbl">매수 횟수</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val down" id="s-sell">0</div>
+        <div class="stat-lbl">매도 횟수</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val neutral" id="s-stocks">0</div>
+        <div class="stat-lbl">거래 종목 수</div>
+      </div>
+    </div>
+
+    <button class="btn-analyze" id="analyze-btn" onclick="analyzeWithClaude()">
+      <span>🤖</span> Claude AI 성향 분석 시작
+    </button>
+
+    <div class="analysis-result" id="analysis-result">
+      <div style="color:var(--muted);text-align:center;padding:20px">
+        <span class="pulse"></span>매매 기록을 추가한 후 AI 분석을 시작하세요
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API_URL = "https://api.anthropic.com/v1/messages";
+let trades = JSON.parse(localStorage.getItem('trades') || '[]');
+let selectedEmotion = '';
+
+// 오늘 날짜 기본값
+document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
+
+function toggleEmotion(btn) {
+  document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedEmotion = btn.textContent.trim();
+}
+
+function addTrade() {
+  const date = document.getElementById('inp-date').value;
+  const stock = document.getElementById('inp-stock').value.trim();
+  const type = document.getElementById('inp-type').value;
+  const price = document.getElementById('inp-price').value;
+  const qty = document.getElementById('inp-qty').value;
+  const reason = document.getElementById('inp-reason').value.trim();
+  const memo = document.getElementById('inp-memo').value.trim();
+
+  if (!date || !stock || !price || !qty) {
+    alert('날짜, 종목명, 가격, 수량은 필수 입력 항목입니다!');
+    return;
+  }
+
+  const trade = { date, stock, type, price: parseInt(price), qty: parseInt(qty), reason, emotion: selectedEmotion, memo, id: Date.now() };
+  trades.push(trade);
+  localStorage.setItem('trades', JSON.stringify(trades));
+
+  renderTrades();
+  updateStats();
+
+  // Reset form
+  document.getElementById('inp-stock').value = '';
+  document.getElementById('inp-price').value = '';
+  document.getElementById('inp-qty').value = '';
+  document.getElementById('inp-reason').value = '';
+  document.getElementById('inp-memo').value = '';
+  document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
+  selectedEmotion = '';
+}
+
+function renderTrades() {
+  const list = document.getElementById('trades-list');
+  if (trades.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div>아직 매매 기록이 없어요</div><div style="font-size:12px;margin-top:6px">왼쪽에서 기록을 추가해보세요!</div></div>`;
+    return;
+  }
+  list.innerHTML = [...trades].reverse().map(t => `
+    <div class="trade-item">
+      <span class="trade-badge ${t.type === '매수' ? 'badge-buy' : 'badge-sell'}">${t.type}</span>
+      <div class="trade-info">
+        <div class="trade-name">${t.stock}</div>
+        <div class="trade-detail">${t.price.toLocaleString()}원 × ${t.qty}주 = ${(t.price*t.qty).toLocaleString()}원</div>
+        ${t.reason ? `<div class="trade-reason">💬 ${t.reason}</div>` : ''}
+        ${t.emotion ? `<div style="font-size:11px;margin-top:2px">${t.emotion}</div>` : ''}
+      </div>
+      <div>
+        <div class="trade-date">${t.date}</div>
+        <button onclick="deleteTrade(${t.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;margin-top:4px;display:block;margin-left:auto">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteTrade(id) {
+  trades = trades.filter(t => t.id !== id);
+  localStorage.setItem('trades', JSON.stringify(trades));
+  renderTrades();
+  updateStats();
+}
+
+function updateStats() {
+  const total = trades.length;
+  const buys = trades.filter(t => t.type === '매수').length;
+  const sells = trades.filter(t => t.type === '매도').length;
+  const stocks = [...new Set(trades.map(t => t.stock))].length;
+
+  document.getElementById('h-total').textContent = total;
+  document.getElementById('h-buy').textContent = buys;
+  document.getElementById('h-sell').textContent = sells;
+  document.getElementById('trade-count').textContent = total + '건';
+
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-buy').textContent = buys;
+  document.getElementById('s-sell').textContent = sells;
+  document.getElementById('s-stocks').textContent = stocks;
+
+  if (total > 0) document.getElementById('stats-row').style.display = 'grid';
+}
+
+async function analyzeWithClaude() {
+  if (trades.length === 0) {
+    alert('먼저 매매 기록을 입력해주세요!');
+    return;
+  }
+
+  const btn = document.getElementById('analyze-btn');
+  const result = document.getElementById('analysis-result');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 분석 중...';
+
+  result.className = 'analysis-result loading';
+  result.innerHTML = `분석 중입니다 <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+
+  const summary = trades.map(t =>
+    `[${t.date}] ${t.stock} ${t.type} | 가격: ${t.price.toLocaleString()}원 | 수량: ${t.qty}주 | 이유: ${t.reason || '없음'} | 심리: ${t.emotion || '미입력'} | 메모: ${t.memo || '없음'}`
+  ).join('\n');
+
+  const prompt = `다음은 사용자의 주식 매매 기록입니다:
+
+${summary}
+
+위 매매 기록을 분석하여 다음 항목을 한국어로 리포팅해주세요:
+
+1. **매매 성향 유형** (예: 단기 스캘퍼, 중기 스윙트레이더, 장기 가치투자자 등)
+2. **주요 매매 패턴** (자주 나타나는 행동 패턴 3가지)
+3. **심리적 특성** (감정이 매매에 미치는 영향)
+4. **강점** (잘 하고 있는 부분)
+5. **개선이 필요한 부분** (주의해야 할 습관)
+6. **맞춤 전략 제안** (성향에 맞는 투자 전략 2-3가지)
+
+각 항목을 h3 태그로 구분하고, 구체적이고 통찰력 있게 분석해주세요. 데이터가 적더라도 가능한 패턴을 찾아 분석해주세요.`;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '분석 결과를 가져오지 못했습니다.';
+
+    result.className = 'analysis-result';
+    result.innerHTML = text
+      .replace(/### (.*)/g, '<h3>$1</h3>')
+      .replace(/## (.*)/g, '<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^- (.*)/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+
+  } catch (e) {
+    result.className = 'analysis-result';
+    result.innerHTML = `<div style="color:var(--red)">⚠️ 분석 중 오류가 발생했습니다. API 연결을 확인해주세요.<br><small style="color:var(--muted)">${e.message}</small></div>`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>🤖</span> Claude AI 성향 분석 시작';
+}
+
+// Init
+renderTrades();
+updateStats();
+</script>
+</body>
+</html>
