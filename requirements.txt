@@ -11,3 +11,6 @@ colorama>=0.4.6
 Pillow>=9.0.0
 yfinance>=0.2.0
 schedule>=1.2.0
+# 웹 대시보드 (streamlit_app.py)
+streamlit>=1.35.0
+plotly>=5.18.0
