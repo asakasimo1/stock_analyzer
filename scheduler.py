@@ -136,19 +136,22 @@ def daily_briefing():
 
 # ── 신호 알림 체크 ────────────────────────────────────────────────────────────
 
-def check_signals():
+def check_signals(force: bool = False):
     """
     장중(09:10~15:20) 30분 간격으로 실행
     RSI 과매수/과매도, MACD 크로스, 볼린저밴드 돌파 시 알림
+
+    force=True: 시간/요일 체크 건너뜀 (GitHub Actions runner는 UTC 기준이므로 필수)
     """
     now = datetime.now()
-    # 주말 제외
-    if now.weekday() >= 5:
-        return
-    # 장 시간 외 제외 (09:10 ~ 15:20)
-    t = now.hour * 60 + now.minute
-    if not (9 * 60 + 10 <= t <= 15 * 60 + 20):
-        return
+    if not force:
+        # 주말 제외
+        if now.weekday() >= 5:
+            return
+        # 장 시간 외 제외 (09:10 ~ 15:20)
+        t = now.hour * 60 + now.minute
+        if not (9 * 60 + 10 <= t <= 15 * 60 + 20):
+            return
 
     log.info("📡 신호 체크 시작")
 

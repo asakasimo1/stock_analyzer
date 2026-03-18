@@ -18,6 +18,11 @@ _MSG_URL    = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 # ── 토큰 관리 ───────────────────────────────────────────────
 
 def load_tokens() -> dict:
+    # GitHub Actions: 환경변수에서 토큰 우선 읽기
+    access  = os.environ.get("KAKAO_TOKEN_ACCESS", "")
+    refresh = os.environ.get("KAKAO_TOKEN_REFRESH", "")
+    if access and refresh:
+        return {"access_token": access, "refresh_token": refresh}
     if os.path.exists(_TOKEN_FILE):
         with open(_TOKEN_FILE, "r") as f:
             return json.load(f)
@@ -25,6 +30,9 @@ def load_tokens() -> dict:
 
 
 def save_tokens(tokens: dict):
+    # CI 환경(GitHub Actions)에서는 파일 저장 스킵
+    if os.environ.get("CI"):
+        return
     with open(_TOKEN_FILE, "w") as f:
         json.dump(tokens, f, indent=2)
 
