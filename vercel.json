@@ -1,5 +1,10 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/stock_analyzer.html" }
+  "builds": [
+    { "src": "stock_analyzer.html", "use": "@vercel/static" },
+    { "src": "api/analyze.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/stock_analyzer.html" },
+    { "src": "/api/analyze", "dest": "/api/analyze.js" }
   ]
 }
