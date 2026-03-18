@@ -132,6 +132,7 @@ def generate_chart(
         edgecolor="gray",
         figcolor="white",
         y_on_right=False,
+        rc={"font.family": matplotlib.rcParams["font.family"]},
     )
 
     # ── 차트 저장 ────────────────────────────────────────────
