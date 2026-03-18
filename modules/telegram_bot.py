@@ -19,6 +19,7 @@ import sys
 import time
 from datetime import datetime
 
+import html
 import requests
 
 # 프로젝트 루트를 경로에 추가
@@ -178,20 +179,20 @@ def format_stock_analysis(ticker: str, name: str, df, tech: dict,
         signals = tech.get("signals", {})
         macd_sig = signals.get("MACD", "")
         if macd_sig:
-            lines.append(f"  MACD: {macd_sig}")
+            lines.append(f"  MACD: {html.escape(macd_sig)}")
 
         # 볼린저밴드
         bb_sig = signals.get("볼린저밴드", "")
         if bb_sig:
-            lines.append(f"  BB: {bb_sig}")
+            lines.append(f"  BB: {html.escape(bb_sig)}")
 
     # 뉴스
     if news_list:
         lines.append("")
         lines.append("📰 <b>최근 뉴스</b>")
         for n in news_list[:3]:
-            title = n.get("title", "")[:40]
-            date  = n.get("date", "")
+            title = html.escape(n.get("title", "")[:40])
+            date  = html.escape(n.get("date", ""))
             lines.append(f"  • {title}  <i>{date}</i>")
 
     lines.append(f"\n<i>{datetime.now().strftime('%m/%d %H:%M')} 기준</i>")
@@ -242,7 +243,7 @@ def format_daily_report(us_data: dict, stock_results: list,
         lines.append("")
         lines.append("📰 <b>시장 뉴스</b>")
         for n in market_news[:5]:
-            lines.append(f"  • {n.get('title','')[:38]}")
+            lines.append(f"  • {html.escape(n.get('title','')[:38])}")
 
     return "\n".join(lines)
 
