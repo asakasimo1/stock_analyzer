@@ -226,9 +226,70 @@ def check_signals(force: bool = False):
 
 # ── 스케줄 등록 & 실행 ────────────────────────────────────────────────────────
 
+def daily_pick():
+    """매일 08:50 실행 — 금일 매수 추천 (장 시작 10분 전)"""
+    log.info("🎯 매수 추천 스캔 시작")
+    try:
+        from modules import buy_signal as _buy, us_market as us_mod
+        from modules.telegram_bot import send_message as tg_send
+
+        us_data  = us_mod.get_us_market()
+        stocks   = load_watchlist()
+        picks    = _buy.scan_watchlist(
+            watchlist=stocks,
+            us_market=us_data,
+            include_supply=True,
+        )
+
+        import html as _html
+        from datetime import datetime as _dt
+        now   = _dt.now().strftime("%Y-%m-%d %H:%M")
+        lines = [f"🎯 <b>금일 매수 추천</b>  [관심종목]", f"<i>{now}</i>", ""]
+
+        if us_data and us_data.get("indices"):
+            summary = us_data.get("summary", "")
+            icon = "📈" if "상승" in summary else ("📉" if "하락" in summary else "📊")
+            lines.append(f"🌍 <b>전일 미국 증시</b>  {icon} {_html.escape(summary)}")
+            sp = next((i for i in us_data["indices"] if i["name"] == "S&P500"), None)
+            nd = next((i for i in us_data["indices"] if i["name"] == "나스닥"), None)
+            vx = next((i for i in us_data["indices"] if i["name"] == "VIX"), None)
+            parts = []
+            if sp: parts.append(f"S&P500 {sp['chg_pct']:+.2f}%")
+            if nd: parts.append(f"나스닥 {nd['chg_pct']:+.2f}%")
+            if vx: parts.append(f"VIX {vx['close']:.1f}")
+            if parts: lines.append("  " + "  |  ".join(parts))
+            lines.append("")
+
+        if not picks:
+            lines.append("⚠️ 관심종목 중 조건 충족 종목 없음")
+        else:
+            for rank, p in enumerate(picks[:5], 1):
+                sign = "+" if p["chg_pct"] >= 0 else ""
+                icon = "🟢" if p["score"] >= 50 else ("🟡" if p["score"] >= 20 else "⚪")
+                lines.append(f"{icon} <b>#{rank} {_html.escape(p['name'])} ({p['ticker']})</b>")
+                lines.append(f"  {p['close']:,.0f}원  {sign}{p['chg_pct']:.2f}%  점수:{p['score']:+d}")
+                lines.append(f"  거래량 {p['vol_ratio']:.1f}배  장대양봉 {int(p['body_ratio']*100)}%  연속 {p['consec_bullish']}일")
+                supply = p.get("supply", {})
+                if supply:
+                    f_t = supply.get("foreign_trend", "")
+                    i_t = supply.get("inst_trend", "")
+                    f_icon = "🟢" if f_t == "순매수" else ("🔴" if f_t == "순매도" else "⚪")
+                    i_icon = "🟢" if i_t == "순매수" else ("🔴" if i_t == "순매도" else "⚪")
+                    lines.append(f"  외국인 {f_icon}{f_t}  기관 {i_icon}{i_t}")
+                lines.append("")
+
+        _send("\n".join(lines))
+        log.info(f"✅ 매수 추천 전송 완료 ({len(picks)}종목)")
+    except Exception as e:
+        log.error(f"매수 추천 실패: {e}", exc_info=True)
+
+
 def run():
     # 일일 브리핑: 매일 07:30
     schedule.every().day.at("07:30").do(daily_briefing)
+
+    # 매수 추천: 매일 08:50 (장 시작 10분 전)
+    schedule.every().day.at("08:50").do(daily_pick)
 
     # 신호 체크: 장중 30분 간격
     for hh in range(9, 16):
@@ -239,6 +300,7 @@ def run():
 
     log.info("스케줄러 시작")
     log.info(f"  • 일일 브리핑: 매일 07:30")
+    log.info(f"  • 매수 추천:  매일 08:50 (장 시작 10분 전)")
     log.info(f"  • 신호 알림:  09:00~15:30 (30분 간격, 장중 한정)")
     log.info(f"  • 알림 채널:  {getattr(config, 'ALERT_CHANNEL', 'telegram')}")
     log.info(f"  • 관심종목:  {[s['name'] for s in load_watchlist()]}")
