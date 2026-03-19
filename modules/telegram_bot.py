@@ -328,13 +328,84 @@ def start_bot():
             "  예: <code>/analyze 005930</code>\n\n"
             "/watchlist — 관심종목 전체 요약\n"
             "/us — 전일 미국 증시\n"
-            "/briefing — 즉시 일일 브리핑\n\n"
+            "/briefing — 즉시 일일 브리핑\n"
+            "/pick — 🎯 금일 매수 추천 (관심종목 스캔)\n\n"
             "/add <code>[티커] [이름]</code> — 관심종목 추가\n"
             "  예: <code>/add 005930 삼성전자</code>\n\n"
             "/remove <code>[티커]</code> — 관심종목 제거\n"
             "  예: <code>/remove 005930</code>\n\n"
             "/chatid — 현재 Chat ID 확인"
         ))
+
+    # ── /pick ─────────────────────────────────────────────────────────────────
+    @bot.message_handler(commands=["pick"])
+    def cmd_pick(message):
+        cid = message.chat.id
+        _typing(cid)
+        bot.send_message(cid, "⏳ 매수 추천 분석 중...\n관심종목 기술 분석 + 수급 확인 중입니다.")
+
+        try:
+            from modules import buy_signal as _buy
+            stocks  = _load_watchlist()
+            us_data = _us.get_us_market()
+
+            picks = _buy.scan_watchlist(
+                watchlist=stocks,
+                us_market=us_data,
+                include_supply=True,
+            )
+
+            # 텔레그램용 포맷 (run_daily_pick.py의 build_telegram_msg 재사용)
+            import html as _html_mod
+            now = datetime.now().strftime("%Y-%m-%d %H:%M")
+            lines = [f"🎯 <b>금일 매수 추천</b>  [관심종목]", f"<i>{now}</i>", ""]
+
+            # 미국 시황
+            if us_data and us_data.get("indices"):
+                summary = us_data.get("summary", "")
+                icon = "📈" if "상승" in summary else ("📉" if "하락" in summary else "📊")
+                lines.append(f"🌍 <b>전일 미국 증시</b>  {icon} {_html_mod.escape(summary)}")
+                sp = next((i for i in us_data["indices"] if i["name"] == "S&P500"), None)
+                nd = next((i for i in us_data["indices"] if i["name"] == "나스닥"), None)
+                vx = next((i for i in us_data["indices"] if i["name"] == "VIX"), None)
+                parts = []
+                if sp: parts.append(f"S&P500 {sp['chg_pct']:+.2f}%")
+                if nd: parts.append(f"나스닥 {nd['chg_pct']:+.2f}%")
+                if vx: parts.append(f"VIX {vx['close']:.1f}")
+                if parts: lines.append("  " + "  |  ".join(parts))
+                lines.append("")
+
+            if not picks:
+                lines.append("⚠️ 관심종목 중 조건 충족 종목 없음")
+            else:
+                for rank, p in enumerate(picks[:10], 1):
+                    sign = "+" if p["chg_pct"] >= 0 else ""
+                    icon = "🟢" if p["score"] >= 50 else ("🟡" if p["score"] >= 20 else "⚪")
+                    lines.append(f"{icon} <b>#{rank} {_html_mod.escape(p['name'])} ({p['ticker']})</b>")
+                    lines.append(f"  현재가: <b>{p['close']:,.0f}원</b>  {sign}{p['chg_pct']:.2f}%")
+                    lines.append(f"  점수: {p['score']:+d}  |  거래량: {p['vol_ratio']:.1f}배  거래대금: {p['amount_ratio']:.1f}배")
+                    body_pct = int(p["body_ratio"] * 100)
+                    gap_str  = " | 갭업🔼" if p.get("gap_up") else ""
+                    lines.append(f"  장대양봉: {body_pct}%  연속: {p['consec_bullish']}일{gap_str}")
+                    if p.get("ma_summary"):
+                        lines.append(f"  이동평균: {_html_mod.escape(p['ma_summary'])}")
+                    rsi_str  = f"RSI {p['rsi']}" if p.get("rsi") else ""
+                    macd_str = _html_mod.escape(p["macd_sig"]) if p.get("macd_sig") else ""
+                    ind = "  |  ".join(filter(None, [rsi_str, macd_str]))
+                    if ind: lines.append(f"  {ind}")
+                    supply = p.get("supply", {})
+                    if supply:
+                        f_t = supply.get("foreign_trend", "")
+                        i_t = supply.get("inst_trend", "")
+                        f_icon = "🟢" if f_t == "순매수" else ("🔴" if f_t == "순매도" else "⚪")
+                        i_icon = "🟢" if i_t == "순매수" else ("🔴" if i_t == "순매도" else "⚪")
+                        lines.append(f"  외국인 {f_icon}{f_t}  기관 {i_icon}{i_t}")
+                    lines.append("")
+
+            bot.send_message(cid, "\n".join(lines))
+
+        except Exception as e:
+            bot.send_message(cid, f"❌ 매수 추천 분석 오류: {html.escape(str(e))}")
 
     # ── /chatid ──────────────────────────────────────────────────────────────
     @bot.message_handler(commands=["chatid"])
