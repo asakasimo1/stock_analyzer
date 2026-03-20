@@ -226,60 +226,98 @@ def check_signals(force: bool = False):
 
 # ── 스케줄 등록 & 실행 ────────────────────────────────────────────────────────
 
-def daily_pick():
-    """매일 08:50 실행 — 금일 매수 추천 (장 시작 10분 전)"""
-    log.info("🎯 매수 추천 스캔 시작")
-    try:
-        from modules import buy_signal as _buy, us_market as us_mod
-        from modules.telegram_bot import send_message as tg_send
+def _format_picks_msg(picks: list, us_data: dict, label: str) -> str:
+    """매수 추천 텔레그램 메시지 포맷 (공통)"""
+    import html as _html
+    from datetime import datetime as _dt
+    now   = _dt.now().strftime("%Y-%m-%d %H:%M")
+    lines = [f"🎯 <b>금일 매수 추천</b>  [{label}]", f"<i>{now}</i>", ""]
 
-        us_data  = us_mod.get_us_market()
-        stocks   = load_watchlist()
-        picks    = _buy.scan_watchlist(
-            watchlist=stocks,
-            us_market=us_data,
-            include_supply=True,
-        )
+    if us_data and us_data.get("indices"):
+        summary = us_data.get("summary", "")
+        icon = "📈" if "상승" in summary else ("📉" if "하락" in summary else "📊")
+        lines.append(f"🌍 <b>전일 미국 증시</b>  {icon} {_html.escape(summary)}")
+        sp = next((i for i in us_data["indices"] if i["name"] == "S&P500"), None)
+        nd = next((i for i in us_data["indices"] if i["name"] == "나스닥"), None)
+        vx = next((i for i in us_data["indices"] if i["name"] == "VIX"), None)
+        parts = []
+        if sp: parts.append(f"S&P500 {sp['chg_pct']:+.2f}%")
+        if nd: parts.append(f"나스닥 {nd['chg_pct']:+.2f}%")
+        if vx: parts.append(f"VIX {vx['close']:.1f}")
+        if parts: lines.append("  " + "  |  ".join(parts))
+        lines.append("")
 
-        import html as _html
-        from datetime import datetime as _dt
-        now   = _dt.now().strftime("%Y-%m-%d %H:%M")
-        lines = [f"🎯 <b>금일 매수 추천</b>  [관심종목]", f"<i>{now}</i>", ""]
-
-        if us_data and us_data.get("indices"):
-            summary = us_data.get("summary", "")
-            icon = "📈" if "상승" in summary else ("📉" if "하락" in summary else "📊")
-            lines.append(f"🌍 <b>전일 미국 증시</b>  {icon} {_html.escape(summary)}")
-            sp = next((i for i in us_data["indices"] if i["name"] == "S&P500"), None)
-            nd = next((i for i in us_data["indices"] if i["name"] == "나스닥"), None)
-            vx = next((i for i in us_data["indices"] if i["name"] == "VIX"), None)
-            parts = []
-            if sp: parts.append(f"S&P500 {sp['chg_pct']:+.2f}%")
-            if nd: parts.append(f"나스닥 {nd['chg_pct']:+.2f}%")
-            if vx: parts.append(f"VIX {vx['close']:.1f}")
-            if parts: lines.append("  " + "  |  ".join(parts))
+    if not picks:
+        lines.append("⚠️ 조건 충족 종목 없음")
+    else:
+        for rank, p in enumerate(picks, 1):
+            sign = "+" if p["chg_pct"] >= 0 else ""
+            icon = "🟢" if p["score"] >= 50 else ("🟡" if p["score"] >= 20 else "⚪")
+            # 관심종목 표시
+            wl_mark = " ⭐" if p.get("in_watchlist") else ""
+            lines.append(f"{icon} <b>#{rank} {_html.escape(p['name'])} ({p['ticker']})</b>{wl_mark}")
+            lines.append(f"  {p['close']:,.0f}원  {sign}{p['chg_pct']:.2f}%  점수:{p['score']:+d}")
+            lines.append(f"  거래량 {p['vol_ratio']:.1f}배  장대양봉 {int(p['body_ratio']*100)}%  연속 {p['consec_bullish']}일")
+            supply = p.get("supply", {})
+            if supply:
+                f_t = supply.get("foreign_trend", "")
+                i_t = supply.get("inst_trend", "")
+                f_icon = "🟢" if f_t == "순매수" else ("🔴" if f_t == "순매도" else "⚪")
+                i_icon = "🟢" if i_t == "순매수" else ("🔴" if i_t == "순매도" else "⚪")
+                lines.append(f"  외국인 {f_icon}{f_t}  기관 {i_icon}{i_t}")
             lines.append("")
 
-        if not picks:
-            lines.append("⚠️ 관심종목 중 조건 충족 종목 없음")
-        else:
-            for rank, p in enumerate(picks[:5], 1):
-                sign = "+" if p["chg_pct"] >= 0 else ""
-                icon = "🟢" if p["score"] >= 50 else ("🟡" if p["score"] >= 20 else "⚪")
-                lines.append(f"{icon} <b>#{rank} {_html.escape(p['name'])} ({p['ticker']})</b>")
-                lines.append(f"  {p['close']:,.0f}원  {sign}{p['chg_pct']:.2f}%  점수:{p['score']:+d}")
-                lines.append(f"  거래량 {p['vol_ratio']:.1f}배  장대양봉 {int(p['body_ratio']*100)}%  연속 {p['consec_bullish']}일")
-                supply = p.get("supply", {})
-                if supply:
-                    f_t = supply.get("foreign_trend", "")
-                    i_t = supply.get("inst_trend", "")
-                    f_icon = "🟢" if f_t == "순매수" else ("🔴" if f_t == "순매도" else "⚪")
-                    i_icon = "🟢" if i_t == "순매수" else ("🔴" if i_t == "순매도" else "⚪")
-                    lines.append(f"  외국인 {f_icon}{f_t}  기관 {i_icon}{i_t}")
-                lines.append("")
+    return "\n".join(lines)
 
-        _send("\n".join(lines))
-        log.info(f"✅ 매수 추천 전송 완료 ({len(picks)}종목)")
+
+def daily_pick():
+    """매일 08:50 실행 — 금일 매수 추천 (장 시작 10분 전)
+    KOSPI+KOSDAQ 전체 스캔 후 TOP 5 + 관심종목 결과 별도 전송
+    """
+    log.info("🎯 매수 추천 스캔 시작 (KOSPI+KOSDAQ 전체)")
+    try:
+        from modules import buy_signal as _buy, us_market as us_mod
+
+        us_data   = us_mod.get_us_market()
+        watchlist = load_watchlist()
+        wl_tickers = {s["ticker"] for s in watchlist}
+
+        # ── 전체 시장 스캔 ─────────────────────────────────────────
+        picks = _buy.scan(
+            us_market=us_data,
+            markets=["KOSPI", "KOSDAQ"],
+            top_volume=100,
+            min_amount_billion=30.0,
+            min_vol_ratio=1.5,
+            min_body_ratio=0.4,
+            include_supply=True,
+            top_n=5,
+            progress_cb=lambda msg: log.info(f"  {msg}"),
+        )
+
+        # 관심종목 여부 표시
+        for p in picks:
+            p["in_watchlist"] = p["ticker"] in wl_tickers
+
+        # ── 전체 TOP 5 전송 ────────────────────────────────────────
+        msg_market = _format_picks_msg(picks, us_data, "KOSPI+KOSDAQ TOP 5")
+        _send(msg_market)
+        log.info(f"✅ 전체 시장 추천 전송 ({len(picks)}종목)")
+
+        # ── 관심종목 스캔 별도 전송 ────────────────────────────────
+        if watchlist:
+            wl_picks = _buy.scan_watchlist(
+                watchlist=watchlist,
+                us_market=us_data,
+                include_supply=True,
+            )
+            for p in wl_picks:
+                p["in_watchlist"] = True
+
+            msg_wl = _format_picks_msg(wl_picks[:5], us_data, "관심종목")
+            _send(msg_wl)
+            log.info(f"✅ 관심종목 추천 전송 ({len(wl_picks)}종목)")
+
     except Exception as e:
         log.error(f"매수 추천 실패: {e}", exc_info=True)
 
