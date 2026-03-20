@@ -2,12 +2,14 @@
 매수 후보 스크리닝 모듈
 ──────────────────────────────────────────────────────────────────
 [스크리닝 로직]
-1. pykrx로 전일 KOSPI/KOSDAQ 전체 OHLCV 수집
-2. 거래대금(거래량×종가) 상위 N종목 1차 필터
-3. 양봉 조건 (종가 > 시가) 2차 필터
-4. 각 후보 종목의 20일 OHLCV로 기술적 분석
-5. 외국인/기관 수급 분석
-6. 종합 스코어링 → TOP N 추천
+1. 네이버 금융 거래량 상위 페이지에서 KOSPI/KOSDAQ 상위 티커 수집
+   (pykrx 전체 시장 API가 불안정하여 네이버 스크래핑으로 대체)
+2. 각 티커의 60일 OHLCV 다운로드 (pykrx 개별 종목 API — 안정적)
+3. 전일 양봉 조건 (종가 > 시가) 필터
+4. 거래량 급증 조건 (20일 평균 대비) 필터
+5. 장대양봉 조건 (몸통비율) 필터
+6. 기술적 분석 + 외국인/기관 수급 분석
+7. 종합 스코어링 → TOP N 추천
 
 [스코어 구성]  총합 기준 정렬
 - 기술적 점수     : technical.py score (−100~+100)
@@ -20,14 +22,14 @@
 - 기관 순매수     : +10
 - 미국 시황 반영  : +10 (상승) / −10 (하락)
 """
-import contextlib
-import io
 import sys
 import os
 from datetime import datetime, timedelta
 
 import pandas as pd
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
@@ -39,6 +41,13 @@ except ImportError:
 
 import config
 from modules import technical
+
+_NAVER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -74,18 +83,40 @@ def _safe_download(ticker: str, fromdate: str, todate: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _get_market_snapshot(market: str, date: str) -> pd.DataFrame:
+def _get_top_tickers_from_naver(market_code: int, pages: int = 2) -> list:
     """
-    특정 날짜의 시장 전체 스냅샷 반환
-    columns: 시가, 고가, 저가, 종가, 거래량, 거래대금 (원래 한글 컬럼)
+    네이버 금융 거래량 상위 페이지에서 티커 코드 리스트 반환.
+    market_code: 0=KOSPI, 1=KOSDAQ
+    pages: 조회 페이지 수 (1페이지 = 최대 50개)
     """
-    try:
-        df = krx.get_market_ohlcv(date, market=market)
-        if df is None or df.empty:
-            return pd.DataFrame()
-        return df
-    except Exception:
-        return pd.DataFrame()
+    tickers = []
+    for page in range(1, pages + 1):
+        url = (
+            f"https://finance.naver.com/sise/sise_quant.naver"
+            f"?sosok={market_code}&page={page}"
+        )
+        try:
+            r = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
+            soup = BeautifulSoup(r.text, "html.parser")
+            table = soup.select_one("table.type_2")
+            if not table:
+                break
+            for row in table.select("tr"):
+                cols = row.select("td")
+                if len(cols) < 6:
+                    continue
+                name_a = cols[1].select_one("a")
+                if not name_a:
+                    continue
+                href = name_a.get("href", "")
+                if "code=" not in href:
+                    continue
+                code = href.split("code=")[-1][:6]
+                if code and len(code) == 6 and code.isdigit():
+                    tickers.append(code)
+        except Exception:
+            break
+    return tickers
 
 
 def _get_stock_name(ticker: str) -> str:
@@ -242,6 +273,101 @@ def _calc_score(
 # 메인 스크리닝 함수
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _analyze_ticker(
+    ticker: str,
+    end_date: str,
+    start_date: str,
+    us_market: dict,
+    include_supply: bool,
+    min_vol_ratio: float,
+    min_body_ratio: bool,  # False = 필터 안 함 (관심종목 모드)
+) -> dict | None:
+    """단일 종목 OHLCV 다운로드 → 필터 → 분석 → dict 반환 (실패 시 None)"""
+    df = _safe_download(ticker, start_date, end_date)
+    if df.empty or len(df) < 10:
+        return None
+
+    last_row = df.iloc[-1]
+    prev_row = df.iloc[-2] if len(df) > 1 else last_row
+
+    close   = float(last_row["Close"])
+    prev_cl = float(prev_row["Close"])
+    chg_pct = (close - prev_cl) / prev_cl * 100 if prev_cl else 0
+
+    is_bullish = close > float(last_row["Open"])
+
+    # 거래량 비율
+    avg_vol  = float(df["Volume"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
+    last_vol = float(last_row["Volume"])
+    vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
+
+    # 거래대금 비율
+    df["Amount"] = df["Volume"] * df["Close"]
+    avg_amt  = float(df["Amount"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
+    last_amt = float(last_vol * close)
+    amount_ratio = last_amt / avg_amt if avg_amt > 0 else 1.0
+
+    br = _body_ratio(last_row)
+
+    # 필터 (full scan 모드일 때만 적용)
+    if min_body_ratio:
+        if not is_bullish:
+            return None
+        if vol_ratio < min_vol_ratio:
+            return None
+        if br < min_body_ratio:
+            return None
+
+    tech = technical.calculate(df)
+    if not tech:
+        return None
+
+    supply = {}
+    if include_supply:
+        sup_start = (datetime.today() - timedelta(days=5)).strftime("%Y%m%d")
+        supply = _get_supply_demand(ticker, sup_start, end_date)
+
+    consec = _consecutive_bullish(df)
+    gap_up = bool(last_row["Open"] > prev_row["Close"])
+    score  = _calc_score(df, tech, supply, us_market or {}, vol_ratio, amount_ratio)
+
+    signals    = tech.get("signals", {})
+    rsi_series = tech.get("rsi")
+    rsi_val    = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
+
+    ma_dict    = tech.get("ma", {})
+    ma_summary = []
+    for p in [5, 20, 60]:
+        if p in ma_dict and not ma_dict[p].empty:
+            ma_v = float(ma_dict[p].iloc[-1])
+            if not np.isnan(ma_v):
+                arrow = "↑" if close > ma_v else "↓"
+                ma_summary.append(f"MA{p}{arrow}")
+
+    name = _get_stock_name(ticker)
+
+    return {
+        "ticker":         ticker,
+        "name":           name,
+        "close":          close,
+        "chg_pct":        round(chg_pct, 2),
+        "score":          score,
+        "tech_score":     tech.get("score", 0),
+        "vol_ratio":      round(vol_ratio, 1),
+        "amount_ratio":   round(amount_ratio, 1),
+        "body_ratio":     round(br, 2),
+        "consec_bullish": consec,
+        "gap_up":         gap_up,
+        "is_bullish":     is_bullish,
+        "supply":         supply,
+        "rsi":            round(rsi_val, 1) if rsi_val else None,
+        "macd_sig":       signals.get("MACD", ""),
+        "bb_sig":         signals.get("볼린저밴드", ""),
+        "ma_summary":     " ".join(ma_summary),
+        "tech_signals":   signals,
+    }
+
+
 def scan(
     us_market: dict = None,
     markets: list = None,
@@ -254,26 +380,8 @@ def scan(
     progress_cb=None,
 ) -> list:
     """
-    거래량 터진 양봉 종목 스크리닝 후 매수 추천 리스트 반환.
-
-    Parameters
-    ----------
-    us_market       : get_us_market() 결과 dict (미국 시황 반영용)
-    markets         : ["KOSPI", "KOSDAQ"] 중 선택 (기본 둘 다)
-    top_volume      : 거래대금 상위 N종목만 후보로 사용
-    min_amount_billion : 최소 거래대금 기준 (억원)
-    min_vol_ratio   : 최소 거래량 비율 (20일 평균 대비)
-    min_body_ratio  : 양봉 몸통 최소 비율 (0.4 = 40%)
-    include_supply  : 외국인/기관 수급 분석 포함 여부 (속도↓)
-    top_n           : 최종 추천 종목 수
-    progress_cb     : 진행상황 콜백 fn(msg: str)
-
-    Returns
-    -------
-    list of dict:
-        ticker, name, close, chg_pct, score, vol_ratio, amount_ratio,
-        body_ratio, consec_bullish, gap_up, supply, tech_score,
-        tech_signals, rsi, macd_sig, bb_sig, ma_signals
+    KOSPI/KOSDAQ 거래량 상위 종목 스크리닝 후 매수 추천 반환.
+    네이버 금융 거래량 상위 페이지에서 티커를 수집하여 분석합니다.
     """
     if krx is None:
         return []
@@ -284,165 +392,54 @@ def scan(
         if progress_cb:
             progress_cb(msg)
 
-    # ── 1. 전일 시장 스냅샷 수집 ─────────────────────────────────────────────
-    trade_date = _last_trading_date(1)
-    _log(f"[1/5] 전일({trade_date}) 시장 스냅샷 수집 중...")
+    # ── 1. 네이버 금융에서 거래량 상위 티커 수집 ────────────────────────────
+    _log(f"[1/4] 네이버 금융 거래량 상위 티커 수집 중...")
 
-    frames = []
+    market_code_map = {"KOSPI": 0, "KOSDAQ": 1}
+    tickers = []
     for mkt in markets:
-        snap = _get_market_snapshot(mkt, trade_date)
-        if not snap.empty:
-            snap["_market"] = mkt
-            frames.append(snap)
+        code = market_code_map.get(mkt)
+        if code is None:
+            continue
+        mkt_tickers = _get_top_tickers_from_naver(code, pages=2)
+        _log(f"  {mkt}: {len(mkt_tickers)}개 수집")
+        tickers.extend(mkt_tickers)
 
-    if not frames:
-        _log("  ⚠ 시장 스냅샷 데이터 없음 (날짜 확인 필요)")
+    # 중복 제거 후 상위 top_volume개
+    seen = set()
+    unique_tickers = []
+    for t in tickers:
+        if t not in seen:
+            seen.add(t)
+            unique_tickers.append(t)
+    tickers = unique_tickers[:top_volume]
+
+    if not tickers:
+        _log("  ⚠ 티커 수집 실패 (네이버 금융 접속 확인 필요)")
         return []
 
-    snap_all = pd.concat(frames)
+    _log(f"  총 {len(tickers)}개 후보 티커 확보")
 
-    # ── 2. 거래대금 상위 필터 ────────────────────────────────────────────────
-    _log(f"[2/5] 거래대금 상위 {top_volume}종목 필터...")
-
-    # 컬럼 표준화
-    col_rename = {"시가": "Open", "고가": "High", "저가": "Low",
-                  "종가": "Close", "거래량": "Volume", "거래대금": "Amount"}
-    snap_all = snap_all.rename(columns=col_rename)
-
-    if "Amount" not in snap_all.columns:
-        # 거래대금 없으면 거래량 × 종가로 추정
-        if "Volume" in snap_all.columns and "Close" in snap_all.columns:
-            snap_all["Amount"] = snap_all["Volume"] * snap_all["Close"]
-        else:
-            _log("  ⚠ 거래대금 컬럼 없음")
-            return []
-
-    # 최소 거래대금 필터 (억원)
-    min_amount = min_amount_billion * 1_0000_0000
-    snap_all = snap_all[snap_all["Amount"] >= min_amount]
-
-    # 거래대금 상위 N
-    snap_top = snap_all.nlargest(top_volume, "Amount")
-
-    # ── 3. 양봉 조건 1차 필터 ────────────────────────────────────────────────
-    _log("[3/5] 양봉 조건 필터...")
-    if "Open" not in snap_top.columns or "Close" not in snap_top.columns:
-        _log("  ⚠ 시가/종가 컬럼 없음")
-        return []
-
-    snap_bullish = snap_top[snap_top["Close"] > snap_top["Open"]].copy()
-    _log(f"  양봉 후보: {len(snap_bullish)}종목 (전체 {len(snap_top)}종목 중)")
-
-    if snap_bullish.empty:
-        return []
-
-    # ── 4. 각 후보 종목 상세 분석 ────────────────────────────────────────────
-    _log(f"[4/5] 후보 {len(snap_bullish)}종목 상세 분석 중...")
-
-    # 20일 + 오늘 범위
+    # ── 2. 각 종목 OHLCV 다운로드 + 필터 + 분석 ────────────────────────────
     end_date   = _last_trading_date(0)
     start_date = (datetime.today() - timedelta(days=60)).strftime("%Y%m%d")
+    total      = len(tickers)
+
+    _log(f"[2/4] {total}개 종목 개별 분석 중 (양봉+거래량 조건 필터)...")
 
     results = []
-    total = len(snap_bullish)
+    for i, ticker in enumerate(tickers, 1):
+        if i % 10 == 0 or i == total:
+            _log(f"  진행: {i}/{total}")
+        result = _analyze_ticker(
+            ticker, end_date, start_date, us_market,
+            include_supply, min_vol_ratio, min_body_ratio,
+        )
+        if result:
+            results.append(result)
 
-    for i, (ticker, snap_row) in enumerate(snap_bullish.iterrows(), 1):
-        _log(f"  ({i}/{total}) {ticker} 분석 중...")
-
-        # 20일 히스토리 OHLCV
-        df = _safe_download(str(ticker), start_date, end_date)
-        if df.empty or len(df) < 10:
-            continue
-
-        last_row = df.iloc[-1]
-        prev_row = df.iloc[-2] if len(df) > 1 else last_row
-
-        close    = float(last_row["Close"])
-        prev_cl  = float(prev_row["Close"])
-        chg_pct  = (close - prev_cl) / prev_cl * 100 if prev_cl else 0
-
-        # 거래량 비율
-        avg_vol = float(df["Volume"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
-        last_vol = float(last_row["Volume"])
-        vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
-
-        # 거래대금 비율
-        df["Amount"] = df["Volume"] * df["Close"]
-        avg_amt = float(df["Amount"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
-        last_amt = float(last_row["Volume"] * close)
-        amount_ratio = last_amt / avg_amt if avg_amt > 0 else 1.0
-
-        # 필터: 거래량 비율 미달
-        if vol_ratio < min_vol_ratio:
-            continue
-
-        # 필터: 몸통 비율 미달
-        br = _body_ratio(last_row)
-        if br < min_body_ratio:
-            continue
-
-        # 기술적 분석
-        tech = technical.calculate(df)
-        if not tech:
-            continue
-
-        # 수급 분석
-        supply = {}
-        if include_supply:
-            sup_start = (datetime.today() - timedelta(days=5)).strftime("%Y%m%d")
-            supply = _get_supply_demand(str(ticker), sup_start, end_date)
-
-        # 연속 양봉
-        consec = _consecutive_bullish(df)
-
-        # 갭업
-        gap_up = bool(last_row["Open"] > prev_row["Close"])
-
-        # 종합 점수
-        score = _calc_score(df, tech, supply, us_market or {}, vol_ratio, amount_ratio)
-
-        # 신호 추출
-        signals   = tech.get("signals", {})
-        rsi_series = tech.get("rsi")
-        rsi_val   = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
-        macd_sig  = signals.get("MACD", "")
-        bb_sig    = signals.get("볼린저밴드", "")
-        ma_sigs   = signals.get("MA", [])
-
-        # MA 위치 요약
-        ma_dict = tech.get("ma", {})
-        ma_summary = []
-        for p in [5, 20, 60]:
-            if p in ma_dict and not ma_dict[p].empty:
-                ma_v = float(ma_dict[p].iloc[-1])
-                if not np.isnan(ma_v):
-                    arrow = "↑" if close > ma_v else "↓"
-                    ma_summary.append(f"MA{p}{arrow}")
-
-        name = _get_stock_name(str(ticker))
-
-        results.append({
-            "ticker":        str(ticker),
-            "name":          name,
-            "close":         close,
-            "chg_pct":       round(chg_pct, 2),
-            "score":         score,
-            "tech_score":    tech.get("score", 0),
-            "vol_ratio":     round(vol_ratio, 1),
-            "amount_ratio":  round(amount_ratio, 1),
-            "body_ratio":    round(br, 2),
-            "consec_bullish": consec,
-            "gap_up":        gap_up,
-            "supply":        supply,
-            "rsi":           round(rsi_val, 1) if rsi_val else None,
-            "macd_sig":      macd_sig,
-            "bb_sig":        bb_sig,
-            "ma_summary":    " ".join(ma_summary),
-            "tech_signals":  signals,
-        })
-
-    # ── 5. 스코어 정렬 → TOP N ───────────────────────────────────────────────
-    _log(f"[5/5] 스코어 정렬 → TOP {top_n} 선정...")
+    # ── 3. 스코어 정렬 → TOP N ──────────────────────────────────────────────
+    _log(f"[3/4] 필터 통과: {len(results)}개 → TOP {top_n} 선정...")
     results.sort(key=lambda x: x["score"], reverse=True)
     top = results[:top_n]
 
@@ -461,7 +458,7 @@ def scan_watchlist(
     progress_cb=None,
 ) -> list:
     """
-    watchlist 종목만 스크리닝 (전체 시장 스캔보다 빠름)
+    watchlist 종목만 스크리닝 (전체 시장 스캔보다 빠름, 필터 조건 없음)
     watchlist: [{"ticker": "005930", "name": "삼성전자"}, ...]
     """
     end_date   = _last_trading_date(0)
@@ -477,74 +474,15 @@ def scan_watchlist(
         name   = s.get("name", ticker)
         _log(f"  {name} ({ticker}) 분석 중...")
 
-        df = _safe_download(ticker, start_date, end_date)
-        if df.empty or len(df) < 10:
-            continue
-
-        last_row = df.iloc[-1]
-        prev_row = df.iloc[-2] if len(df) > 1 else last_row
-
-        close   = float(last_row["Close"])
-        prev_cl = float(prev_row["Close"])
-        chg_pct = (close - prev_cl) / prev_cl * 100 if prev_cl else 0
-
-        # 양봉 여부
-        is_bullish = close > float(last_row["Open"])
-
-        avg_vol  = float(df["Volume"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
-        last_vol = float(last_row["Volume"])
-        vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
-
-        df["Amount"] = df["Volume"] * df["Close"]
-        avg_amt  = float(df["Amount"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
-        last_amt = float(last_vol * close)
-        amount_ratio = last_amt / avg_amt if avg_amt > 0 else 1.0
-
-        br     = _body_ratio(last_row)
-        consec = _consecutive_bullish(df)
-        gap_up = bool(last_row["Open"] > prev_row["Close"])
-
-        tech   = technical.calculate(df)
-        supply = {}
-        if include_supply:
-            sup_start = (datetime.today() - timedelta(days=5)).strftime("%Y%m%d")
-            supply = _get_supply_demand(ticker, sup_start, end_date)
-
-        score = _calc_score(df, tech, supply, us_market or {}, vol_ratio, amount_ratio)
-
-        signals    = tech.get("signals", {}) if tech else {}
-        rsi_series = tech.get("rsi") if tech else None
-        rsi_val    = float(rsi_series.iloc[-1]) if rsi_series is not None and not rsi_series.empty else None
-
-        ma_dict  = tech.get("ma", {}) if tech else {}
-        ma_summary = []
-        for p in [5, 20, 60]:
-            if p in ma_dict and not ma_dict[p].empty:
-                ma_v = float(ma_dict[p].iloc[-1])
-                if not np.isnan(ma_v):
-                    arrow = "↑" if close > ma_v else "↓"
-                    ma_summary.append(f"MA{p}{arrow}")
-
-        results.append({
-            "ticker":         ticker,
-            "name":           name,
-            "close":          close,
-            "chg_pct":        round(chg_pct, 2),
-            "score":          score,
-            "tech_score":     tech.get("score", 0) if tech else 0,
-            "vol_ratio":      round(vol_ratio, 1),
-            "amount_ratio":   round(amount_ratio, 1),
-            "body_ratio":     round(br, 2),
-            "consec_bullish": consec,
-            "gap_up":         gap_up,
-            "is_bullish":     is_bullish,
-            "supply":         supply,
-            "rsi":            round(rsi_val, 1) if rsi_val else None,
-            "macd_sig":       signals.get("MACD", ""),
-            "bb_sig":         signals.get("볼린저밴드", ""),
-            "ma_summary":     " ".join(ma_summary),
-            "tech_signals":   signals,
-        })
+        # min_body_ratio=False → 양봉/거래량 필터 적용 안 함 (전체 표시)
+        result = _analyze_ticker(
+            ticker, end_date, start_date, us_market,
+            include_supply, min_vol_ratio=0, min_body_ratio=False,
+        )
+        if result:
+            # 관심종목에서 지정한 이름 우선 사용
+            result["name"] = name
+            results.append(result)
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
