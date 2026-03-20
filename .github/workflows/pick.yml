@@ -1,14 +1,14 @@
-name: Daily Briefing
+name: Daily Pick
 
 on:
   schedule:
-    - cron: '30 22 * * *'   # 07:30 KST (UTC+9) — 매일
-  workflow_dispatch:         # 수동 실행 버튼
+    - cron: '50 23 * * 1-5'  # 08:50 KST (UTC+9) — 평일만
+  workflow_dispatch:          # 수동 실행 버튼
 
 jobs:
-  briefing:
+  pick:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -20,12 +20,11 @@ jobs:
       - name: 패키지 설치
         run: pip install -r requirements.txt
 
-      - name: 일일 브리핑 실행
-        run: python run_briefing.py
+      - name: 매수 추천 실행
+        run: python run_pick.py
         env:
           PYTHONUTF8: "1"
           PYTHONIOENCODING: "utf-8"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DART_API_KEY: ${{ secrets.DART_API_KEY }}
           ALERT_CHANNEL: "telegram"
