@@ -3,7 +3,10 @@ name: Daily Pick
 on:
   schedule:
     - cron: '50 23 * * 1-5'  # 08:50 KST (UTC+9) — 평일만
-  workflow_dispatch:          # 수동 실행 버튼
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   pick:
@@ -19,6 +22,9 @@ jobs:
 
       - name: 패키지 설치
         run: pip install -r requirements.txt
+
+      - name: config.py 생성
+        run: cp config.example.py config.py
 
       - name: 매수 추천 실행
         run: python run_pick.py
