@@ -1043,8 +1043,10 @@ function renderCalendar(data) {
 let _calEvents = {};
 
 function showDayDetail(key) {
-  const evs = (_calEvents[key] || []).filter(e => !e.text.startsWith('⏰'));
-  if (!evs.length) return;
+  const allEvs = _calEvents[key] || [];
+  if (!allEvs.length) return;
+  const evs = allEvs.filter(e => !e.text.startsWith('⏰'));
+  const schedEvs = allEvs.filter(e => e.text.startsWith('⏰'));
 
   const [y, mo, d] = key.split('-');
   document.getElementById('day-modal-title').textContent =
@@ -1148,7 +1150,22 @@ function showDayDetail(key) {
     html += `</div>`;
   }
 
-  if (!html) html = `<div class="day-modal-ev" style="color:var(--muted);text-align:center">상세 데이터가 없습니다</div>`;
+  if (!html) {
+    if (schedEvs.length) {
+      html = `<div class="day-modal-section">
+        <div class="day-modal-section-title">📅 예정 스케줄</div>
+        ${schedEvs.map(e => `<div class="day-modal-ev" style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">⏰</span>
+          <div>
+            <div style="font-weight:600">${e.text.replace('⏰ ','')}</div>
+            <div style="font-size:12px;color:var(--muted)">GitHub Actions 실행 후 실제 데이터가 표시됩니다</div>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    } else {
+      html = `<div class="day-modal-ev" style="color:var(--muted);text-align:center">상세 데이터가 없습니다</div>`;
+    }
+  }
 
   document.getElementById('day-modal-body').innerHTML = html;
   document.getElementById('day-modal-overlay').classList.add('open');
