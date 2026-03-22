@@ -408,6 +408,120 @@
     .dash-grid { grid-template-columns: 1fr; padding: 16px; }
     .tab-nav { padding: 12px 16px 0; }
   }
+
+  /* ══════════════════════════════════════════════════
+     포트폴리오 탭
+  ══════════════════════════════════════════════════ */
+  .port-wrap {
+    max-width: 1400px; margin: 0 auto;
+    padding: 28px 40px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* 요약 카드 5개 */
+  .port-summary-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .port-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .port-kpi-label {
+    font-size: 11px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  }
+  .port-kpi-value {
+    font-size: 22px; font-weight: 700; color: var(--text);
+  }
+  .port-kpi-sub {
+    font-size: 12px; color: var(--muted);
+  }
+  .port-kpi-value.up  { color: var(--green); }
+  .port-kpi-value.dn  { color: var(--red); }
+  .port-kpi-value.pri { color: var(--primary); }
+
+  /* 차트 + 종목 2열 그리드 */
+  .port-mid-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .port-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .port-card-title {
+    font-size: 13px; font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .06em; text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  /* SVG 차트 */
+  .port-chart-svg { width: 100%; overflow: visible; }
+
+  /* 보유종목 요약 리스트 */
+  .port-holdings-list { display: flex; flex-direction: column; gap: 8px; }
+  .port-holding-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .port-holding-name { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .port-holding-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .port-holding-rate { font-size: 13px; font-weight: 700; }
+  .port-holding-eval { font-size: 12px; color: var(--muted); }
+
+  /* 테이블 공통 */
+  .port-table-wrap { overflow-x: auto; }
+  .port-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  .port-table th {
+    text-align: right;
+    padding: 10px 12px;
+    font-size: 11px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  .port-table th:first-child { text-align: left; }
+  .port-table td {
+    text-align: right;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .port-table td:first-child { text-align: left; font-weight: 600; }
+  .port-table tr:last-child td { border-bottom: none; }
+  .port-table tr:hover td { background: var(--bg); }
+  .port-table .up  { color: var(--green); font-weight: 700; }
+  .port-table .dn  { color: var(--red);   font-weight: 700; }
+  .port-table .neu { color: var(--muted); }
+
+  /* 로딩 / 에러 상태 */
+  .port-loading {
+    text-align: center; padding: 48px 20px;
+    color: var(--muted); font-size: 14px;
+  }
+
+  @media (max-width: 768px) {
+    .port-wrap { padding: 16px; }
+    .port-summary-row { grid-template-columns: repeat(2, 1fr); }
+    .port-mid-grid { grid-template-columns: 1fr; }
+    .port-kpi-value { font-size: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -433,6 +547,7 @@
 <!-- 탭 네비게이션 -->
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('dashboard')">📊 대시보드</button>
+  <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
   <button class="tab-btn" onclick="switchTab('trades')">📋 매매기록</button>
 </nav>
 
@@ -549,6 +664,80 @@
 
 </main>
 </div><!-- /tab-trades -->
+
+<!-- 포트폴리오 탭 -->
+<div id="tab-portfolio" class="tab-page">
+  <div class="port-wrap">
+
+    <!-- 상단 요약 카드 -->
+    <div class="port-summary-row" id="port-kpi-row">
+      <div class="port-loading" style="grid-column:1/-1">데이터를 불러오는 중...</div>
+    </div>
+
+    <!-- 차트 + 종목 요약 2열 -->
+    <div class="port-mid-grid">
+      <div class="port-card">
+        <div class="port-card-title">📅 월별 배당금 (세후)</div>
+        <svg id="port-chart" class="port-chart-svg" height="220"></svg>
+      </div>
+      <div class="port-card">
+        <div class="port-card-title">💼 보유 종목 요약</div>
+        <div class="port-holdings-list" id="port-holdings-list">
+          <div class="port-loading">로딩 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETF 보유 상세 -->
+    <div class="port-card">
+      <div class="port-card-title">📊 ETF 보유 현황</div>
+      <div class="port-table-wrap">
+        <table class="port-table" id="port-etf-table">
+          <thead>
+            <tr>
+              <th>종목명</th>
+              <th>수량</th>
+              <th>현재가</th>
+              <th>수익률</th>
+              <th>수익금</th>
+              <th>배당합계</th>
+              <th>평가금액</th>
+            </tr>
+          </thead>
+          <tbody id="port-etf-tbody">
+            <tr><td colspan="7" class="port-loading">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 개별주 보유 상세 -->
+    <div class="port-card">
+      <div class="port-card-title">📌 개별주 보유 현황</div>
+      <div class="port-table-wrap">
+        <table class="port-table" id="port-stock-table">
+          <thead>
+            <tr>
+              <th>종목명</th>
+              <th>수량</th>
+              <th>현재가</th>
+              <th>수익률</th>
+              <th>수익금</th>
+              <th>평가금액</th>
+            </tr>
+          </thead>
+          <tbody id="port-stock-tbody">
+            <tr><td colspan="6" class="port-loading">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 데이터 갱신 안내 -->
+    <div style="text-align:right;font-size:11px;color:var(--muted)" id="port-updated-at"></div>
+
+  </div>
+</div><!-- /tab-portfolio -->
 
 <!-- 대시보드 탭 -->
 <div id="tab-dashboard" class="tab-page active">
@@ -761,6 +950,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'dashboard') initDashboard();
+  if (name === 'portfolio') initPortfolio();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1194,6 +1384,372 @@ function closeModal(evt) {
   if (evt && evt.target !== document.getElementById('day-modal-overlay')) return;
   document.getElementById('day-modal-overlay').classList.remove('open');
 }
+// ══════════════════════════════════════════════════════════
+// 포트폴리오 대시보드
+// ══════════════════════════════════════════════════════════
+const PORTFOLIO_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F2DeIKHRdaD4frxFWwr76SywV5G_bXQAbxjYylXN4O4/gviz/tq?tqx=out:csv';
+let _portData = null;
+
+// ── CSV 파싱 ───────────────────────────────────────────────
+function parsePortfolioCsv(csvText) {
+  // 줄 단위로 분리
+  const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  // CSV 한 줄을 셀 배열로 파싱 (큰따옴표 처리)
+  function parseLine(line) {
+    const cells = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        cells.push(cur.trim()); cur = '';
+      } else { cur += c; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+
+  // 숫자 변환 헬퍼
+  function toNum(s) {
+    if (!s) return 0;
+    return parseFloat(String(s).replace(/[₩,\s]/g, '').replace('−','-')) || 0;
+  }
+  function toPct(s) {
+    if (!s) return 0;
+    return parseFloat(String(s).replace('%','').trim()) || 0;
+  }
+
+  const MONTH_LABELS = ['4월','5월','6월','7월','8월','9월','10월','11월','12월','1월','2월','3월'];
+  const dividends = []; // { label, gross, net, invest }
+  const etfs = [];      // { name, qty, price, rate, profit, divSum, eval }
+  const stocks = [];    // { name, qty, price, rate, profit, eval }
+  let summary = {};
+
+  let section = null; // 'div' | 'etf' | 'stock' | 'summary'
+  let divIdx = 0;
+
+  for (let li = 0; li < lines.length; li++) {
+    const cells = parseLine(lines[li]);
+    const first = cells[0] || '';
+
+    // 섹션 감지
+    if (first.includes('배당금 계산') || first.includes('배당금')) {
+      section = 'div'; continue;
+    }
+    if (first.includes('수익률 계산') || first.includes('ETF') && cells[1] && cells[1].includes('수량')) {
+      section = 'etf'; continue;
+    }
+    if (first.includes('개별주') || first.includes('개별 주식')) {
+      section = 'stock'; continue;
+    }
+    if (first.includes('총') || first.includes('합계') || first.includes('투자원금')) {
+      section = 'summary';
+    }
+
+    if (section === 'div') {
+      // 헤더 행 건너뜀
+      if (first === '월' || first === '' || first.startsWith('//')) continue;
+      // 합계 행
+      if (first === '계' || first.includes('합계')) continue;
+      // 실제 데이터 행: 첫 셀이 월 레이블이거나 숫자가 2개 이상 있을 때
+      const gross = toNum(cells[1]);
+      const net   = toNum(cells[2]);
+      const inv   = toNum(cells[3]);
+      if ((gross > 0 || net > 0) && divIdx < 12) {
+        dividends.push({
+          label: MONTH_LABELS[divIdx] || cells[0],
+          gross, net, invest: inv
+        });
+        divIdx++;
+      }
+    }
+
+    if (section === 'etf') {
+      if (first === '' || first === '종목명' || first.startsWith('//')) continue;
+      if (first === '계' || first.includes('합계')) continue;
+      // 개별주 섹션 시작 감지
+      if (first.includes('개별주') || first.includes('개별 주식')) { section = 'stock'; continue; }
+      const qty   = toNum(cells[1]);
+      const price = toNum(cells[2]);
+      if (first && (qty > 0 || price > 0)) {
+        etfs.push({
+          name:   first,
+          qty:    qty,
+          price:  price,
+          rate:   toPct(cells[3]),
+          profit: toNum(cells[4]),
+          divSum: toNum(cells[5]),
+          eval:   toNum(cells[6])
+        });
+      }
+    }
+
+    if (section === 'stock') {
+      if (first === '' || first === '종목명' || first.startsWith('//')) continue;
+      if (first === '계' || first.includes('합계')) { section = 'summary'; continue; }
+      const qty   = toNum(cells[1]);
+      const price = toNum(cells[2]);
+      if (first && (qty > 0 || price > 0)) {
+        stocks.push({
+          name:   first,
+          qty:    qty,
+          price:  price,
+          rate:   toPct(cells[3]),
+          profit: toNum(cells[4]),
+          eval:   toNum(cells[5])
+        });
+      }
+    }
+
+    if (section === 'summary') {
+      // 키-값 쌍이 있는 행에서 요약 수집
+      const key = first.replace(/\s/g,'');
+      const val = toNum(cells[1]) || toNum(cells[2]) || toNum(cells[3]);
+      if (key) summary[key] = val;
+      // 수익률은 % 형식일 수 있음
+      if (key.includes('수익률')) {
+        summary[key] = toPct(cells[1]) || toPct(cells[2]) || toPct(cells[3]);
+      }
+    }
+  }
+
+  return { dividends, etfs, stocks, summary };
+}
+
+// ── fetch + 파싱 ─────────────────────────────────────────
+async function initPortfolio() {
+  if (_portData) { renderPortfolio(_portData); return; }
+
+  // 로딩 상태
+  document.getElementById('port-kpi-row').innerHTML =
+    '<div class="port-loading" style="grid-column:1/-1">📡 스프레드시트에서 데이터를 불러오는 중...</div>';
+
+  try {
+    const res = await fetch(PORTFOLIO_SHEET_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csv = await res.text();
+    _portData = parsePortfolioCsv(csv);
+    _portData._fetchedAt = new Date().toLocaleString('ko-KR');
+    renderPortfolio(_portData);
+  } catch(e) {
+    document.getElementById('port-kpi-row').innerHTML =
+      `<div class="port-loading" style="grid-column:1/-1;color:var(--red)">
+        ⚠️ 데이터 로드 실패: ${e.message}<br>
+        <small style="color:var(--muted)">스프레드시트 공개 설정을 확인해주세요.</small>
+      </div>`;
+    console.error('포트폴리오 로드 실패:', e);
+  }
+}
+
+// ── 렌더링 진입점 ─────────────────────────────────────────
+function renderPortfolio(data) {
+  const { dividends, etfs, stocks, summary, _fetchedAt } = data;
+
+  // 합산 계산
+  const totalEval  = [...etfs, ...stocks].reduce((s, h) => s + (h.eval || 0), 0);
+  const etfEval    = etfs.reduce((s, h) => s + (h.eval || 0), 0);
+  const stockEval  = stocks.reduce((s, h) => s + (h.eval || 0), 0);
+  const totalProfit = [...etfs, ...stocks].reduce((s, h) => s + (h.profit || 0), 0);
+  const etfDivTotal = etfs.reduce((s, h) => s + (h.divSum || 0), 0);
+  const divNetTotal = dividends.reduce((s, d) => s + (d.net || 0), 0);
+
+  // 투자원금: summary에서 가져오거나 추정
+  let principal = 0;
+  for (const k of Object.keys(summary)) {
+    if (k.includes('투자원금') || k.includes('원금')) { principal = summary[k]; break; }
+  }
+  if (!principal) {
+    // dividends의 invest 합계
+    principal = dividends.reduce((s, d) => s + (d.invest || 0), 0);
+  }
+
+  // 전체 수익률
+  let totalRate = 0;
+  for (const k of Object.keys(summary)) {
+    if (k.includes('수익률')) { totalRate = summary[k]; break; }
+  }
+  if (!totalRate && principal > 0) {
+    totalRate = ((totalEval + divNetTotal - principal) / principal) * 100;
+  }
+
+  renderPortKpi({ totalEval, principal, totalProfit, totalRate, divNetTotal });
+  renderPortChart(dividends);
+  renderPortHoldingsList(etfs, stocks);
+  renderPortEtfTable(etfs);
+  renderPortStockTable(stocks);
+
+  if (_fetchedAt) {
+    document.getElementById('port-updated-at').textContent = '마지막 갱신: ' + _fetchedAt;
+  }
+}
+
+// ── KPI 카드 ──────────────────────────────────────────────
+function renderPortKpi({ totalEval, principal, totalProfit, totalRate, divNetTotal }) {
+  const fmt = n => Math.abs(n) >= 1e8
+    ? (n/1e8).toFixed(2) + '억'
+    : Math.abs(n) >= 1e4
+      ? Math.round(n/1e4).toLocaleString() + '만'
+      : n.toLocaleString();
+
+  const kpis = [
+    { label: '총 평가금액', value: fmt(totalEval) + '원', cls: 'pri', sub: '' },
+    { label: '투자 원금',   value: fmt(principal) + '원',  cls: '',    sub: '' },
+    { label: '평가 손익',
+      value: (totalProfit >= 0 ? '+' : '') + fmt(totalProfit) + '원',
+      cls: totalProfit >= 0 ? 'up' : 'dn', sub: '' },
+    { label: '전체 수익률',
+      value: (totalRate >= 0 ? '+' : '') + totalRate.toFixed(2) + '%',
+      cls: totalRate >= 0 ? 'up' : 'dn', sub: '' },
+    { label: '누적 배당금(세후)',
+      value: fmt(divNetTotal) + '원',
+      cls: 'up', sub: '재투자 포함' },
+  ];
+
+  document.getElementById('port-kpi-row').innerHTML = kpis.map(k => `
+    <div class="port-kpi">
+      <div class="port-kpi-label">${k.label}</div>
+      <div class="port-kpi-value ${k.cls}">${k.value}</div>
+      ${k.sub ? `<div class="port-kpi-sub">${k.sub}</div>` : ''}
+    </div>`).join('');
+}
+
+// ── SVG 막대 차트 ─────────────────────────────────────────
+function renderPortChart(dividends) {
+  const svg = document.getElementById('port-chart');
+  if (!dividends.length) {
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9EA3B0" font-size="13">배당 데이터 없음</text>';
+    return;
+  }
+
+  const W = 700, H = 200;
+  const PAD = { top: 30, right: 10, bottom: 36, left: 10 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+  const maxVal = Math.max(...dividends.map(d => d.net || 0), 1);
+
+  const n = dividends.length;
+  const barW = Math.floor(chartW / n * 0.55);
+  const gap  = Math.floor(chartW / n);
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  let bars = '', labels = '', values = '';
+
+  dividends.forEach((d, i) => {
+    const x = PAD.left + i * gap + (gap - barW) / 2;
+    const barH = Math.max(2, Math.round((d.net / maxVal) * chartH));
+    const y = PAD.top + chartH - barH;
+    const valLabel = d.net >= 10000
+      ? (d.net / 10000).toFixed(1) + '만'
+      : d.net.toLocaleString();
+
+    bars += `<rect x="${x}" y="${y}" width="${barW}" height="${barH}"
+      rx="4" fill="#3D5AFE" opacity="0.85"/>`;
+
+    values += `<text x="${x + barW/2}" y="${y - 5}"
+      text-anchor="middle" font-size="9" fill="#3D5AFE" font-weight="600">${valLabel}</text>`;
+
+    labels += `<text x="${x + barW/2}" y="${H - 6}"
+      text-anchor="middle" font-size="10" fill="#9EA3B0">${d.label}</text>`;
+  });
+
+  svg.innerHTML = `
+    <g>
+      <line x1="${PAD.left}" y1="${PAD.top + chartH}" x2="${W - PAD.right}" y2="${PAD.top + chartH}"
+        stroke="#EBEBEB" stroke-width="1"/>
+      ${bars}${values}${labels}
+    </g>`;
+}
+
+// ── 보유 종목 요약 리스트 ──────────────────────────────────
+function renderPortHoldingsList(etfs, stocks) {
+  const all = [
+    ...etfs.map(h => ({ ...h, type: 'ETF' })),
+    ...stocks.map(h => ({ ...h, type: '주식' }))
+  ].sort((a, b) => (b.eval || 0) - (a.eval || 0));
+
+  const el = document.getElementById('port-holdings-list');
+  if (!all.length) { el.innerHTML = '<div class="port-loading">보유 종목 없음</div>'; return; }
+
+  el.innerHTML = all.map(h => {
+    const cls   = h.rate >= 0 ? 'up' : 'dn';
+    const arrow = h.rate >= 0 ? '▲' : '▼';
+    const evalFmt = h.eval
+      ? (h.eval >= 1e8 ? (h.eval/1e8).toFixed(2)+'억' : Math.round(h.eval/1e4).toLocaleString()+'만')
+      : '-';
+    return `
+      <div class="port-holding-item">
+        <span class="port-holding-name">${h.name}</span>
+        <div class="port-holding-right">
+          <span class="port-holding-rate ${cls}">${arrow}${Math.abs(h.rate).toFixed(2)}%</span>
+          <span class="port-holding-eval">${evalFmt}원</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── ETF 테이블 ────────────────────────────────────────────
+function renderPortEtfTable(etfs) {
+  const tbody = document.getElementById('port-etf-tbody');
+  if (!etfs.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">ETF 데이터 없음</td></tr>'; return; }
+
+  const fmt  = n => n ? n.toLocaleString() : '-';
+  const pct  = (r, p) => {
+    const cls = p >= 0 ? 'up' : 'dn';
+    const ar  = p >= 0 ? '▲' : '▼';
+    return `<span class="${cls}">${ar}${Math.abs(r).toFixed(2)}%</span>`;
+  };
+  const money = (n, showSign = true) => {
+    if (!n && n !== 0) return '-';
+    const cls = n > 0 ? 'up' : n < 0 ? 'dn' : 'neu';
+    const sign = showSign && n > 0 ? '+' : '';
+    return `<span class="${cls}">${sign}${n.toLocaleString()}</span>`;
+  };
+
+  tbody.innerHTML = etfs.map(h => `
+    <tr>
+      <td>${h.name}</td>
+      <td>${fmt(h.qty)}</td>
+      <td>${fmt(h.price)}</td>
+      <td>${pct(h.rate, h.profit)}</td>
+      <td>${money(h.profit)}</td>
+      <td>${money(h.divSum, false)}</td>
+      <td>${fmt(h.eval)}</td>
+    </tr>`).join('');
+}
+
+// ── 개별주 테이블 ─────────────────────────────────────────
+function renderPortStockTable(stocks) {
+  const tbody = document.getElementById('port-stock-tbody');
+  if (!stocks.length) { tbody.innerHTML = '<tr><td colspan="6" class="port-loading">개별주 데이터 없음</td></tr>'; return; }
+
+  const fmt  = n => n ? n.toLocaleString() : '-';
+  const pct  = (r, p) => {
+    const cls = p >= 0 ? 'up' : 'dn';
+    const ar  = p >= 0 ? '▲' : '▼';
+    return `<span class="${cls}">${ar}${Math.abs(r).toFixed(2)}%</span>`;
+  };
+  const money = (n) => {
+    if (!n && n !== 0) return '-';
+    const cls = n > 0 ? 'up' : n < 0 ? 'dn' : 'neu';
+    const sign = n > 0 ? '+' : '';
+    return `<span class="${cls}">${sign}${n.toLocaleString()}</span>`;
+  };
+
+  tbody.innerHTML = stocks.map(h => `
+    <tr>
+      <td>${h.name}</td>
+      <td>${fmt(h.qty)}</td>
+      <td>${fmt(h.price)}</td>
+      <td>${pct(h.rate, h.profit)}</td>
+      <td>${money(h.profit)}</td>
+      <td>${fmt(h.eval)}</td>
+    </tr>`).join('');
+}
+
 // 페이지 로드 시 대시보드 즉시 초기화 (모든 변수/함수 선언 완료 후)
 initDashboard();
 </script>
