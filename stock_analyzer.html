@@ -345,6 +345,38 @@
   .cal-event.ipo-sub-done { background: #a7f3d0; color: #064e3b; font-weight: 700; }
   .cal-event.ipo-allot  { background: #fef9c3; color: #854d0e; font-weight: 700; border: 1px solid #fbbf24; }
 
+  /* ── 날짜 상세 모달 ── */
+  .day-modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+    z-index:1000; align-items:center; justify-content:center;
+  }
+  .day-modal-overlay.open { display:flex; }
+  .day-modal {
+    background:var(--surface); border-radius:16px; padding:28px;
+    max-width:540px; width:92%; max-height:82vh; overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+  }
+  .day-modal-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .day-modal-title { font-size:17px; font-weight:700; }
+  .day-modal-close {
+    background:none; border:none; cursor:pointer;
+    font-size:20px; color:var(--muted); padding:4px 8px; border-radius:8px;
+  }
+  .day-modal-close:hover { background:var(--bg); }
+  .day-modal-section { margin-bottom:16px; }
+  .day-modal-section-title {
+    font-size:12px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;
+    padding-bottom:6px; border-bottom:1px solid var(--border);
+  }
+  .day-modal-ev {
+    background:var(--bg); border-radius:10px; padding:12px 14px;
+    margin-bottom:8px; font-size:13px; line-height:1.7;
+  }
+
   /* ── 결과 목록 ── */
   .result-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
   .result-item {
@@ -874,15 +906,18 @@ function calMove(dir) {
 }
 
 function calcAllotDate(dateSubEnd) {
-  // 청약 마감 + 2 영업일
+  // 청약 마감 + 2 영업일 (로컬 시간 기준으로 파싱)
   try {
-    let d = new Date(dateSubEnd);
+    let d = new Date(dateSubEnd + 'T00:00:00');
     let bdays = 0;
     while (bdays < 2) {
       d.setDate(d.getDate() + 1);
       if (d.getDay() !== 0 && d.getDay() !== 6) bdays++;
     }
-    return d.toISOString().slice(0, 10);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth()+1).padStart(2,'0');
+    const dy = String(d.getDate()).padStart(2,'0');
+    return `${y}-${mo}-${dy}`;
   } catch(_) { return ''; }
 }
 
@@ -896,16 +931,17 @@ function renderCalendar(data) {
 
   // 이벤트 인덱스 (날짜 → 배열)
   const events = {};
-  const add = (date, type, text) => {
+  const add = (date, type, text, detail = null) => {
+    if (!date) return;
     if (!events[date]) events[date] = [];
-    events[date].push({ type, text });
+    events[date].push({ type, text, detail });
   };
 
-  (data.briefing || []).forEach(b => add(b.date, 'briefing', `📊 브리핑 (${(b.stocks||[]).length}종목)`));
-  (data.picks    || []).forEach(p => add(p.date, 'pick',     `🎯 추천 (${(p.picks||[]).length}종목)`));
-  (data.signals  || []).forEach(s => add(s.date, 'signal',   `📡 ${s.name} ${s.alerts?.[0]?.substring(0,10)||''}`));
+  (data.briefing || []).forEach(b => add(b.date, 'briefing', `📊 브리핑 (${(b.stocks||[]).length}종목)`, b));
+  (data.picks    || []).forEach(p => add(p.date, 'pick',     `🎯 추천 (${(p.picks||[]).length}종목)`, p));
+  (data.signals  || []).forEach(s => add(s.date, 'signal',   `📡 ${s.name} ${s.alerts?.[0]?.substring(0,10)||''}`, s));
 
-  // 공모주 청약일 / 상장일
+  // 공모주 청약일 / 상장일 (로컬 시간 기준 날짜 파싱)
   (data.ipo || []).forEach(ipo => {
     const name = ipo.name || '';
     const subscribed = ipo.subscribed;
@@ -913,14 +949,17 @@ function renderCalendar(data) {
 
     // 청약 기간 (시작~마감 전체 날짜에 표시)
     if (ipo.date_sub_start && ipo.date_sub_end) {
-      let cur = new Date(ipo.date_sub_start);
-      const end = new Date(ipo.date_sub_end);
+      let cur = new Date(ipo.date_sub_start + 'T00:00:00');
+      const end = new Date(ipo.date_sub_end + 'T00:00:00');
       while (cur <= end) {
-        const key = cur.toISOString().slice(0, 10);
+        const cy = cur.getFullYear();
+        const cm = String(cur.getMonth()+1).padStart(2,'0');
+        const cd = String(cur.getDate()).padStart(2,'0');
+        const key = `${cy}-${cm}-${cd}`;
         if (subscribed) {
-          add(key, 'ipo-sub-done', `✅ ${name} 청약완료`);
+          add(key, 'ipo-sub-done', `✅ ${name} 청약완료`, ipo);
         } else if (!['상장완료','청약포기'].includes(status)) {
-          add(key, 'ipo-sub', `🏢 ${name} 청약`);
+          add(key, 'ipo-sub', `🏢 ${name} 청약`, ipo);
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -931,16 +970,16 @@ function renderCalendar(data) {
       const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
       const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
       if (allotDate && !hasAlloc && status !== '청약포기') {
-        add(allotDate, 'ipo-allot', `📬 ${name} 배정확인`);
+        add(allotDate, 'ipo-allot', `📬 ${name} 배정확인`, ipo);
       }
     }
 
     // 상장일 — 배정 확정된 항목만 강조
     const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
     if (ipo.date_list && subscribed && hasAlloc) {
-      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`);
-    } else if (ipo.date_list && !subscribed && ['상장예정','상장완료'].includes(status)) {
-      add(ipo.date_list, 'ipo-list', `📋 ${name} 상장`);
+      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`, ipo);
+    } else if (ipo.date_list && !subscribed && !['청약포기'].includes(status)) {
+      add(ipo.date_list, 'ipo-list', `📋 ${name} 상장`, ipo);
     }
   });
 
@@ -952,10 +991,13 @@ function renderCalendar(data) {
     const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     if (dow >= 1 && dow <= 5) { // 평일
       if (!events[key]) events[key] = [];
-      events[key].unshift({ type: 'briefing', text: '⏰ 07:30 브리핑' });
-      events[key].push({ type: 'pick', text: '⏰ 08:50 매수추천' });
+      events[key].unshift({ type: 'briefing', text: '⏰ 07:30 브리핑', detail: null });
+      events[key].push({ type: 'pick', text: '⏰ 08:50 매수추천', detail: null });
     }
   }
+
+  // 전역 이벤트 저장 (클릭 상세보기용)
+  _calEvents = events;
 
   // 그리기
   const grid = document.getElementById('cal-grid');
@@ -978,7 +1020,7 @@ function renderCalendar(data) {
     const evs = events[key] || [];
     const hasReal = evs.some(e => !e.text.startsWith('⏰'));
 
-    html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}">
+    html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}" onclick="showDayDetail('${key}')">
       <div class="cal-day${dow===0?' sun':dow===6?' sat':''}">${d}</div>
       ${evs.slice(0,3).map(e => `<div class="cal-event ${e.type}">${e.text}</div>`).join('')}
       ${evs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${evs.length-3}개</div>` : ''}
@@ -994,6 +1036,139 @@ function renderCalendar(data) {
 
   grid.innerHTML = html;
 }
+
+// ══════════════════════════════════════════════════════════
+// 날짜 상세 모달
+// ══════════════════════════════════════════════════════════
+let _calEvents = {};
+
+function showDayDetail(key) {
+  const evs = (_calEvents[key] || []).filter(e => !e.text.startsWith('⏰'));
+  if (!evs.length) return;
+
+  const [y, mo, d] = key.split('-');
+  document.getElementById('day-modal-title').textContent =
+    `${y}년 ${parseInt(mo)}월 ${parseInt(d)}일`;
+
+  let html = '';
+
+  // 브리핑
+  const briefings = evs.filter(e => e.type === 'briefing' && e.detail);
+  if (briefings.length) {
+    html += `<div class="day-modal-section"><div class="day-modal-section-title">📊 브리핑</div>`;
+    briefings.forEach(ev => {
+      const b = ev.detail;
+      html += `<div class="day-modal-ev">`;
+      (b.stocks || []).forEach(s => {
+        const cc = (s.chg_pct||0) >= 0 ? 'var(--green)' : 'var(--red)';
+        const ar = (s.chg_pct||0) >= 0 ? '▲' : '▼';
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;
+          padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="font-weight:600">${s.name||s.code||''}</span>
+          <span>${(s.price||0).toLocaleString()}원
+            <span style="color:${cc}">${ar}${Math.abs(s.chg_pct||0).toFixed(2)}%</span>
+          </span></div>`;
+        (s.alerts||[]).forEach(a => {
+          html += `<div style="font-size:11px;color:var(--muted);padding-left:8px">• ${a}</div>`;
+        });
+      });
+      if (!(b.stocks||[]).length) html += `<div style="color:var(--muted)">종목 데이터 없음</div>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 매수 추천
+  const picks = evs.filter(e => e.type === 'pick' && e.detail);
+  if (picks.length) {
+    html += `<div class="day-modal-section"><div class="day-modal-section-title">🎯 매수 추천</div>`;
+    picks.forEach(ev => {
+      const p = ev.detail;
+      html += `<div class="day-modal-ev">`;
+      (p.picks || []).forEach(s => {
+        html += `<div style="display:flex;align-items:flex-start;justify-content:space-between;
+          padding:4px 0;border-bottom:1px solid var(--border);gap:8px">
+          <span style="font-weight:600;flex-shrink:0">${s.name||s.code||''}</span>
+          <span style="font-size:12px;color:var(--muted);text-align:right">${s.reason||''}</span>
+        </div>`;
+      });
+      if (!(p.picks||[]).length) html += `<div style="color:var(--muted)">추천 데이터 없음</div>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 신호 알림
+  const signals = evs.filter(e => e.type === 'signal' && e.detail);
+  if (signals.length) {
+    html += `<div class="day-modal-section"><div class="day-modal-section-title">📡 신호 알림</div>`;
+    signals.forEach(ev => {
+      const s = ev.detail;
+      const cc = (s.chg_pct||0) >= 0 ? 'var(--green)' : 'var(--red)';
+      const ar = (s.chg_pct||0) >= 0 ? '▲' : '▼';
+      html += `<div class="day-modal-ev">
+        <div style="font-weight:600;margin-bottom:4px">${s.name||''}</div>
+        ${(s.alerts||[]).map(a=>`<div style="font-size:12px">• ${a}</div>`).join('')}
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          ${(s.price||0).toLocaleString()}원
+          <span style="color:${cc}">${ar}${Math.abs(s.chg_pct||0).toFixed(2)}%</span>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 공모주
+  const ipoEvs = evs.filter(e => e.type.startsWith('ipo') && e.detail);
+  if (ipoEvs.length) {
+    html += `<div class="day-modal-section"><div class="day-modal-section-title">🏢 공모주</div>`;
+    const typeLabel = {
+      'ipo-sub':'청약기간','ipo-sub-done':'청약완료',
+      'ipo-allot':'배정확인일','ipo-list':'상장일'
+    };
+    ipoEvs.forEach(ev => {
+      const ipo = ev.detail;
+      html += `<div class="day-modal-ev">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-weight:700">${ipo.name||''}</span>
+          <span class="cal-event ${ev.type}" style="display:inline-block">${typeLabel[ev.type]||ev.type}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          공모가: <strong>${(ipo.price_ipo||0).toLocaleString()}원</strong>
+          ${ipo.date_sub_start ? ` · 청약: ${ipo.date_sub_start}~${ipo.date_sub_end||''}` : ''}
+          ${ipo.date_list ? ` · 상장: ${ipo.date_list}` : ''}
+          ${ipo.broker ? ` · ${ipo.broker}` : ''}
+        </div>
+        ${(ipo.shares_alloc||0) > 0
+          ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">배정: ${ipo.shares_alloc}주</div>` : ''}
+        ${ipo.score !== undefined
+          ? `<div style="font-size:12px;margin-top:4px">추천점수: <strong>${ipo.score}점</strong></div>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (!html) html = `<div class="day-modal-ev" style="color:var(--muted);text-align:center">상세 데이터가 없습니다</div>`;
+
+  document.getElementById('day-modal-body').innerHTML = html;
+  document.getElementById('day-modal-overlay').classList.add('open');
+}
+
+function closeModal(evt) {
+  if (evt && evt.target !== document.getElementById('day-modal-overlay')) return;
+  document.getElementById('day-modal-overlay').classList.remove('open');
+}
 </script>
+
+<!-- 날짜 상세 모달 -->
+<div class="day-modal-overlay" id="day-modal-overlay" onclick="closeModal(event)">
+  <div class="day-modal" id="day-modal">
+    <div class="day-modal-header">
+      <div class="day-modal-title" id="day-modal-title"></div>
+      <button class="day-modal-close" onclick="document.getElementById('day-modal-overlay').classList.remove('open')">✕</button>
+    </div>
+    <div id="day-modal-body"></div>
+  </div>
+</div>
 </body>
 </html>
