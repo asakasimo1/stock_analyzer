@@ -1,0 +1,34 @@
+name: IPO 배정 결과 알림
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 매일 10:00 KST (UTC+9 = UTC 01:00)
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  allot_check:
+    name: 배정일 체크 & 텔레그램 알림
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 패키지 설치
+        run: pip install requests
+
+      - name: 배정일 체크 실행
+        run: python run_allot_check.py
+        env:
+          PYTHONUTF8: "1"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          GIST_ID:            ${{ secrets.GIST_ID }}
+          GH_TOKEN:           ${{ secrets.GH_TOKEN }}

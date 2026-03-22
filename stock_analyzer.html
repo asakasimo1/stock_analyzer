@@ -340,9 +340,10 @@
   .cal-event.briefing  { background: #dbeafe; color: #1e40af; }
   .cal-event.pick      { background: #d1fae5; color: #065f46; }
   .cal-event.signal    { background: #fef3c7; color: #92400e; }
-  .cal-event.ipo-sub   { background: #ede9fe; color: #5b21b6; }
-  .cal-event.ipo-list  { background: #fce7f3; color: #9d174d; font-weight: 700; }
+  .cal-event.ipo-sub    { background: #ede9fe; color: #5b21b6; }
+  .cal-event.ipo-list   { background: #fce7f3; color: #9d174d; font-weight: 700; }
   .cal-event.ipo-sub-done { background: #a7f3d0; color: #064e3b; font-weight: 700; }
+  .cal-event.ipo-allot  { background: #fef9c3; color: #854d0e; font-weight: 700; border: 1px solid #fbbf24; }
 
   /* ── 결과 목록 ── */
   .result-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
@@ -527,6 +528,13 @@
       <button class="cal-nav" onclick="calMove(-1)">&#8249;</button>
       <h2 id="cal-title"></h2>
       <button class="cal-nav" onclick="calMove(1)">&#8250;</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:11px">
+      <span class="cal-event briefing" style="display:inline-block">📊 브리핑/추천</span>
+      <span class="cal-event ipo-sub" style="display:inline-block">🏢 공모주 청약기간</span>
+      <span class="cal-event ipo-sub-done" style="display:inline-block">✅ 청약완료</span>
+      <span class="cal-event ipo-allot" style="display:inline-block">📬 배정 확인일</span>
+      <span class="cal-event ipo-list" style="display:inline-block">🚀 상장일</span>
     </div>
     <div class="cal-grid" id="cal-grid"></div>
   </div>
@@ -865,6 +873,19 @@ function calMove(dir) {
   renderCalendar(_dashData || {});
 }
 
+function calcAllotDate(dateSubEnd) {
+  // 청약 마감 + 2 영업일
+  try {
+    let d = new Date(dateSubEnd);
+    let bdays = 0;
+    while (bdays < 2) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) bdays++;
+    }
+    return d.toISOString().slice(0, 10);
+  } catch(_) { return ''; }
+}
+
 function renderCalendar(data) {
   const DOWS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
   const today = new Date();
@@ -905,10 +926,20 @@ function renderCalendar(data) {
       }
     }
 
-    // 상장일 (청약 완료된 항목만 강조 표시)
-    if (ipo.date_list && subscribed) {
-      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일`);
-    } else if (ipo.date_list && ['상장예정','상장완료'].includes(status)) {
+    // 배정일 (청약 완료 + 배정주수 미입력)
+    if (subscribed && ipo.date_sub_end) {
+      const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
+      const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
+      if (allotDate && !hasAlloc && status !== '청약포기') {
+        add(allotDate, 'ipo-allot', `📬 ${name} 배정확인`);
+      }
+    }
+
+    // 상장일 — 배정 확정된 항목만 강조
+    const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
+    if (ipo.date_list && subscribed && hasAlloc) {
+      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`);
+    } else if (ipo.date_list && !subscribed && ['상장예정','상장완료'].includes(status)) {
       add(ipo.date_list, 'ipo-list', `📋 ${name} 상장`);
     }
   });

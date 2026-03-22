@@ -4,7 +4,7 @@
 """
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -40,6 +40,22 @@ def save_data(records: list):
 
 def next_id(records: list) -> int:
     return max((r["id"] for r in records), default=0) + 1
+
+
+def calc_allot_date(date_sub_end: str) -> str:
+    """배정일 계산: 청약 마감 + 2 영업일 (주말 건너뜀)"""
+    if not date_sub_end:
+        return ""
+    try:
+        d = date.fromisoformat(date_sub_end)
+        bdays = 0
+        while bdays < 2:
+            d += timedelta(days=1)
+            if d.weekday() < 5:  # 월~금
+                bdays += 1
+        return d.isoformat()
+    except Exception:
+        return ""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -424,6 +440,38 @@ c3.metric("상장완료",   len(completed))
 c4.metric("총 수익",    f"{total_profit:+,.0f}원" if completed else "-")
 c5.metric("승률",       f"{wins / len(completed) * 100:.0f}%" if completed else "-")
 
+# ── 배정 결과 입력 알림 배너 ──────────────────────────────────────────────────
+today_str = date.today().isoformat()
+for r in records:
+    if not r.get("subscribed"):
+        continue
+    allot_date = r.get("date_allot") or calc_allot_date(r.get("date_sub_end", ""))
+    if allot_date and allot_date <= today_str and not r.get("shares_alloc") and r.get("status") != "청약포기":
+        st.warning(
+            f"📬 **{r['name']}** 배정 결과 확인일({allot_date})이 됐어요!  "
+            f"몇 주 받으셨나요? 아래에서 배정주수를 입력해주세요.",
+            icon="🔔",
+        )
+        with st.form(f"allot_form_{r['id']}"):
+            col_a, col_b = st.columns([3, 1])
+            allot_input = col_a.number_input(
+                f"{r['name']} 배정주수 (0 = 미배정)",
+                min_value=0, value=0, step=1,
+            )
+            if col_b.form_submit_button("✅ 입력", use_container_width=True, type="primary"):
+                idx = next((i for i, x in enumerate(st.session_state.ipo_records) if x["id"] == r["id"]), None)
+                if idx is not None:
+                    st.session_state.ipo_records[idx]["shares_alloc"] = int(allot_input)
+                    st.session_state.ipo_records[idx]["date_allot"]   = allot_date
+                    if allot_input == 0:
+                        st.session_state.ipo_records[idx]["status"] = "청약포기"
+                        st.toast(f"😢 {r['name']} 미배정으로 처리됐습니다.")
+                    else:
+                        st.session_state.ipo_records[idx]["status"] = "상장예정"
+                        st.toast(f"🎉 {r['name']} {allot_input:,}주 배정 완료!")
+                    save_data(st.session_state.ipo_records)
+                    st.rerun()
+
 st.divider()
 
 
@@ -697,8 +745,22 @@ with tab_list:
                         save_data(st.session_state.ipo_records)
                         st.rerun()
 
-                if subscribed and r.get("date_list"):
-                    st.info(f"🗓️ 상장 예정일: **{r['date_list']}** — 캘린더에 표시됩니다", icon="📅")
+                if subscribed:
+                    allot_date = r.get("date_allot") or calc_allot_date(r.get("date_sub_end", ""))
+                    alloc = r.get("shares_alloc", 0) or 0
+                    if alloc > 0:
+                        st.success(
+                            f"🎉 **{alloc:,}주 배정** 확정  |  "
+                            f"🚀 상장 예정일: **{r.get('date_list', '-')}** — 캘린더 반영됨",
+                        )
+                    elif r.get("status") == "청약포기":
+                        st.error("😢 미배정 — 상장일 표시 없음")
+                    elif allot_date:
+                        st.info(
+                            f"📅 배정 결과 확인일: **{allot_date}**  "
+                            f"| 해당일 텔레그램으로 알림 예정",
+                            icon="🔔",
+                        )
 
                 if edit_col.button("✏️", key=f"edit_{r['id']}"):
                     st.session_state.ipo_edit_id = r["id"]
