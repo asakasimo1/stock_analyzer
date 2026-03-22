@@ -959,7 +959,10 @@ function renderCalendar(data) {
         if (subscribed) {
           add(key, 'ipo-sub-done', `✅ ${name} 청약완료`, ipo);
         } else if (!['상장완료','청약포기'].includes(status)) {
-          add(key, 'ipo-sub', `🏢 ${name} 청약`, ipo);
+          const sc = ipo.score;
+          const star = sc >= 70 ? '⭐' : sc >= 50 ? '🔹' : '';
+          const scoreTag = sc != null ? ` ${star}${sc}점` : '';
+          add(key, 'ipo-sub', `🏢 ${name}${scoreTag}`, ipo);
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -1143,8 +1146,24 @@ function showDayDetail(key) {
         </div>
         ${(ipo.shares_alloc||0) > 0
           ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">배정: ${ipo.shares_alloc}주</div>` : ''}
-        ${ipo.score !== undefined
-          ? `<div style="font-size:12px;margin-top:4px">추천점수: <strong>${ipo.score}점</strong></div>` : ''}
+        ${ipo.score != null ? (() => {
+          const sc = ipo.score;
+          const color = sc >= 70 ? 'var(--green)' : sc >= 50 ? '#f59e0b' : 'var(--muted)';
+          const rec = ipo.recommendation || '';
+          const sd = ipo.score_detail || {};
+          return `<div style="margin-top:8px;padding:8px;background:#fff;border-radius:8px;border:1px solid var(--border)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-weight:700;color:${color};font-size:15px">${sc}점</span>
+              <span style="font-size:12px">${rec}</span>
+            </div>
+            ${Object.keys(sd).length ? `<div style="font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
+              ${sd.inst_comp != null ? `<span>기관경쟁률 ${sd.inst_comp}점</span>` : ''}
+              ${sd.lock_up != null ? `<span>의무확약 ${sd.lock_up}점</span>` : ''}
+              ${sd.band != null ? `<span>밴드위치 ${sd.band}점</span>` : ''}
+              ${sd.premium != null ? `<span>수익기대 ${sd.premium}점</span>` : ''}
+            </div>` : ''}
+          </div>`;
+        })() : ''}
       </div>`;
     });
     html += `</div>`;
