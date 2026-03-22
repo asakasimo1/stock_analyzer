@@ -7,6 +7,28 @@ import os
 import requests
 from datetime import datetime
 
+
+class _SafeEncoder(json.JSONEncoder):
+    """numpy/pandas 타입 등 JSON 직렬화 불가 타입 처리"""
+    def default(self, obj):
+        try:
+            import numpy as np
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        except ImportError:
+            pass
+        try:
+            import pandas as pd
+            if isinstance(obj, pd.Timestamp):
+                return obj.isoformat()
+        except ImportError:
+            pass
+        return super().default(obj)
+
 # 환경변수 우선, 없으면 config.py에서 읽기
 GIST_ID  = os.environ.get("GIST_ID", "")
 GH_TOKEN = os.environ.get("GITHUB_TOKEN", "") or os.environ.get("GH_TOKEN", "")
@@ -49,7 +71,7 @@ def _write_gist(updates: dict):
         print("[Gist] GIST_ID 또는 GITHUB_TOKEN 미설정 — 저장 건너뜀")
         return False
     try:
-        payload = {"files": {k: {"content": json.dumps(v, ensure_ascii=False, indent=2)} for k, v in updates.items()}}
+        payload = {"files": {k: {"content": json.dumps(v, ensure_ascii=False, indent=2, cls=_SafeEncoder)} for k, v in updates.items()}}
         r = requests.patch(f"https://api.github.com/gists/{GIST_ID}", headers=_headers(), json=payload, timeout=15)
         if r.status_code == 200:
             print(f"[Gist] 저장 완료: {list(updates.keys())}")
