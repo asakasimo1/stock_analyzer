@@ -337,10 +337,12 @@
     font-size: 10px; padding: 2px 5px; border-radius: 4px;
     margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .cal-event.briefing { background: #dbeafe; color: #1e40af; }
-  .cal-event.pick     { background: #d1fae5; color: #065f46; }
-  .cal-event.signal   { background: #fef3c7; color: #92400e; }
-  .cal-event.ipo      { background: #ede9fe; color: #5b21b6; }
+  .cal-event.briefing  { background: #dbeafe; color: #1e40af; }
+  .cal-event.pick      { background: #d1fae5; color: #065f46; }
+  .cal-event.signal    { background: #fef3c7; color: #92400e; }
+  .cal-event.ipo-sub   { background: #ede9fe; color: #5b21b6; }
+  .cal-event.ipo-list  { background: #fce7f3; color: #9d174d; font-weight: 700; }
+  .cal-event.ipo-sub-done { background: #a7f3d0; color: #064e3b; font-weight: 700; }
 
   /* ── 결과 목록 ── */
   .result-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
@@ -545,6 +547,14 @@
     </div>
   </div>
 
+  <!-- 공모주 청약 현황 -->
+  <div class="card dash-full">
+    <div class="card-title">🏢 공모주 청약 현황</div>
+    <div class="result-list" id="list-ipo">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+
   <!-- 신호 알림 히스토리 -->
   <div class="card dash-full">
     <div class="card-title">📡 신호 알림 내역</div>
@@ -735,6 +745,7 @@ function renderDashboard(data) {
   renderBriefingList(data.briefing || []);
   renderPicksList(data.picks || []);
   renderSignalsList(data.signals || []);
+  renderIpoList(data.ipo || []);
   renderCalendar(data);
 }
 
@@ -777,6 +788,46 @@ function renderPicksList(items) {
           </span>`).join('')}
       </div>
     </div>`).join('');
+}
+
+// ── 공모주 청약 현황 ─────────────────────────────────────
+function renderIpoList(items) {
+  const el = document.getElementById('list-ipo');
+  const STATUS_EMOJI = { '청약예정':'🔵', '청약중':'🟡', '상장예정':'🟠', '상장완료':'🟢', '청약포기':'⚫' };
+
+  // 진행중 → 상장완료 순 정렬
+  const order = ['청약중','청약예정','상장예정','상장완료','청약포기'];
+  const sorted = [...items].sort((a,b) => order.indexOf(a.status||'') - order.indexOf(b.status||''));
+
+  if (!sorted.length) { el.innerHTML = '<div class="empty-msg">등록된 공모주가 없습니다</div>'; return; }
+
+  el.innerHTML = sorted.map(ipo => {
+    const sub = ipo.subscribed;
+    const status = ipo.status || '';
+    const emoji = STATUS_EMOJI[status] || '⚪';
+    const subBadge = sub
+      ? `<span style="background:#a7f3d0;color:#064e3b;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700">✅ 청약완료</span>`
+      : ((['청약예정','청약중'].includes(status))
+          ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 8px;border-radius:20px">⏳ 청약대기</span>`
+          : '');
+    const listingBadge = sub && ipo.date_list
+      ? `<span style="background:#fce7f3;color:#9d174d;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700">🚀 상장: ${ipo.date_list}</span>`
+      : (ipo.date_list && ['상장예정','상장완료'].includes(status)
+          ? `<span style="background:#fce7f3;color:#9d174d;font-size:11px;padding:2px 8px;border-radius:20px">📋 상장: ${ipo.date_list}</span>`
+          : '');
+
+    return `<div class="result-item" style="${sub ? 'border-color:#a7f3d0' : ''}">
+      <div class="result-item-header">
+        <span style="font-weight:700">${emoji} ${ipo.name}</span>
+        <span style="font-size:11px;color:var(--muted)">${ipo.broker || ''}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
+        <span style="font-size:12px;color:var(--muted)">📅 ${ipo.date_sub_start||''} ~ ${ipo.date_sub_end||''}</span>
+        ${subBadge} ${listingBadge}
+      </div>
+      ${ipo.price_ipo ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">공모가 ${ipo.price_ipo.toLocaleString()}원${ipo.competition_inst ? ` | 기관경쟁률 ${ipo.competition_inst.toLocaleString()}:1` : ''}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ── 신호 알림 목록 ───────────────────────────────────────
@@ -832,6 +883,35 @@ function renderCalendar(data) {
   (data.briefing || []).forEach(b => add(b.date, 'briefing', `📊 브리핑 (${(b.stocks||[]).length}종목)`));
   (data.picks    || []).forEach(p => add(p.date, 'pick',     `🎯 추천 (${(p.picks||[]).length}종목)`));
   (data.signals  || []).forEach(s => add(s.date, 'signal',   `📡 ${s.name} ${s.alerts?.[0]?.substring(0,10)||''}`));
+
+  // 공모주 청약일 / 상장일
+  (data.ipo || []).forEach(ipo => {
+    const name = ipo.name || '';
+    const subscribed = ipo.subscribed;
+    const status = ipo.status || '';
+
+    // 청약 기간 (시작~마감 전체 날짜에 표시)
+    if (ipo.date_sub_start && ipo.date_sub_end) {
+      let cur = new Date(ipo.date_sub_start);
+      const end = new Date(ipo.date_sub_end);
+      while (cur <= end) {
+        const key = cur.toISOString().slice(0, 10);
+        if (subscribed) {
+          add(key, 'ipo-sub-done', `✅ ${name} 청약완료`);
+        } else if (!['상장완료','청약포기'].includes(status)) {
+          add(key, 'ipo-sub', `🏢 ${name} 청약`);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+
+    // 상장일 (청약 완료된 항목만 강조 표시)
+    if (ipo.date_list && subscribed) {
+      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일`);
+    } else if (ipo.date_list && ['상장예정','상장완료'].includes(status)) {
+      add(ipo.date_list, 'ipo-list', `📋 ${name} 상장`);
+    }
+  });
 
   // 스케줄 (평일 고정 이벤트)
   const daysInMonth = new Date(y, m + 1, 0).getDate();

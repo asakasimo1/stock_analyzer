@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       briefing: [],
       picks:    [],
       signals:  [],
+      ipo:      [],
     };
 
     for (const [key, fileObj] of Object.entries(files)) {
@@ -38,6 +39,7 @@ export default async function handler(req, res) {
         if (key === 'briefing.json') result.briefing = data;
         if (key === 'picks.json')    result.picks    = data;
         if (key === 'signals.json')  result.signals  = data;
+        if (key === 'ipo.json')      result.ipo      = data;
       } catch (_) {}
     }
 

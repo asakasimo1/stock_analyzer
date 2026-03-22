@@ -7,8 +7,17 @@ import os
 import requests
 from datetime import datetime
 
-GIST_ID    = os.environ.get("GIST_ID", "")
-GH_TOKEN   = os.environ.get("GITHUB_TOKEN", "") or os.environ.get("GH_TOKEN", "")
+# 환경변수 우선, 없으면 config.py에서 읽기
+GIST_ID  = os.environ.get("GIST_ID", "")
+GH_TOKEN = os.environ.get("GITHUB_TOKEN", "") or os.environ.get("GH_TOKEN", "")
+
+if not GIST_ID or not GH_TOKEN:
+    try:
+        import config as _cfg
+        GIST_ID  = GIST_ID  or getattr(_cfg, "GIST_ID", "")
+        GH_TOKEN = GH_TOKEN or getattr(_cfg, "GH_TOKEN", "")
+    except Exception:
+        pass
 MAX_HISTORY = 30  # 최대 보관 건수
 
 
@@ -91,3 +100,8 @@ def save_signal(ticker: str, name: str, price: float, chg_pct: float, alerts: li
         "message": message,
     })
     _write_gist({"signals.json": history[:MAX_HISTORY * 3]})
+
+
+def save_ipo(records: list):
+    """공모주 청약 전체 데이터 저장 (Vercel 캘린더 표시용)"""
+    _write_gist({"ipo.json": records})

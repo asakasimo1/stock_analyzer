@@ -28,6 +28,14 @@ def load_data() -> list:
 def save_data(records: list):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
+    # Gist 동기화 (웹 캘린더 반영)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+        from modules.gist_writer import save_ipo
+        save_ipo(records)
+    except Exception:
+        pass
 
 
 def next_id(records: list) -> int:
@@ -591,6 +599,20 @@ with tab_review:
             if r.get("memo"):
                 st.caption(f"📝 {r['memo']}")
 
+            # 청약 완료 체크
+            subscribed = r.get("subscribed", False)
+            new_chk = st.checkbox(
+                f"{'✅' if subscribed else '⬜'} 청약 완료 (체크 시 상장일이 캘린더에 표시됩니다)",
+                value=subscribed,
+                key=f"sub_review_{r['id']}",
+            )
+            if new_chk != subscribed:
+                idx = next((i for i, x in enumerate(st.session_state.ipo_records) if x["id"] == r["id"]), None)
+                if idx is not None:
+                    st.session_state.ipo_records[idx]["subscribed"] = new_chk
+                    save_data(st.session_state.ipo_records)
+                    st.rerun()
+
             st.divider()
 
 
@@ -659,11 +681,29 @@ with tab_list:
                 if r.get("memo"):
                     st.caption(f"📝 {r['memo']}")
 
-                btn1, btn2, _ = st.columns([1, 1, 6])
-                if btn1.button("✏️ 수정", key=f"edit_{r['id']}"):
+                # ── 청약 완료 체크 ──
+                st.divider()
+                chk_col, edit_col, del_col = st.columns([4, 1, 1])
+                subscribed = r.get("subscribed", False)
+                new_chk = chk_col.checkbox(
+                    f"{'✅ 청약 완료' if subscribed else '⬜ 청약 완료 (체크하면 상장일이 캘린더에 표시)'}",
+                    value=subscribed,
+                    key=f"sub_list_{r['id']}",
+                )
+                if new_chk != subscribed:
+                    idx = next((i for i, x in enumerate(st.session_state.ipo_records) if x["id"] == r["id"]), None)
+                    if idx is not None:
+                        st.session_state.ipo_records[idx]["subscribed"] = new_chk
+                        save_data(st.session_state.ipo_records)
+                        st.rerun()
+
+                if subscribed and r.get("date_list"):
+                    st.info(f"🗓️ 상장 예정일: **{r['date_list']}** — 캘린더에 표시됩니다", icon="📅")
+
+                if edit_col.button("✏️", key=f"edit_{r['id']}"):
                     st.session_state.ipo_edit_id = r["id"]
                     st.rerun()
-                if btn2.button("🗑️ 삭제", key=f"del_{r['id']}"):
+                if del_col.button("🗑️", key=f"del_{r['id']}"):
                     st.session_state.ipo_records = [x for x in records if x["id"] != r["id"]]
                     save_data(st.session_state.ipo_records)
                     st.rerun()
