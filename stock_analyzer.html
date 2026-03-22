@@ -751,7 +751,6 @@ async function analyzeWithClaude() {
 
 renderTrades();
 updateStats();
-initDashboard();
 
 // ══════════════════════════════════════════════════════════
 // 탭 전환
@@ -1195,6 +1194,8 @@ function closeModal(evt) {
   if (evt && evt.target !== document.getElementById('day-modal-overlay')) return;
   document.getElementById('day-modal-overlay').classList.remove('open');
 }
+// 페이지 로드 시 대시보드 즉시 초기화 (모든 변수/함수 선언 완료 후)
+initDashboard();
 </script>
 
 <!-- 날짜 상세 모달 -->
