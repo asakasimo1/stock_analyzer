@@ -130,6 +130,13 @@ def daily_briefing():
         msg = format_daily_report(us_data, stock_results, market_news)
         _send(msg)
 
+        # Gist에 결과 저장 (웹 대시보드용)
+        try:
+            from modules.gist_writer import save_briefing
+            save_briefing(us_data, stock_results, msg)
+        except Exception as ge:
+            log.warning(f"Gist 저장 실패: {ge}")
+
     except Exception as e:
         log.error(f"브리핑 실패: {e}", exc_info=True)
 
@@ -215,6 +222,13 @@ def check_signals(force: bool = False):
                 msg = format_signal_alert(ticker, name, last, chg_p, alerts)
                 _send(msg)
                 log.info(f"  🚨 신호 알림 전송: {name} ({ticker}) — {alerts}")
+
+                # Gist에 신호 저장
+                try:
+                    from modules.gist_writer import save_signal
+                    save_signal(ticker, name, float(last), round(chg_p, 2), alerts, msg)
+                except Exception as ge:
+                    log.warning(f"Gist 신호 저장 실패: {ge}")
 
             except Exception as e:
                 log.warning(f"  {name} 신호 체크 실패: {e}")
@@ -303,6 +317,13 @@ def daily_pick():
         msg_market = _format_picks_msg(picks, us_data, "KOSPI+KOSDAQ TOP 5")
         _send(msg_market)
         log.info(f"✅ 전체 시장 추천 전송 ({len(picks)}종목)")
+
+        # Gist에 picks 저장
+        try:
+            from modules.gist_writer import save_picks
+            save_picks(picks, us_data, msg_market)
+        except Exception as ge:
+            log.warning(f"Gist picks 저장 실패: {ge}")
 
         # ── 관심종목 스캔 별도 전송 ────────────────────────────────
         if watchlist:

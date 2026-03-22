@@ -35,3 +35,5 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           ALERT_CHANNEL: "telegram"
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

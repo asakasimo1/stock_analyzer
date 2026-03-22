@@ -290,6 +290,79 @@
     50%       { box-shadow: 0 0 0 6px rgba(0,200,83,0); }
   }
 
+  /* ── 탭 네비게이션 ── */
+  .tab-nav {
+    display: flex; gap: 8px;
+    padding: 16px 40px 0;
+    max-width: 1400px; margin: 0 auto;
+    border-bottom: 2px solid var(--border);
+  }
+  .tab-btn {
+    padding: 10px 22px; border: none; background: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+    transition: color .2s, border-color .2s;
+  }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tab-page { display: none; }
+  .tab-page.active { display: block; }
+
+  /* ── 대시보드 ── */
+  .dash-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 20px; padding: 28px 40px; max-width: 1400px; margin: 0 auto;
+  }
+  .dash-full { grid-column: 1 / -1; }
+
+  /* ── 캘린더 ── */
+  .cal-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .cal-header h2 { font-size: 18px; font-weight: 700; }
+  .cal-nav { background: none; border: 1px solid var(--border); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display:flex;align-items:center;justify-content:center; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 0; text-transform: uppercase; }
+  .cal-cell {
+    min-height: 90px; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px; font-size: 11px; cursor: pointer;
+    transition: background .15s; position: relative; overflow: hidden;
+  }
+  .cal-cell:hover { background: #f0f4ff; }
+  .cal-cell.today { border-color: var(--primary); background: #eef1ff; }
+  .cal-cell.other-month { opacity: .35; }
+  .cal-cell.has-event { background: #f8fff8; }
+  .cal-day { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .cal-day.sun { color: var(--red); }
+  .cal-day.sat { color: #3D5AFE; }
+  .cal-event {
+    font-size: 10px; padding: 2px 5px; border-radius: 4px;
+    margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-event.briefing { background: #dbeafe; color: #1e40af; }
+  .cal-event.pick     { background: #d1fae5; color: #065f46; }
+  .cal-event.signal   { background: #fef3c7; color: #92400e; }
+  .cal-event.ipo      { background: #ede9fe; color: #5b21b6; }
+
+  /* ── 결과 목록 ── */
+  .result-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
+  .result-item {
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .result-item-header { display: flex; align-items: center; justify-content: space-between; }
+  .result-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+  .result-badge.briefing { background: #dbeafe; color: #1e40af; }
+  .result-badge.pick     { background: #d1fae5; color: #065f46; }
+  .result-badge.signal   { background: #fef3c7; color: #92400e; }
+  .result-stocks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .stock-chip {
+    font-size: 11px; padding: 3px 8px; border-radius: 20px;
+    background: var(--secondary); color: var(--primary);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .stock-chip .up { color: var(--green); }
+  .stock-chip .dn { color: var(--red); }
+  .empty-msg { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
   @media (max-width: 768px) {
     header { padding: 0 20px; }
     main { grid-template-columns: 1fr; padding: 16px; }
@@ -297,6 +370,8 @@
     .analysis-card { grid-column: 1; grid-row: 3; }
     .header-stats { gap: 16px; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .dash-grid { grid-template-columns: 1fr; padding: 16px; }
+    .tab-nav { padding: 12px 16px 0; }
   }
 </style>
 </head>
@@ -320,6 +395,14 @@
   </div>
 </header>
 
+<!-- 탭 네비게이션 -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('trades')">📋 매매기록</button>
+  <button class="tab-btn" onclick="switchTab('dashboard')">📊 대시보드</button>
+</nav>
+
+<!-- 매매기록 탭 -->
+<div id="tab-trades" class="tab-page active">
 <main>
 
   <!-- INPUT CARD -->
@@ -430,6 +513,48 @@
   </div>
 
 </main>
+</div><!-- /tab-trades -->
+
+<!-- 대시보드 탭 -->
+<div id="tab-dashboard" class="tab-page">
+<div class="dash-grid">
+
+  <!-- 캘린더 -->
+  <div class="cal-wrap dash-full">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="calMove(-1)">&#8249;</button>
+      <h2 id="cal-title"></h2>
+      <button class="cal-nav" onclick="calMove(1)">&#8250;</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <!-- 브리핑 히스토리 -->
+  <div class="card">
+    <div class="card-title">📊 일일 브리핑 내역</div>
+    <div class="result-list" id="list-briefing">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- 매수 추천 히스토리 -->
+  <div class="card">
+    <div class="card-title">🎯 매수 추천 내역</div>
+    <div class="result-list" id="list-picks">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- 신호 알림 히스토리 -->
+  <div class="card dash-full">
+    <div class="card-title">📡 신호 알림 내역</div>
+    <div class="result-list" id="list-signals">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /tab-dashboard -->
 
 <script>
 const API_URL = "/api/analyze";
@@ -576,6 +701,188 @@ async function analyzeWithClaude() {
 
 renderTrades();
 updateStats();
+
+// ══════════════════════════════════════════════════════════
+// 탭 전환
+// ══════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'dashboard') initDashboard();
+}
+
+// ══════════════════════════════════════════════════════════
+// 대시보드 데이터 로드
+// ══════════════════════════════════════════════════════════
+let _dashData = null;
+
+async function initDashboard() {
+  if (_dashData) { renderDashboard(_dashData); return; }
+  try {
+    const r = await fetch('/api/data');
+    if (!r.ok) throw new Error('API 오류');
+    _dashData = await r.json();
+  } catch(e) {
+    _dashData = { briefing: [], picks: [], signals: [] };
+    console.warn('대시보드 데이터 로드 실패:', e.message);
+  }
+  renderDashboard(_dashData);
+}
+
+function renderDashboard(data) {
+  renderBriefingList(data.briefing || []);
+  renderPicksList(data.picks || []);
+  renderSignalsList(data.signals || []);
+  renderCalendar(data);
+}
+
+// ── 브리핑 목록 ─────────────────────────────────────────
+function renderBriefingList(items) {
+  const el = document.getElementById('list-briefing');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 브리핑 데이터가 없습니다</div>'; return; }
+  el.innerHTML = items.slice(0, 20).map(item => `
+    <div class="result-item">
+      <div class="result-item-header">
+        <span class="result-badge briefing">📊 일일 브리핑</span>
+        <span style="font-size:11px;color:var(--muted)">${item.date} ${item.time}</span>
+      </div>
+      <div class="result-stocks">
+        ${(item.stocks || []).map(s => `
+          <span class="stock-chip">
+            ${s.name}
+            <span class="${s.chg_pct >= 0 ? 'up' : 'dn'}">${s.chg_pct >= 0 ? '▲' : '▼'}${Math.abs(s.chg_pct).toFixed(1)}%</span>
+            <span style="color:var(--muted);font-size:10px">${s.signal?.replace(/[🟢🔴🟡]/g,'').trim()}</span>
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// ── 매수 추천 목록 ───────────────────────────────────────
+function renderPicksList(items) {
+  const el = document.getElementById('list-picks');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 추천 데이터가 없습니다</div>'; return; }
+  el.innerHTML = items.slice(0, 20).map(item => `
+    <div class="result-item">
+      <div class="result-item-header">
+        <span class="result-badge pick">🎯 매수 추천</span>
+        <span style="font-size:11px;color:var(--muted)">${item.date} ${item.time}</span>
+      </div>
+      <div class="result-stocks">
+        ${(item.picks || []).map(p => `
+          <span class="stock-chip" style="background:#d1fae5;color:#065f46">
+            ${p.name || p.ticker}
+            ${p.score != null ? `<span style="font-size:10px">${p.score}점</span>` : ''}
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// ── 신호 알림 목록 ───────────────────────────────────────
+function renderSignalsList(items) {
+  const el = document.getElementById('list-signals');
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 신호 데이터가 없습니다</div>'; return; }
+  el.innerHTML = items.slice(0, 30).map(item => `
+    <div class="result-item">
+      <div class="result-item-header">
+        <span class="result-badge signal">📡 ${item.name} (${item.ticker})</span>
+        <span style="font-size:11px;color:var(--muted)">${item.date} ${item.time}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text);margin-top:4px">
+        ${(item.alerts || []).map(a => `<div>${a}</div>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">
+        ${item.price?.toLocaleString()}원
+        <span class="${item.chg_pct >= 0 ? 'up' : 'dn'}" style="color:${item.chg_pct >= 0 ? 'var(--green)' : 'var(--red)'}">
+          ${item.chg_pct >= 0 ? '▲' : '▼'}${Math.abs(item.chg_pct).toFixed(2)}%
+        </span>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// 캘린더
+// ══════════════════════════════════════════════════════════
+let _calYear  = new Date().getFullYear();
+let _calMonth = new Date().getMonth();
+
+function calMove(dir) {
+  _calMonth += dir;
+  if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+  renderCalendar(_dashData || {});
+}
+
+function renderCalendar(data) {
+  const DOWS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const today = new Date();
+  const y = _calYear, m = _calMonth;
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  document.getElementById('cal-title').textContent = `${y}년 ${monthNames[m]}`;
+
+  // 이벤트 인덱스 (날짜 → 배열)
+  const events = {};
+  const add = (date, type, text) => {
+    if (!events[date]) events[date] = [];
+    events[date].push({ type, text });
+  };
+
+  (data.briefing || []).forEach(b => add(b.date, 'briefing', `📊 브리핑 (${(b.stocks||[]).length}종목)`));
+  (data.picks    || []).forEach(p => add(p.date, 'pick',     `🎯 추천 (${(p.picks||[]).length}종목)`));
+  (data.signals  || []).forEach(s => add(s.date, 'signal',   `📡 ${s.name} ${s.alerts?.[0]?.substring(0,10)||''}`));
+
+  // 스케줄 (평일 고정 이벤트)
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(y, m, d);
+    const dow = dt.getDay();
+    const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (dow >= 1 && dow <= 5) { // 평일
+      if (!events[key]) events[key] = [];
+      events[key].unshift({ type: 'briefing', text: '⏰ 07:30 브리핑' });
+      events[key].push({ type: 'pick', text: '⏰ 08:50 매수추천' });
+    }
+  }
+
+  // 그리기
+  const grid = document.getElementById('cal-grid');
+  const firstDay = new Date(y, m, 1).getDay();
+  const lastDate = new Date(y, m + 1, 0).getDate();
+  const prevLast = new Date(y, m, 0).getDate();
+
+  let html = DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  // 이전달 빈 칸
+  for (let i = firstDay - 1; i >= 0; i--) {
+    html += `<div class="cal-cell other-month"><div class="cal-day">${prevLast - i}</div></div>`;
+  }
+
+  for (let d = 1; d <= lastDate; d++) {
+    const dt = new Date(y, m, d);
+    const dow = dt.getDay();
+    const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
+    const evs = events[key] || [];
+    const hasReal = evs.some(e => !e.text.startsWith('⏰'));
+
+    html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}">
+      <div class="cal-day${dow===0?' sun':dow===6?' sat':''}">${d}</div>
+      ${evs.slice(0,3).map(e => `<div class="cal-event ${e.type}">${e.text}</div>`).join('')}
+      ${evs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${evs.length-3}개</div>` : ''}
+    </div>`;
+  }
+
+  // 다음달 빈 칸
+  const total = firstDay + lastDate;
+  const remain = (7 - (total % 7)) % 7;
+  for (let d = 1; d <= remain; d++) {
+    html += `<div class="cal-cell other-month"><div class="cal-day">${d}</div></div>`;
+  }
+
+  grid.innerHTML = html;
+}
 </script>
 </body>
 </html>
