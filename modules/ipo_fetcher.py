@@ -177,9 +177,10 @@ def _parse_float_rate(s: str):
 # 상장일 사이드바 파싱
 # ──────────────────────────────────────────────────────────────
 
-def _parse_listing_dates(text: str, year: int) -> dict:
+def _parse_listing_dates(text: str) -> dict:
     """
-    'IPO 신규상장 일정\n03/25 한패스\n...' 형식 파싱
+    'IPO 신규상장 일정\nMM/DD 종목명\n...' 형식 파싱
+    - 날짜가 오늘 이후이면 올해, 이미 지났으면 내년으로 판단
     Returns {name: 'YYYY-MM-DD'}
     """
     listing = {}
@@ -189,13 +190,17 @@ def _parse_listing_dates(text: str, year: int) -> dict:
     if idx == -1:
         return listing
     section = text[idx: idx + 3000]
+    year_now = TODAY.year
     for m in re.finditer(r"(\d{2})/(\d{2})\s+([^\n\r\d][^\n\r]*)", section):
-        mm, dd, name = m.group(1), m.group(2), m.group(3).strip()
+        mm, dd, name = int(m.group(1)), int(m.group(2)), m.group(3).strip()
         name = re.split(r"\s{2,}", name)[0].strip()
         if not name:
             continue
         try:
-            d = date(year, int(mm), int(dd))
+            # 올해 날짜로 먼저 시도, 이미 90일 이상 지났으면 내년
+            d = date(year_now, mm, dd)
+            if (TODAY - d).days > 90:
+                d = date(year_now + 1, mm, dd)
             listing[name] = d.strftime("%Y-%m-%d")
         except ValueError:
             pass
@@ -446,9 +451,7 @@ def fetch_ipo_schedule() -> list:
     plain = re.sub(r"[ \t]+", " ", plain)
 
     # Listing dates from sidebar
-    year_now = TODAY.year
-    listing_map = _parse_listing_dates(plain, year_now)
-    listing_map.update(_parse_listing_dates(plain, year_now + 1))
+    listing_map = _parse_listing_dates(plain)
     print(f"[IPO] 상장일 사이드바 {len(listing_map)}건: {list(listing_map.keys())[:8]}")
 
     # Fetch demand forecast data
