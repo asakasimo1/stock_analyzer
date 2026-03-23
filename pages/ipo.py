@@ -229,6 +229,47 @@ def calc_expected(record: dict) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 배정주수 인라인 입력 (알림 없이 언제든 가능)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_allot_input(r: dict, key_sfx: str):
+    """청약 완료 종목의 배정주수를 언제든 입력/수정할 수 있는 인라인 폼"""
+    if not r.get("subscribed", False):
+        return
+
+    rid = r["id"]
+    current_alloc = r.get("shares_alloc", 0) or 0
+    status = r.get("status", "")
+
+    if status == "상장완료":
+        return  # 상장 완료된 건 편집 모드에서만
+
+    label = "📬 배정주수 수정" if current_alloc > 0 else "📬 배정주수 입력"
+    with st.form(f"allot_inline_{rid}_{key_sfx}", clear_on_submit=False):
+        col_a, col_b = st.columns([3, 1])
+        new_alloc = col_a.number_input(
+            f"{label} (0 = 미배정/청약포기)",
+            min_value=0,
+            value=current_alloc,
+            step=1,
+        )
+        if col_b.form_submit_button("✅ 저장", use_container_width=True, type="primary"):
+            idx = next(
+                (i for i, x in enumerate(st.session_state.ipo_records) if x["id"] == rid), None
+            )
+            if idx is not None:
+                st.session_state.ipo_records[idx]["shares_alloc"] = int(new_alloc)
+                if new_alloc == 0:
+                    st.session_state.ipo_records[idx]["status"] = "청약포기"
+                    st.toast(f"😢 {r['name']} 미배정으로 처리됐습니다.")
+                else:
+                    st.session_state.ipo_records[idx]["status"] = "상장예정"
+                    st.toast(f"🎉 {r['name']} {new_alloc:,}주 배정 완료!")
+                save_data(st.session_state.ipo_records)
+                st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 공통 폼
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -664,6 +705,7 @@ with tab_review:
                     save_data(st.session_state.ipo_records)
                     st.rerun()
 
+            render_allot_input(r, key_sfx="review")
             st.divider()
 
 
@@ -767,6 +809,7 @@ with tab_list:
                             f"| 해당일 텔레그램으로 알림 예정",
                             icon="🔔",
                         )
+                    render_allot_input(r, key_sfx="list")
 
                 if edit_col.button("✏️", key=f"edit_{r['id']}"):
                     st.session_state.ipo_edit_id = r["id"]
