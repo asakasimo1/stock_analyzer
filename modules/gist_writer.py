@@ -5,7 +5,12 @@ GitHub Actions에서 GITHUB_TOKEN + GIST_ID 환경변수로 동작
 import json
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+_KST = timezone(timedelta(hours=9))
+
+def _now_kst() -> datetime:
+    return datetime.now(_KST)
 
 
 class _SafeEncoder(json.JSONEncoder):
@@ -84,10 +89,11 @@ def _write_gist(updates: dict):
 
 def save_briefing(us_data: dict, stock_results: list, message: str):
     """일일 브리핑 결과 저장"""
+    now = _now_kst()
     history = _read_gist("briefing.json")
     history.insert(0, {
-        "date":          datetime.now().strftime("%Y-%m-%d"),
-        "time":          datetime.now().strftime("%H:%M"),
+        "date":          now.strftime("%Y-%m-%d"),
+        "time":          now.strftime("%H:%M"),
         "us_market":     us_data,
         "stocks":        stock_results,
         "message":       message,
@@ -97,10 +103,11 @@ def save_briefing(us_data: dict, stock_results: list, message: str):
 
 def save_picks(picks: list, us_data: dict, message: str):
     """매수 추천 결과 저장"""
+    now = _now_kst()
     history = _read_gist("picks.json")
     history.insert(0, {
-        "date":      datetime.now().strftime("%Y-%m-%d"),
-        "time":      datetime.now().strftime("%H:%M"),
+        "date":      now.strftime("%Y-%m-%d"),
+        "time":      now.strftime("%H:%M"),
         "picks":     picks,
         "us_market": us_data,
         "message":   message,
@@ -110,10 +117,11 @@ def save_picks(picks: list, us_data: dict, message: str):
 
 def save_signal(ticker: str, name: str, price: float, chg_pct: float, alerts: list, message: str):
     """신호 알림 저장"""
+    now = _now_kst()
     history = _read_gist("signals.json")
     history.insert(0, {
-        "date":    datetime.now().strftime("%Y-%m-%d"),
-        "time":    datetime.now().strftime("%H:%M"),
+        "date":    now.strftime("%Y-%m-%d"),
+        "time":    now.strftime("%H:%M"),
         "ticker":  ticker,
         "name":    name,
         "price":   price,
