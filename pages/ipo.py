@@ -639,9 +639,12 @@ with tab_review:
                     comp_cols[idx].metric("밴드 위치", r["band_position"])
 
             # 일정
+            _sub_r = r.get("subscribed", False)
+            _alloc_r = r.get("shares_alloc", 0) or 0
+            _list_str = r.get("date_list", "-") if (_sub_r and _alloc_r > 0) else "-"
             st.caption(
                 f"📅 청약: {r.get('date_sub_start', '')} ~ {r.get('date_sub_end', '')}  "
-                f"| 상장: {r.get('date_list', '-')}  "
+                f"| 상장: {_list_str}  "
                 f"| 증권사: {r.get('broker', '-')}"
             )
             if r.get("memo"):
@@ -694,9 +697,12 @@ with tab_list:
                 expanded=(status in ("청약중",)),
             ):
                 d1, d2, d3, d4 = st.columns(4)
+                _subscribed = r.get("subscribed", False)
+                _alloc = r.get("shares_alloc", 0) or 0
+                _listing_label = r.get("date_list", "—") if (_subscribed and _alloc > 0) else "—"
                 d1.markdown(f"**증권사**\n\n{r.get('broker', '—')}")
-                d2.markdown(f"**상장일**\n\n{r.get('date_list', '—')}")
-                d3.markdown(f"**배정주수**\n\n{r.get('shares_alloc', 0):,}주")
+                d2.markdown(f"**상장일**\n\n{_listing_label}")
+                d3.markdown(f"**배정주수**\n\n{_alloc:,}주")
                 d4.markdown(f"**증거금**\n\n{r.get('deposit', 0):,}원")
 
                 # 청약 대상: 예상 수익

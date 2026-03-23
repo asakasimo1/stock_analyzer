@@ -62,17 +62,19 @@ def update_config(token: str, chat_id: str):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 이미 있으면 값만 교체, 없으면 끝에 추가
+    # 이미 있으면 값만 교체 (os.environ.get(...) 형태 포함), 없으면 끝에 추가
     if "TELEGRAM_BOT_TOKEN" in content:
         content = re.sub(
-            r'TELEGRAM_BOT_TOKEN\s*=\s*"[^"]*"',
+            r'^TELEGRAM_BOT_TOKEN\s*=.*$',
             f'TELEGRAM_BOT_TOKEN  = "{token}"',
             content,
+            flags=re.MULTILINE,
         )
         content = re.sub(
-            r'TELEGRAM_CHAT_ID\s*=\s*"[^"]*"',
+            r'^TELEGRAM_CHAT_ID\s*=.*$',
             f'TELEGRAM_CHAT_ID    = "{chat_id}"',
             content,
+            flags=re.MULTILINE,
         )
     else:
         content += f"""

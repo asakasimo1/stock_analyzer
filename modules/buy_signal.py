@@ -294,7 +294,9 @@ def _analyze_ticker(
     prev_cl = float(prev_row["Close"])
     chg_pct = (close - prev_cl) / prev_cl * 100 if prev_cl else 0
 
-    is_bullish = close > float(last_row["Open"])
+    open_price = float(last_row["Open"])
+    is_bullish = close > open_price
+    body_pct   = (close - open_price) / open_price * 100 if open_price else 0  # 음수=음봉
 
     # 거래량 비율
     avg_vol  = float(df["Volume"].iloc[:-1].tail(20).mean()) if len(df) > 1 else 1
@@ -311,11 +313,13 @@ def _analyze_ticker(
 
     # 필터 (full scan 모드일 때만 적용)
     if min_body_ratio:
-        if not is_bullish:
+        # 음봉 -1% 초과 제외 (양봉 + -1%까지 허용)
+        if body_pct < -1.0:
             return None
         if vol_ratio < min_vol_ratio:
             return None
-        if br < min_body_ratio:
+        # 장대양봉 비율: 양봉일 때만 체크 (음봉 허용 구간은 skip)
+        if is_bullish and br < min_body_ratio:
             return None
 
     tech = technical.calculate(df)

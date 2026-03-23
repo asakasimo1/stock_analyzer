@@ -1040,11 +1040,10 @@ function renderIpoList(items) {
       : ((['청약예정','청약중'].includes(status))
           ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 8px;border-radius:20px">⏳ 청약대기</span>`
           : '');
-    const listingBadge = sub && ipo.date_list
-      ? `<span style="background:#fce7f3;color:#9d174d;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700">🚀 상장: ${ipo.date_list}</span>`
-      : (ipo.date_list && ['상장예정','상장완료'].includes(status)
-          ? `<span style="background:#fce7f3;color:#9d174d;font-size:11px;padding:2px 8px;border-radius:20px">📋 상장: ${ipo.date_list}</span>`
-          : '');
+    const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
+    const listingBadge = sub && hasAlloc && ipo.date_list
+      ? `<span style="background:#fce7f3;color:#9d174d;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700">🚀 상장: ${ipo.date_list} (${ipo.shares_alloc}주)</span>`
+      : '';
 
     return `<div class="result-item" style="${sub ? 'border-color:#a7f3d0' : ''}">
       <div class="result-item-header">
@@ -1167,12 +1166,10 @@ function renderCalendar(data) {
       }
     }
 
-    // 상장일 — 배정 확정된 항목만 강조
+    // 상장일 — 배정 확정(subscribed + shares_alloc > 0)된 항목만 표시
     const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
     if (ipo.date_list && subscribed && hasAlloc) {
       add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`, ipo);
-    } else if (ipo.date_list && !subscribed && !['청약포기'].includes(status)) {
-      add(ipo.date_list, 'ipo-list', `📋 ${name} 상장`, ipo);
     }
   });
 
