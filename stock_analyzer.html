@@ -549,6 +549,7 @@
   <button class="tab-btn active" onclick="switchTab('dashboard')">📊 대시보드</button>
   <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
   <button class="tab-btn" onclick="switchTab('trades')">📋 매매기록</button>
+  <button class="tab-btn" onclick="switchTab('ipo')">🏢 공모주</button>
 </nav>
 
 <!-- 매매기록 탭 -->
@@ -738,6 +739,99 @@
 
   </div>
 </div><!-- /tab-portfolio -->
+
+<!-- 공모주 관리 탭 -->
+<div id="tab-ipo" class="tab-page">
+<div style="max-width:900px;margin:0 auto;padding:16px">
+
+  <!-- 알림 배너 영역 -->
+  <div id="ipo-alerts"></div>
+
+  <!-- 상단: 요약 지표 -->
+  <div id="ipo-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px"></div>
+
+  <!-- 공모주 목록 -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin:0">🏢 공모주 목록</div>
+      <button onclick="openIpoModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">+ 공모주 추가</button>
+    </div>
+    <div id="ipo-list-manage"></div>
+  </div>
+
+</div>
+</div><!-- /tab-ipo -->
+
+<!-- 공모주 추가/편집 모달 -->
+<div id="ipo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;overflow-y:auto;padding:20px">
+  <div style="background:#1e2d45;border-radius:16px;max-width:560px;margin:40px auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3 id="ipo-modal-title" style="margin:0;color:#f1f5f9">공모주 추가</h3>
+      <button onclick="closeIpoModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:grid;gap:14px">
+      <input id="if-id" type="hidden" value="">
+      <div>
+        <label style="font-size:12px;color:#94a3b8">종목명 *</label>
+        <input id="if-name" placeholder="예: 리센스메디컬" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;color:#94a3b8">청약 시작일</label>
+          <input id="if-sub-start" type="date" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#94a3b8">청약 마감일</label>
+          <input id="if-sub-end" type="date" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;color:#94a3b8">상장 예정일</label>
+          <input id="if-list" type="date" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#94a3b8">공모가 (원)</label>
+          <input id="if-price" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;color:#94a3b8">증권사</label>
+          <select id="if-broker" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+            <option value="">선택</option>
+            <option>미래에셋증권</option><option>삼성증권</option><option>한국투자증권</option>
+            <option>NH투자증권</option><option>KB증권</option><option>키움증권</option>
+            <option>대신증권</option><option>신한투자증권</option><option>하나증권</option>
+            <option>메리츠증권</option><option>기타</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#94a3b8">청약주수 (주)</label>
+          <input id="if-apply" type="number" placeholder="0" min="0" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;color:#94a3b8">기관경쟁률 (:1)</label>
+          <input id="if-comp" type="number" placeholder="0" min="0" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#94a3b8">의무보유확약 (%)</label>
+          <input id="if-lockup" type="number" placeholder="0" min="0" max="100" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;color:#94a3b8">메모</label>
+        <input id="if-memo" placeholder="간단한 메모" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button onclick="saveIpoRecord()" style="flex:1;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer">💾 저장</button>
+      <button onclick="closeIpoModal()" style="background:#1e2d45;color:#94a3b8;border:none;border-radius:8px;padding:12px 20px;cursor:pointer">취소</button>
+    </div>
+  </div>
+</div>
 
 <!-- 대시보드 탭 -->
 <div id="tab-dashboard" class="tab-page active">
@@ -951,6 +1045,7 @@ function switchTab(name) {
   event.currentTarget.classList.add('active');
   if (name === 'dashboard') initDashboard();
   if (name === 'portfolio') initPortfolio();
+  if (name === 'ipo') loadIpoRecords();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1761,5 +1856,260 @@ initDashboard();
     <div id="day-modal-body"></div>
   </div>
 </div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// 공모주 관리 (웹 CRUD)
+// ══════════════════════════════════════════════════════════════════════════════
+let _ipoRecords = [];
+
+const IPO_STATUS = {
+  '청약예정': '🔵', '청약중': '🟡', '상장예정': '🟠', '상장완료': '🟢', '청약포기': '⚫',
+};
+
+function calcAllotDateIpo(subEnd) {
+  if (!subEnd) return '';
+  let d = new Date(subEnd + 'T00:00:00');
+  let bdays = 0;
+  while (bdays < 2) { d.setDate(d.getDate() + 1); if (d.getDay() >= 1 && d.getDay() <= 5) bdays++; }
+  return d.toISOString().slice(0, 10);
+}
+
+function autoStatus(r) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (r.shares_alloc > 0 && r.date_list) {
+    return today >= r.date_list ? '상장완료' : '상장예정';
+  }
+  if (r.shares_alloc === 0 && r.subscribed && r.date_sub_end && today > r.date_sub_end) return '청약포기';
+  if (r.date_sub_end && today > r.date_sub_end) return r.subscribed ? '상장예정' : '청약포기';
+  if (r.date_sub_start && today >= r.date_sub_start) return '청약중';
+  return '청약예정';
+}
+
+async function loadIpoRecords() {
+  try {
+    const r = await fetch('/api/ipo');
+    const data = await r.json();
+    _ipoRecords = data.records || [];
+  } catch (e) {
+    _ipoRecords = [];
+  }
+  renderIpoManage();
+}
+
+async function saveIpoRecords() {
+  await fetch('/api/ipo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records: _ipoRecords }),
+  });
+  // 대시보드 캐시 초기화
+  _dashData = null;
+}
+
+// ── 목록 렌더링 ───────────────────────────────────────────────────────────────
+function renderIpoManage() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // KPI
+  const total = _ipoRecords.length;
+  const pending = _ipoRecords.filter(r => ['청약예정','청약중','상장예정'].includes(r.status)).length;
+  const completed = _ipoRecords.filter(r => r.status === '상장완료');
+  const totalProfit = completed.reduce((s, r) => s + ((r.price_open||0) - r.price_ipo) * (r.shares_alloc||0), 0);
+  document.getElementById('ipo-kpi').innerHTML = `
+    ${kpiCard('전체 종목', total + '개')}
+    ${kpiCard('진행중', pending + '개')}
+    ${kpiCard('상장완료', completed.length + '개')}
+    ${kpiCard('총 수익', totalProfit ? (totalProfit >= 0 ? '🟢 ' : '🔴 ') + totalProfit.toLocaleString() + '원' : '-')}
+  `;
+
+  // 알림 배너 (배정 확인일 도래)
+  let alerts = '';
+  _ipoRecords.forEach(r => {
+    if (!r.subscribed) return;
+    if (r.shares_alloc > 0 || r.status === '청약포기') return;
+    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
+    if (allotDate && allotDate <= today) {
+      alerts += `
+        <div style="background:#78350f;border:1px solid #fbbf24;border-radius:10px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:20px">📬</span>
+          <div style="flex:1">
+            <strong style="color:#fef3c7">${r.name}</strong>
+            <span style="color:#fde68a;font-size:13px"> 배정 결과 확인일(${allotDate})이 됐어요! 배정주수를 입력해주세요.</span>
+          </div>
+          <button onclick="quickAllot(${r.id})" style="background:#f59e0b;color:#000;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;white-space:nowrap">배정 입력</button>
+        </div>`;
+    }
+  });
+  document.getElementById('ipo-alerts').innerHTML = alerts;
+
+  // 목록
+  const order = ['청약중','청약예정','상장예정','상장완료','청약포기'];
+  const sorted = [..._ipoRecords].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+
+  if (!sorted.length) {
+    document.getElementById('ipo-list-manage').innerHTML = '<div style="text-align:center;color:#64748b;padding:40px">등록된 공모주가 없습니다. 위 버튼으로 추가해보세요.</div>';
+    return;
+  }
+
+  document.getElementById('ipo-list-manage').innerHTML = sorted.map(r => {
+    const emoji = IPO_STATUS[r.status] || '⚪';
+    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
+    const alloc = r.shares_alloc || 0;
+    const subDone = r.subscribed;
+
+    // 배정주수 영역
+    let allocSection = '';
+    if (subDone && r.status !== '상장완료') {
+      allocSection = `
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">📬 배정주수</span>
+          <input type="number" id="alloc-input-${r.id}" value="${alloc}" min="0"
+            style="width:100px;padding:6px 8px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <button onclick="saveAlloc(${r.id})"
+            style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
+          ${alloc > 0 ? `<span style="color:#34d399;font-size:12px">✅ ${alloc.toLocaleString()}주 확정</span>` : `<span style="color:#94a3b8;font-size:12px">(0 = 미배정)</span>`}
+        </div>`;
+    }
+
+    return `
+      <div style="border:1px solid ${subDone ? '#1e3a2e' : '#1e2d45'};border-radius:10px;padding:14px;margin-bottom:10px;background:${subDone ? '#0d1f16' : '#0f172a'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <span style="font-weight:700;font-size:15px">${emoji} ${r.name}</span>
+            ${r.broker ? `<span style="font-size:11px;color:#64748b;margin-left:8px">${r.broker}</span>` : ''}
+            <span style="font-size:11px;background:#1e2d45;color:#94a3b8;border-radius:20px;padding:2px 8px;margin-left:6px">${r.status}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button onclick="editIpo(${r.id})" style="background:none;border:1px solid #1e2d45;color:#94a3b8;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">✏️</button>
+            <button onclick="deleteIpo(${r.id})" style="background:none;border:1px solid #3f1515;color:#f87171;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">🗑️</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:10px">
+          ${r.date_sub_start ? `<span>📅 청약 ${r.date_sub_start} ~ ${r.date_sub_end||''}</span>` : ''}
+          ${r.date_list && subDone && alloc > 0 ? `<span>🚀 상장 ${r.date_list}</span>` : ''}
+          ${r.price_ipo ? `<span>💰 공모가 ${r.price_ipo.toLocaleString()}원</span>` : ''}
+          ${allotDate && subDone && !alloc && r.status !== '청약포기' ? `<span style="color:#fbbf24">📬 배정확인 ${allotDate}</span>` : ''}
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" ${subDone ? 'checked' : ''} onchange="toggleSubscribed(${r.id}, this.checked)"
+              style="width:16px;height:16px;cursor:pointer">
+            <span style="color:${subDone ? '#34d399' : '#94a3b8'}">${subDone ? '✅ 청약 완료' : '⬜ 청약 완료 (체크 시 배정주수 입력 가능)'}</span>
+          </label>
+        </div>
+        ${allocSection}
+      </div>`;
+  }).join('');
+}
+
+function kpiCard(label, value) {
+  return `<div style="background:#111827;border:1px solid #1e2d45;border-radius:10px;padding:14px;text-align:center">
+    <div style="font-size:11px;color:#64748b;margin-bottom:4px">${label}</div>
+    <div style="font-size:18px;font-weight:700;color:#f1f5f9">${value}</div>
+  </div>`;
+}
+
+// ── CRUD ────────────────────────────────────────────────────────────────────
+function openIpoModal(prefill) {
+  const p = prefill || {};
+  document.getElementById('if-id').value = p.id || '';
+  document.getElementById('if-name').value = p.name || '';
+  document.getElementById('if-sub-start').value = p.date_sub_start || '';
+  document.getElementById('if-sub-end').value = p.date_sub_end || '';
+  document.getElementById('if-list').value = p.date_list || '';
+  document.getElementById('if-price').value = p.price_ipo || '';
+  document.getElementById('if-broker').value = p.broker || '';
+  document.getElementById('if-apply').value = p.shares_apply || '';
+  document.getElementById('if-comp').value = p.competition_inst || '';
+  document.getElementById('if-lockup').value = p.lockup_rate || '';
+  document.getElementById('if-memo').value = p.memo || '';
+  document.getElementById('ipo-modal-title').textContent = p.id ? '공모주 편집' : '공모주 추가';
+  document.getElementById('ipo-modal').style.display = 'block';
+}
+
+function closeIpoModal() {
+  document.getElementById('ipo-modal').style.display = 'none';
+}
+
+async function saveIpoRecord() {
+  const name = document.getElementById('if-name').value.trim();
+  if (!name) { alert('종목명을 입력하세요'); return; }
+
+  const id = parseInt(document.getElementById('if-id').value) || null;
+  const rec = {
+    id: id || (Math.max(0, ..._ipoRecords.map(r => r.id || 0)) + 1),
+    name,
+    date_sub_start:   document.getElementById('if-sub-start').value,
+    date_sub_end:     document.getElementById('if-sub-end').value,
+    date_list:        document.getElementById('if-list').value,
+    price_ipo:        parseInt(document.getElementById('if-price').value) || 0,
+    broker:           document.getElementById('if-broker').value,
+    shares_apply:     parseInt(document.getElementById('if-apply').value) || 0,
+    competition_inst: parseFloat(document.getElementById('if-comp').value) || 0,
+    lockup_rate:      parseFloat(document.getElementById('if-lockup').value) || 0,
+    memo:             document.getElementById('if-memo').value,
+    subscribed:       id ? (_ipoRecords.find(r => r.id === id)?.subscribed || false) : false,
+    shares_alloc:     id ? (_ipoRecords.find(r => r.id === id)?.shares_alloc || 0) : 0,
+  };
+  rec.status = autoStatus(rec);
+
+  if (id) {
+    const idx = _ipoRecords.findIndex(r => r.id === id);
+    if (idx !== -1) _ipoRecords[idx] = rec;
+  } else {
+    _ipoRecords.push(rec);
+  }
+
+  await saveIpoRecords();
+  closeIpoModal();
+  renderIpoManage();
+}
+
+function editIpo(id) {
+  const rec = _ipoRecords.find(r => r.id === id);
+  if (rec) openIpoModal(rec);
+}
+
+async function deleteIpo(id) {
+  const rec = _ipoRecords.find(r => r.id === id);
+  if (!confirm(`"${rec?.name}" 을(를) 삭제할까요?`)) return;
+  _ipoRecords = _ipoRecords.filter(r => r.id !== id);
+  await saveIpoRecords();
+  renderIpoManage();
+}
+
+async function toggleSubscribed(id, checked) {
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].subscribed = checked;
+  _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  renderIpoManage();
+}
+
+async function saveAlloc(id) {
+  const input = document.getElementById(`alloc-input-${id}`);
+  const alloc = parseInt(input?.value) || 0;
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].shares_alloc = alloc;
+  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+  await saveIpoRecords();
+  renderIpoManage();
+}
+
+async function quickAllot(id) {
+  const alloc = parseInt(prompt('배정주수를 입력하세요 (0 = 미배정)')) ?? null;
+  if (alloc === null) return;
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].shares_alloc = alloc;
+  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+  await saveIpoRecords();
+  renderIpoManage();
+}
+
+</script>
 </body>
 </html>

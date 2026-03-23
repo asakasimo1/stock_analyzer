@@ -2,11 +2,13 @@
   "builds": [
     { "src": "stock_analyzer.html", "use": "@vercel/static" },
     { "src": "api/analyze.js", "use": "@vercel/node" },
-    { "src": "api/data.js", "use": "@vercel/node" }
+    { "src": "api/data.js", "use": "@vercel/node" },
+    { "src": "api/ipo.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
     { "src": "/api/analyze", "dest": "/api/analyze.js" },
-    { "src": "/api/data", "dest": "/api/data.js" }
+    { "src": "/api/data", "dest": "/api/data.js" },
+    { "src": "/api/ipo", "dest": "/api/ipo.js" }
   ]
 }
