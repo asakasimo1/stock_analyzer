@@ -2858,13 +2858,14 @@ async function deleteTransaction(id) {
 }
 
 // ══════════════════════════════════════════════════════════
-// 배당 일정 자동계산 — 배당기준일 기준 보유수량 계산 후 배당 적재
+// 배당 일정 자동조회 → 보유수량 계산 → 배당 적재
 // ══════════════════════════════════════════════════════════
+
+let _dsSelected = null; // 현재 선택된 배당 일정 항목
 
 /**
  * 특정 날짜(targetDate) 기준 ETF 보유 수량 계산
  * 공식: 현재qty - sum(targetDate 이후 거래의 qty_delta)
- * (즉, 이후에 한 거래를 역으로 되돌려 과거 수량 복원)
  */
 function calcQtyAtDate(etfId, targetDate) {
   const etf = _etfRecords.find(r => r.id == etfId);
@@ -2875,84 +2876,142 @@ function calcQtyAtDate(etfId, targetDate) {
   return Math.max(0, (etf.qty || 0) - laterDelta);
 }
 
-function openDivScheduleModal(etfId) {
+async function openDivScheduleModal(etfId) {
   const r = _etfRecords.find(x => x.id == etfId);
   if (!r) return;
+
+  _dsSelected = null;
   document.getElementById('ds-etf-id').value      = r.id;
   document.getElementById('ds-etf-name').textContent = r.name + (r.ticker ? ` (${r.ticker})` : '');
-  document.getElementById('ds-ex-date').value     = '';
-  document.getElementById('ds-pay-date').value    = '';
-  document.getElementById('ds-per-share').value   = r.recent_div || '';
   document.getElementById('ds-note').value        = '';
-  document.getElementById('ds-preview').style.display = 'none';
+  document.getElementById('ds-loading').style.display  = 'block';
+  document.getElementById('ds-error').style.display    = 'none';
+  document.getElementById('ds-items').style.display    = 'none';
+  document.getElementById('ds-result').style.display   = 'none';
+  document.getElementById('ds-save-btn').disabled      = true;
+  document.getElementById('ds-save-btn').style.opacity = '.5';
   document.getElementById('div-sched-modal').style.display = 'block';
+
+  if (!r.ticker) {
+    showDsError('티커 정보가 없습니다. ETF 정보에서 티커를 먼저 등록해주세요.');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/dividend-schedule?ticker=${r.ticker}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.items?.length) throw new Error(data.error || '일정 없음');
+    renderDsItems(etfId, data.items);
+  } catch (e) {
+    showDsError(e.message || '배당 일정을 가져오지 못했습니다.');
+  }
+}
+
+function showDsError(msg) {
+  document.getElementById('ds-loading').style.display  = 'none';
+  document.getElementById('ds-error-msg').textContent  = msg;
+  document.getElementById('ds-error').style.display    = 'block';
+}
+
+function renderDsItems(etfId, items) {
+  document.getElementById('ds-loading').style.display = 'none';
+  document.getElementById('ds-items').style.display   = 'block';
+
+  const container = document.getElementById('ds-item-list');
+  container.innerHTML = items.map((item, idx) => {
+    const qty = calcQtyAtDate(etfId, item.ex_date);
+    const gross = Math.round(item.per_share * qty);
+    const net   = Math.round(gross * (1 - TAX_RATE));
+    return `
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s" id="ds-label-${idx}">
+      <input type="radio" name="ds-item" value="${idx}" onchange="selectDsItem(${idx})" style="margin-top:2px;accent-color:var(--primary)">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+          <span style="color:var(--muted)">기준일 <b style="color:var(--text)">${item.ex_date}</b></span>
+          <span style="color:var(--muted)">지급일 <b style="color:var(--text)">${item.pay_date}</b></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span>주당 <b style="color:var(--primary)">${item.per_share.toLocaleString()}원</b> × ${qty.toLocaleString()}주</span>
+          <span style="color:#16a34a;font-weight:700">세후 ${net.toLocaleString()}원</span>
+        </div>
+      </div>
+    </label>`;
+  }).join('');
+
+  // 데이터로 저장 (qty 포함)
+  container._items = items.map(item => {
+    const qty = calcQtyAtDate(etfId, item.ex_date);
+    return { ...item, qty };
+  });
+}
+
+function selectDsItem(idx) {
+  const container = document.getElementById('ds-item-list');
+  const items = container._items;
+  if (!items?.[idx]) return;
+  _dsSelected = items[idx];
+
+  // 선택 테두리 강조
+  container.querySelectorAll('label').forEach((el, i) => {
+    el.style.borderColor = i === idx ? 'var(--primary)' : 'var(--border)';
+    el.style.background  = i === idx ? 'var(--secondary)' : '';
+  });
+
+  // 계산 결과 표시
+  const { ex_date, pay_date, per_share, qty } = _dsSelected;
+  const gross = Math.round(per_share * qty);
+  const net   = Math.round(gross * (1 - TAX_RATE));
+
+  const etfId = document.getElementById('ds-etf-id').value;
+  const etf   = _etfRecords.find(r => r.id == etfId);
+  const laterTxs = _transactions.filter(t => t.etf_id == etfId && t.date > ex_date);
+  let qtyNote = `현재 ${(etf?.qty||0).toLocaleString()}주`;
+  if (laterTxs.length) {
+    const delta = laterTxs.reduce((s, t) => s + (t.type === 'buy' ? +t.qty_change : -t.qty_change), 0);
+    qtyNote += ` — 기준일(${ex_date}) 이후 거래 ${delta >= 0 ? '+' : ''}${delta}주 역산`;
+  }
+
+  document.getElementById('ds-r-qty').textContent       = qty.toLocaleString() + '주';
+  document.getElementById('ds-r-qty-note').textContent  = qtyNote;
+  document.getElementById('ds-r-per-share').textContent = per_share.toLocaleString() + '원';
+  document.getElementById('ds-r-gross').textContent     = gross.toLocaleString() + '원';
+  document.getElementById('ds-r-net').textContent       = net.toLocaleString() + '원';
+  document.getElementById('ds-result').style.display    = 'block';
+
+  const btn = document.getElementById('ds-save-btn');
+  btn.disabled = false; btn.style.opacity = '1';
 }
 
 function closeDivScheduleModal() {
   document.getElementById('div-sched-modal').style.display = 'none';
-}
-
-function calcDivSchedulePreview() {
-  const etfId    = document.getElementById('ds-etf-id').value;
-  const exDate   = document.getElementById('ds-ex-date').value;
-  const payDate  = document.getElementById('ds-pay-date').value;
-  const perShare = parseFloat(document.getElementById('ds-per-share').value) || 0;
-  const preview  = document.getElementById('ds-preview');
-
-  if (!exDate || !perShare) { preview.style.display = 'none'; return; }
-
-  const qty   = calcQtyAtDate(etfId, exDate);
-  const gross = Math.round(perShare * qty);
-  const net   = Math.round(gross * (1 - TAX_RATE));
-
-  // 기준일 이후 거래 목록으로 설명 메시지 생성
-  const etf = _etfRecords.find(r => r.id == etfId);
-  const laterTxs = _transactions.filter(t => t.etf_id == etfId && t.date > exDate);
-  let noteText = `현재 보유 ${(etf?.qty||0).toLocaleString()}주`;
-  if (laterTxs.length) {
-    const delta = laterTxs.reduce((s, t) => s + (t.type === 'buy' ? +t.qty_change : -t.qty_change), 0);
-    noteText += ` — 기준일 이후 거래 ${delta >= 0 ? '+' : ''}${delta}주 역산`;
-  }
-
-  document.getElementById('ds-calc-qty').textContent  = qty.toLocaleString() + '주';
-  document.getElementById('ds-calc-note').textContent = noteText;
-  document.getElementById('ds-calc-gross').textContent = gross.toLocaleString() + '원';
-  document.getElementById('ds-calc-net').textContent   = net.toLocaleString() + '원';
-  document.getElementById('ds-pay-label').textContent  = payDate ? `지급일: ${payDate}` : '';
-  preview.style.display = 'block';
+  _dsSelected = null;
 }
 
 async function saveDivSchedule() {
-  const etfId    = document.getElementById('ds-etf-id').value;
-  const exDate   = document.getElementById('ds-ex-date').value;
-  const payDate  = document.getElementById('ds-pay-date').value;
-  const perShare = parseFloat(document.getElementById('ds-per-share').value) || 0;
-  const note     = document.getElementById('ds-note').value.trim();
+  if (!_dsSelected) return;
+  const etfId  = document.getElementById('ds-etf-id').value;
+  const note   = document.getElementById('ds-note').value.trim();
+  const { ex_date, pay_date, per_share, qty, ym } = _dsSelected;
+  const etf    = _etfRecords.find(r => r.id == etfId);
 
-  if (!exDate)    { alert('배당기준일을 입력하세요'); return; }
-  if (!payDate)   { alert('배당지급일을 입력하세요'); return; }
-  if (!perShare)  { alert('주당 배당금을 입력하세요'); return; }
+  if (!qty) {
+    alert('배당기준일 기준 보유 수량이 0입니다.\n거래 내역에서 매수 내역을 먼저 추가해주세요.');
+    return;
+  }
 
-  const etf   = _etfRecords.find(r => r.id == etfId);
-  const qty   = calcQtyAtDate(etfId, exDate);
-  if (!qty)   { alert('배당기준일 기준 보유 수량이 0입니다.\n거래 내역을 먼저 확인해주세요.'); return; }
-
-  const gross = Math.round(perShare * qty);
+  const gross = Math.round(per_share * qty);
   const net   = Math.round(gross * (1 - TAX_RATE));
-  const [y, m] = payDate.split('-');
-  const ym    = `${y}-${m}`;
-
   const record = {
     id:        Date.now(),
     etf_id:    Number(etfId),
     ticker:    etf?.ticker || '',
     name:      etf?.name   || '',
     ym,
-    per_share: perShare,
+    per_share,
     qty,
     gross,
     net,
-    note: note || `기준일 ${exDate} / 지급일 ${payDate}`,
+    note: note || `기준일 ${ex_date} / 지급일 ${pay_date}`,
   };
 
   const btn = document.getElementById('ds-save-btn');
@@ -2967,11 +3026,10 @@ async function saveDivSchedule() {
     _divRecords.push(record);
     renderDivHistory();
     closeDivScheduleModal();
-    alert(`✅ 배당 적재 완료!\n${ym} / ${qty.toLocaleString()}주 / 세후 ${net.toLocaleString()}원`);
+    alert(`✅ 배당 적재 완료!\n${ym} / ${qty.toLocaleString()}주 × ${per_share}원\n세후 ${net.toLocaleString()}원`);
   } catch (e) {
     alert('저장 중 오류: ' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = '배당 적재';
+    btn.disabled = false; btn.textContent = '배당 적재'; btn.style.opacity = '1';
   }
 }
 
@@ -3448,61 +3506,68 @@ async function refreshAllEtfPrices() {
   </div>
 </div>
 
-<!-- 배당 일정 자동계산 모달 -->
+<!-- 배당 일정 자동조회 모달 -->
 <div id="div-sched-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto;padding:20px">
-  <div style="background:var(--surface);border-radius:16px;max-width:460px;margin:60px auto;padding:24px;border:1px solid var(--border)">
+  <div style="background:var(--surface);border-radius:16px;max-width:500px;margin:50px auto;padding:24px;border:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h3 style="margin:0;color:var(--text);font-size:16px">📅 배당 일정 입력</h3>
+      <h3 style="margin:0;color:var(--text);font-size:16px">📅 배당 일정 자동 조회</h3>
       <button onclick="closeDivScheduleModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:18px">배당기준일 기준 보유 수량을 자동 계산해 배당금을 적재합니다.</div>
-    <div style="display:grid;gap:14px">
-      <input id="ds-etf-id" type="hidden">
-      <div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;font-weight:700;color:var(--text)" id="ds-etf-name"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div>
-          <label style="font-size:12px;color:var(--muted)">배당기준일 <span style="color:#f87171">*</span></label>
-          <input id="ds-ex-date" type="date" style="width:100%" oninput="calcDivSchedulePreview()">
-        </div>
-        <div>
-          <label style="font-size:12px;color:var(--muted)">배당지급일 <span style="color:#f87171">*</span></label>
-          <input id="ds-pay-date" type="date" style="width:100%" oninput="calcDivSchedulePreview()">
-        </div>
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--muted)">주당 배당금 (세전, 원) <span style="color:#f87171">*</span></label>
-        <input id="ds-per-share" type="number" min="0" placeholder="86" oninput="calcDivSchedulePreview()">
-      </div>
-      <!-- 자동 계산 결과 -->
-      <div id="ds-preview" style="display:none;border:1.5px solid #86efac;border-radius:10px;overflow:hidden">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:18px">네이버 증권에서 배당 일정을 자동으로 가져옵니다.</div>
+    <input id="ds-etf-id" type="hidden">
+    <div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px" id="ds-etf-name"></div>
+
+    <!-- 로딩 상태 -->
+    <div id="ds-loading" style="text-align:center;padding:32px;color:var(--muted)">
+      <div style="font-size:22px;margin-bottom:8px">⏳</div>
+      <div style="font-size:13px">배당 일정 조회 중...</div>
+    </div>
+
+    <!-- 오류 -->
+    <div id="ds-error" style="display:none;padding:16px;background:#fef2f2;border-radius:8px;color:#dc2626;font-size:13px;text-align:center">
+      <div style="font-size:20px;margin-bottom:6px">😕</div>
+      <div id="ds-error-msg"></div>
+    </div>
+
+    <!-- 일정 선택 목록 -->
+    <div id="ds-items" style="display:none">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">배당 일정 선택</div>
+      <div id="ds-item-list" style="display:grid;gap:8px"></div>
+
+      <!-- 선택된 항목 계산 결과 -->
+      <div id="ds-result" style="display:none;margin-top:16px;border:1.5px solid #86efac;border-radius:10px;overflow:hidden">
         <div style="background:#f0fdf4;padding:8px 14px;border-bottom:1px solid #86efac">
-          <span style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.05em">자동 계산 결과</span>
+          <span style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.05em">배당금 자동 계산</span>
         </div>
-        <div style="padding:10px 14px;display:grid;gap:6px">
-          <div style="display:flex;justify-content:space-between;font-size:13px">
+        <div style="padding:12px 14px;display:grid;gap:7px;font-size:13px">
+          <div style="display:flex;justify-content:space-between">
             <span style="color:var(--muted)">배당기준일 보유수량</span>
-            <span id="ds-calc-qty" style="font-weight:700;color:var(--text)"></span>
+            <span id="ds-r-qty" style="font-weight:700;color:var(--text)"></span>
           </div>
-          <div style="font-size:10px;color:var(--muted)" id="ds-calc-note"></div>
-          <hr style="border:none;border-top:1px solid #86efac;margin:2px 0">
-          <div style="display:flex;justify-content:space-between;font-size:12px">
+          <div id="ds-r-qty-note" style="font-size:10px;color:var(--muted)"></div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--muted)">주당 배당금(세전)</span>
+            <span id="ds-r-per-share" style="font-weight:600;color:var(--text)"></span>
+          </div>
+          <hr style="border:none;border-top:1px solid #86efac">
+          <div style="display:flex;justify-content:space-between">
             <span style="color:var(--muted)">세전 합계</span>
-            <span id="ds-calc-gross" style="font-weight:600;color:var(--text)"></span>
+            <span id="ds-r-gross" style="font-weight:600"></span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:14px">
-            <span style="color:#15803d;font-weight:600">세후 합계 <small style="font-weight:400;font-size:10px">(15.4% 차감)</small></span>
-            <span id="ds-calc-net" style="font-weight:700;color:#16a34a"></span>
+          <div style="display:flex;justify-content:space-between;font-size:15px">
+            <span style="color:#15803d;font-weight:700">세후 합계 <small style="font-size:10px;font-weight:400">(15.4%)</small></span>
+            <span id="ds-r-net" style="font-weight:700;color:#16a34a"></span>
           </div>
-          <div style="font-size:10px;color:var(--muted)" id="ds-pay-label"></div>
         </div>
       </div>
-      <div>
+
+      <div style="margin-top:12px">
         <label style="font-size:12px;color:var(--muted)">메모 (선택)</label>
-        <input id="ds-note" type="text" placeholder="예: 3월 배당">
+        <input id="ds-note" type="text" placeholder="예: 3월 배당" style="width:100%;margin-top:4px">
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
         <button onclick="closeDivScheduleModal()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;color:var(--text)">취소</button>
-        <button id="ds-save-btn" onclick="saveDivSchedule()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">배당 적재</button>
+        <button id="ds-save-btn" onclick="saveDivSchedule()" disabled style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;opacity:.5">배당 적재</button>
       </div>
     </div>
   </div>
