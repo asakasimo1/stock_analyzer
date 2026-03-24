@@ -527,19 +527,19 @@
 <body>
 
 <header>
-  <div class="logo">📈 Trade<em>Lens</em></div>
+  <div class="logo">🏢 IPO<em>Tracker</em></div>
   <div class="header-stats">
     <div class="hstat">
-      <div class="hstat-val" id="h-total">0</div>
-      <div class="hstat-label">총 매매</div>
+      <div class="hstat-val" id="h-active">-</div>
+      <div class="hstat-label">진행중</div>
     </div>
     <div class="hstat">
-      <div class="hstat-val up" id="h-buy">0</div>
-      <div class="hstat-label">매수</div>
+      <div class="hstat-val up" id="h-profit">-</div>
+      <div class="hstat-label">총 수익</div>
     </div>
     <div class="hstat">
-      <div class="hstat-val dn" id="h-sell">0</div>
-      <div class="hstat-label">매도</div>
+      <div class="hstat-val" id="h-rate">-</div>
+      <div class="hstat-label">수익률</div>
     </div>
   </div>
 </header>
@@ -548,123 +548,9 @@
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('dashboard')">📊 대시보드</button>
   <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
-  <button class="tab-btn" onclick="switchTab('trades')">📋 매매기록</button>
   <button class="tab-btn" onclick="switchTab('ipo')">🏢 공모주</button>
 </nav>
 
-<!-- 매매기록 탭 -->
-<div id="tab-trades" class="tab-page">
-<main>
-
-  <!-- INPUT CARD -->
-  <div class="card input-card">
-    <div class="card-title">✏️ 매매 기록 입력</div>
-
-    <div class="form-row">
-      <div>
-        <label>날짜</label>
-        <input type="date" id="inp-date">
-      </div>
-      <div>
-        <label>종목명</label>
-        <input type="text" id="inp-stock" placeholder="예: 삼성전자">
-      </div>
-    </div>
-
-    <div class="form-row three">
-      <div>
-        <label>매수/매도</label>
-        <select id="inp-type">
-          <option value="매수">📗 매수</option>
-          <option value="매도">📕 매도</option>
-        </select>
-      </div>
-      <div>
-        <label>가격 (원)</label>
-        <input type="number" id="inp-price" placeholder="72000">
-      </div>
-      <div>
-        <label>수량 (주)</label>
-        <input type="number" id="inp-qty" placeholder="10">
-      </div>
-    </div>
-
-    <div style="margin-bottom:10px">
-      <label>매매 이유</label>
-      <input type="text" id="inp-reason" placeholder="예: 52주 신저가 근처, 실적 발표 기대">
-    </div>
-
-    <div style="margin-bottom:16px">
-      <label>당시 심리 상태</label>
-      <div class="emotion-group" id="emotion-group">
-        <button class="emotion-btn" onclick="toggleEmotion(this)">😤 확신</button>
-        <button class="emotion-btn" onclick="toggleEmotion(this)">😰 불안</button>
-        <button class="emotion-btn" onclick="toggleEmotion(this)">🤑 탐욕</button>
-        <button class="emotion-btn" onclick="toggleEmotion(this)">😱 공포</button>
-        <button class="emotion-btn" onclick="toggleEmotion(this)">🧘 평온</button>
-        <button class="emotion-btn" onclick="toggleEmotion(this)">🎲 도박심리</button>
-      </div>
-    </div>
-
-    <div>
-      <label>추가 메모 (선택)</label>
-      <textarea id="inp-memo" placeholder="시장 상황, 뉴스, 특이사항 등 자유롭게 기록해보세요..."></textarea>
-    </div>
-
-    <button class="btn-submit" onclick="addTrade()">+ 매매 기록 추가</button>
-  </div>
-
-  <!-- TRADES LIST -->
-  <div class="card trades-card">
-    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-      <span>📋 매매 내역</span>
-      <span id="trade-count" style="font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500">0건</span>
-    </div>
-    <div class="trades-list" id="trades-list">
-      <div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <p>아직 매매 기록이 없어요</p>
-        <small>왼쪽에서 기록을 추가해보세요!</small>
-      </div>
-    </div>
-  </div>
-
-  <!-- ANALYSIS -->
-  <div class="card analysis-card">
-    <div class="card-title">🧠 AI 성향 분석</div>
-
-    <div class="stats-row" id="stats-row" style="display:none">
-      <div class="stat-box">
-        <div class="stat-val neutral" id="s-total">0</div>
-        <div class="stat-lbl">총 매매 횟수</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val up" id="s-buy">0</div>
-        <div class="stat-lbl">매수 횟수</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val down" id="s-sell">0</div>
-        <div class="stat-lbl">매도 횟수</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val neutral" id="s-stocks">0</div>
-        <div class="stat-lbl">거래 종목 수</div>
-      </div>
-    </div>
-
-    <button class="btn-analyze" id="analyze-btn" onclick="analyzeWithClaude()">
-      <span>🤖</span> Claude AI 성향 분석 시작
-    </button>
-
-    <div class="analysis-result" id="analysis-result">
-      <div style="color:var(--muted);text-align:center;padding:20px">
-        <span class="pulse"></span>매매 기록을 추가한 후 AI 분석을 시작하세요
-      </div>
-    </div>
-  </div>
-
-</main>
-</div><!-- /tab-trades -->
 
 <!-- 포트폴리오 탭 -->
 <div id="tab-portfolio" class="tab-page">
@@ -792,7 +678,7 @@
         </div>
         <div>
           <label style="font-size:12px;color:#94a3b8">공모가 (원)</label>
-          <input id="if-price" type="number" placeholder="0" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+          <input id="if-price" type="number" placeholder="0" oninput="calcMinSub()" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -808,8 +694,14 @@
         </div>
         <div>
           <label style="font-size:12px;color:#94a3b8">청약주수 (주)</label>
-          <input id="if-apply" type="number" placeholder="0" min="0" style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+          <input id="if-apply" type="number" placeholder="0" min="0" oninput="calcMinSub()"
+            style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
         </div>
+      </div>
+      <!-- 최소청약금 자동 계산 -->
+      <div id="if-min-sub-display" style="background:#0f172a;border-radius:6px;padding:8px 12px;font-size:12px;display:none">
+        💳 최소청약금: <strong id="if-min-sub-val" style="color:#fde68a">-</strong>
+        <span style="font-size:10px;color:#475569;margin-left:4px">(청약주수 × 공모가 × 50% 증거금)</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
@@ -890,150 +782,6 @@
 </div><!-- /tab-dashboard -->
 
 <script>
-const API_URL = "/api/analyze";
-let trades = JSON.parse(localStorage.getItem('trades') || '[]');
-let selectedEmotion = '';
-
-document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
-
-function toggleEmotion(btn) {
-  document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  selectedEmotion = btn.textContent.trim();
-}
-
-function addTrade() {
-  const date = document.getElementById('inp-date').value;
-  const stock = document.getElementById('inp-stock').value.trim();
-  const type = document.getElementById('inp-type').value;
-  const price = document.getElementById('inp-price').value;
-  const qty = document.getElementById('inp-qty').value;
-  const reason = document.getElementById('inp-reason').value.trim();
-  const memo = document.getElementById('inp-memo').value.trim();
-
-  if (!date || !stock || !price || !qty) {
-    alert('날짜, 종목명, 가격, 수량은 필수 입력 항목입니다!');
-    return;
-  }
-
-  const trade = { date, stock, type, price: parseInt(price), qty: parseInt(qty), reason, emotion: selectedEmotion, memo, id: Date.now() };
-  trades.push(trade);
-  localStorage.setItem('trades', JSON.stringify(trades));
-
-  renderTrades();
-  updateStats();
-
-  document.getElementById('inp-stock').value = '';
-  document.getElementById('inp-price').value = '';
-  document.getElementById('inp-qty').value = '';
-  document.getElementById('inp-reason').value = '';
-  document.getElementById('inp-memo').value = '';
-  document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('active'));
-  selectedEmotion = '';
-}
-
-function renderTrades() {
-  const list = document.getElementById('trades-list');
-  if (trades.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>아직 매매 기록이 없어요</p><small>왼쪽에서 기록을 추가해보세요!</small></div>`;
-    return;
-  }
-  list.innerHTML = [...trades].reverse().map(t => `
-    <div class="trade-item">
-      <span class="trade-badge ${t.type === '매수' ? 'badge-buy' : 'badge-sell'}">${t.type}</span>
-      <div class="trade-info">
-        <div class="trade-name">${t.stock}</div>
-        <div class="trade-detail">${t.price.toLocaleString()}원 × ${t.qty}주 = ${(t.price*t.qty).toLocaleString()}원${t.emotion ? ' · ' + t.emotion : ''}</div>
-        ${t.reason ? `<div class="trade-reason">💬 ${t.reason}</div>` : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-        <span class="trade-date">${t.date}</span>
-        <button class="trade-del" onclick="deleteTrade(${t.id})">✕</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function deleteTrade(id) {
-  trades = trades.filter(t => t.id !== id);
-  localStorage.setItem('trades', JSON.stringify(trades));
-  renderTrades();
-  updateStats();
-}
-
-function updateStats() {
-  const total = trades.length;
-  const buys = trades.filter(t => t.type === '매수').length;
-  const sells = trades.filter(t => t.type === '매도').length;
-  const stocks = [...new Set(trades.map(t => t.stock))].length;
-
-  document.getElementById('h-total').textContent = total;
-  document.getElementById('h-buy').textContent = buys;
-  document.getElementById('h-sell').textContent = sells;
-  document.getElementById('trade-count').textContent = total + '건';
-  document.getElementById('s-total').textContent = total;
-  document.getElementById('s-buy').textContent = buys;
-  document.getElementById('s-sell').textContent = sells;
-  document.getElementById('s-stocks').textContent = stocks;
-
-  if (total > 0) document.getElementById('stats-row').style.display = 'grid';
-}
-
-async function analyzeWithClaude() {
-  if (trades.length === 0) {
-    alert('먼저 매매 기록을 입력해주세요!');
-    return;
-  }
-
-  const btn = document.getElementById('analyze-btn');
-  const result = document.getElementById('analysis-result');
-  btn.disabled = true;
-  btn.innerHTML = '⏳ 분석 중...';
-
-  result.className = 'analysis-result loading';
-  result.innerHTML = `분석 중입니다 <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
-
-  const summary = trades.map(t =>
-    `[${t.date}] ${t.stock} ${t.type} | 가격: ${t.price.toLocaleString()}원 | 수량: ${t.qty}주 | 이유: ${t.reason || '없음'} | 심리: ${t.emotion || '미입력'} | 메모: ${t.memo || '없음'}`
-  ).join('\n');
-
-  const prompt = `다음은 사용자의 주식 매매 기록입니다:\n\n${summary}\n\n위 매매 기록을 분석하여 다음 항목을 한국어로 리포팅해주세요:\n\n1. **매매 성향 유형** (예: 단기 스캘퍼, 중기 스윙트레이더, 장기 가치투자자 등)\n2. **주요 매매 패턴** (자주 나타나는 행동 패턴 3가지)\n3. **심리적 특성** (감정이 매매에 미치는 영향)\n4. **강점** (잘 하고 있는 부분)\n5. **개선이 필요한 부분** (주의해야 할 습관)\n6. **맞춤 전략 제안** (성향에 맞는 투자 전략 2-3가지)\n\n각 항목을 h3 태그로 구분하고, 구체적이고 통찰력 있게 분석해주세요. 데이터가 적더라도 가능한 패턴을 찾아 분석해주세요.`;
-
-  try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const data = await response.json();
-    const text = data.content?.[0]?.text || '분석 결과를 가져오지 못했습니다.';
-
-    result.className = 'analysis-result';
-    result.innerHTML = text
-      .replace(/### (.*)/g, '<h3>$1</h3>')
-      .replace(/## (.*)/g, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/^- (.*)/gm, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
-      .replace(/\n\n/g, '<br><br>')
-      .replace(/\n/g, '<br>');
-
-  } catch (e) {
-    result.className = 'analysis-result';
-    result.innerHTML = `<div style="color:var(--red)">⚠️ 분석 중 오류가 발생했습니다.<br><small style="color:var(--muted)">${e.message}</small></div>`;
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = '<span>🤖</span> Claude AI 성향 분석 시작';
-}
-
-renderTrades();
-updateStats();
 
 // ══════════════════════════════════════════════════════════
 // 탭 전환
@@ -1958,19 +1706,35 @@ async function saveIpoRecords() {
 function renderIpoManage() {
   const today = new Date().toISOString().slice(0, 10);
 
-  // KPI
-  const total = _ipoRecords.length;
-  const pending = _ipoRecords.filter(r => ['청약예정','청약중','상장예정'].includes(r.status)).length;
+  // ── KPI 계산 ──────────────────────────────────────────────
+  const active    = _ipoRecords.filter(r => ['청약예정','청약중','상장예정'].includes(r.status)).length;
   const completed = _ipoRecords.filter(r => r.status === '상장완료');
-  const totalProfit = completed.reduce((s, r) => s + ((r.price_open||0) - r.price_ipo) * (r.shares_alloc||0), 0);
+  const totalInvest = completed.reduce((s, r) => s + (r.price_ipo||0) * (r.shares_alloc||0), 0);
+  const totalSell   = completed.reduce((s, r) => s + (r.price_open||0) * (r.shares_alloc||0), 0);
+  const totalProfit = totalSell - totalInvest;
+  const profitRate  = totalInvest > 0 ? totalProfit / totalInvest * 100 : null;
+  const pc = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  const ps = totalProfit >= 0 ? '+' : '';
+
   document.getElementById('ipo-kpi').innerHTML = `
-    ${kpiCard('전체 종목', total + '개')}
-    ${kpiCard('진행중', pending + '개')}
-    ${kpiCard('상장완료', completed.length + '개')}
-    ${kpiCard('총 수익', totalProfit ? (totalProfit >= 0 ? '🟢 ' : '🔴 ') + totalProfit.toLocaleString() + '원' : '-')}
+    ${kpiCard('진행중', active + '건')}
+    ${kpiCard('총 투자금', totalInvest ? totalInvest.toLocaleString() + '원' : '-')}
+    ${kpiCard('총 수익금', totalInvest > 0 ? `<span style="color:${pc}">${ps}${totalProfit.toLocaleString()}원</span>` : '-')}
+    ${kpiCard('수익률', profitRate !== null ? `<span style="color:${pc}">${ps}${profitRate.toFixed(1)}%</span>` : '-')}
   `;
 
-  // 알림 배너 (배정 확인일 도래 — subscribed 여부 무관)
+  // 헤더 통계 업데이트
+  document.getElementById('h-active').textContent = active + '건';
+  if (totalInvest > 0) {
+    const profitDisp = Math.abs(totalProfit) >= 10000
+      ? Math.round(totalProfit / 10000) + '만원' : totalProfit.toLocaleString() + '원';
+    document.getElementById('h-profit').textContent = ps + profitDisp;
+    document.getElementById('h-profit').style.color = pc;
+    document.getElementById('h-rate').textContent = profitRate !== null ? ps + profitRate.toFixed(1) + '%' : '-';
+    document.getElementById('h-rate').style.color = pc;
+  }
+
+  // ── 알림 배너 ─────────────────────────────────────────────
   let alerts = '';
   _ipoRecords.forEach(r => {
     if (r.shares_alloc > 0 || ['청약포기','상장완료','배정실패'].includes(r.status)) return;
@@ -1981,7 +1745,7 @@ function renderIpoManage() {
           <span style="font-size:20px">📬</span>
           <div style="flex:1">
             <strong style="color:#fef3c7">${r.name}</strong>
-            <span style="color:#fde68a;font-size:13px"> 배정 결과 확인일(${allotDate})이 됐어요! 배정주수를 입력해주세요.</span>
+            <span style="color:#fde68a;font-size:13px"> 배정 확인일(${allotDate})! 배정주수를 입력해주세요.</span>
           </div>
           <button onclick="quickAllot(${r.id})" style="background:#f59e0b;color:#000;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;white-space:nowrap">배정 입력</button>
         </div>`;
@@ -1989,85 +1753,160 @@ function renderIpoManage() {
   });
   document.getElementById('ipo-alerts').innerHTML = alerts;
 
-  // 목록
+  // ── 정렬 ─────────────────────────────────────────────────
   const order = ['청약중','청약예정','상장예정','상장완료','청약포기','배정실패'];
   const sorted = [..._ipoRecords].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
 
   if (!sorted.length) {
-    document.getElementById('ipo-list-manage').innerHTML = '<div style="text-align:center;color:#64748b;padding:40px">등록된 공모주가 없습니다. 위 버튼으로 추가해보세요.</div>';
+    document.getElementById('ipo-list-manage').innerHTML = '<div style="text-align:center;color:#64748b;padding:40px">등록된 공모주가 없습니다.<br><small>위 버튼으로 추가해보세요.</small></div>';
     return;
   }
 
-  document.getElementById('ipo-list-manage').innerHTML = sorted.map(r => {
-    const emoji = IPO_STATUS[r.status] || '⚪';
-    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
-    const alloc = r.shares_alloc || 0;
-    const subDone = r.subscribed;
+  const editDel = id => `
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button onclick="editIpo(${id})" style="background:none;border:1px solid #1e2d45;color:#94a3b8;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">✏️</button>
+      <button onclick="deleteIpo(${id})" style="background:none;border:1px solid #3f1515;color:#f87171;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">🗑️</button>
+    </div>`;
 
-    // 배정주수 영역 — subscribed 여부 무관, 활성 상태면 항상 표시
-    let allocSection = '';
-    if (!['상장완료','청약포기','배정실패'].includes(r.status)) {
-      allocSection = `
-        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">📬 배정주수</span>
-          <input type="number" id="alloc-input-${r.id}" value="${alloc}" min="0"
-            style="width:100px;padding:6px 8px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:13px">
-          <button onclick="saveAlloc(${r.id})"
-            style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
-          ${alloc > 0 ? `<span style="color:#34d399;font-size:12px">✅ ${alloc.toLocaleString()}주 확정</span>` : `<span style="color:#94a3b8;font-size:12px">(0 = 미배정)</span>`}
-        </div>`;
+  document.getElementById('ipo-list-manage').innerHTML = sorted.map(r => {
+    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
+    const alloc     = r.shares_alloc || 0;
+    const minAmt    = (r.shares_apply && r.price_ipo) ? r.shares_apply * r.price_ipo * 0.5 : null;
+    const buyAmt    = alloc > 0 && r.price_ipo  ? alloc * r.price_ipo  : null;
+    const sellAmt   = alloc > 0 && r.price_open ? alloc * r.price_open : null;
+    const profit    = buyAmt !== null && sellAmt !== null ? sellAmt - buyAmt : null;
+    const profitPct = buyAmt && profit !== null ? profit / buyAmt * 100 : null;
+    const isFailed  = ['배정실패','청약포기'].includes(r.status);
+    const isComp    = r.status === '상장완료';
+    const isListing = r.status === '상장예정';
+    const ddayNum   = r.date_list
+      ? Math.ceil((new Date(r.date_list + 'T00:00:00') - new Date()) / 86400000) : null;
+    const ddayStr   = ddayNum === 0 ? '🚀 D-Day!' : ddayNum > 0 ? `D-${ddayNum}` : ddayNum < 0 ? `D+${Math.abs(ddayNum)}` : '';
+
+    // ── 배정실패 / 청약포기: 컴팩트 ──────────────────────────
+    if (isFailed) {
+      return `<div style="border:1px solid #1a1a1a;border-radius:8px;padding:10px 14px;margin-bottom:6px;background:#0a0a0a;display:flex;align-items:center;justify-content:space-between;opacity:0.55">
+        <div>
+          <span style="font-weight:600;color:#475569">${IPO_STATUS[r.status]||'⚫'} ${r.name}</span>
+          <span style="font-size:11px;color:#374151;margin-left:8px">${r.status} · ${r.date_sub_end||''} · 공모가 ${(r.price_ipo||0).toLocaleString()}원</span>
+        </div>
+        ${editDel(r.id)}
+      </div>`;
     }
 
-    return `
-      <div style="border:1px solid ${subDone ? '#1e3a2e' : '#1e2d45'};border-radius:10px;padding:14px;margin-bottom:10px;background:${subDone ? '#0d1f16' : '#0f172a'}">
+    // ── 상장완료 ─────────────────────────────────────────────
+    if (isComp) {
+      if (profit !== null) {
+        const c = profit >= 0 ? '#34d399' : '#f87171';
+        const s = profit >= 0 ? '+' : '';
+        return `<div style="border:1px solid ${profit >= 0 ? '#14532d' : '#7f1d1d'};border-radius:10px;padding:16px;margin-bottom:10px;background:#0a1a0a">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+            <div>
+              <span style="font-weight:700;font-size:15px">🟢 ${r.name}</span>
+              ${r.broker ? `<span style="font-size:11px;color:#64748b;margin-left:6px">${r.broker}</span>` : ''}
+              <span style="font-size:11px;color:#64748b;margin-left:6px">상장 ${r.date_list||''}</span>
+            </div>
+            ${editDel(r.id)}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center">
+            <div style="background:#0f172a;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:#64748b;margin-bottom:4px">실제 매수금</div>
+              <div style="font-size:14px;font-weight:700">${buyAmt.toLocaleString()}원</div>
+              <div style="font-size:10px;color:#475569">${alloc}주 × ${r.price_ipo.toLocaleString()}</div>
+            </div>
+            <div style="text-align:center;color:#475569;font-size:18px">→</div>
+            <div style="background:#0f172a;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:#64748b;margin-bottom:4px">매도금</div>
+              <div style="font-size:14px;font-weight:700">${sellAmt.toLocaleString()}원</div>
+              <div style="font-size:10px;color:#475569">× ${r.price_open.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:10px;padding:10px;background:#0f172a;border-radius:8px">
+            <span style="color:${c};font-size:20px;font-weight:700">${s}${profit.toLocaleString()}원</span>
+            <span style="color:${c};font-size:14px;margin-left:10px">(${s}${profitPct.toFixed(1)}%)</span>
+          </div>
+        </div>`;
+      }
+      // 상장완료지만 매도가 미입력
+      return `<div style="border:1px solid #166534;border-radius:10px;padding:14px;margin-bottom:10px;background:#0a1a0a">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-weight:700">🟢 ${r.name} <span style="font-size:11px;color:#64748b">· 매도가 미입력</span></span>
+          ${editDel(r.id)}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">💰 매도가</span>
+          <input type="number" id="list-price-input-${r.id}" min="0" placeholder="매도한 가격 입력"
+            style="flex:1;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <button onclick="saveListPrice(${r.id})"
+            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">저장</button>
+        </div>
+      </div>`;
+    }
+
+    // ── 상장예정 ─────────────────────────────────────────────
+    if (isListing) {
+      return `<div style="border:1px solid ${ddayNum === 0 ? '#f59e0b' : '#78350f'};border-radius:10px;padding:14px;margin-bottom:10px;background:#120d00">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
-            <span style="font-weight:700;font-size:15px">${emoji} ${r.name}</span>
-            ${r.broker ? `<span style="font-size:11px;color:#64748b;margin-left:8px">${r.broker}</span>` : ''}
-            <span style="font-size:11px;background:#1e2d45;color:#94a3b8;border-radius:20px;padding:2px 8px;margin-left:6px">${r.status}</span>
+            <span style="font-weight:700;font-size:15px">🟠 ${r.name}</span>
+            ${r.broker ? `<span style="font-size:11px;color:#64748b;margin-left:6px">${r.broker}</span>` : ''}
+            ${ddayStr ? `<span style="font-size:13px;font-weight:700;color:#f59e0b;margin-left:8px">${ddayStr}</span>` : ''}
           </div>
-          <div style="display:flex;gap:6px">
-            <button onclick="editIpo(${r.id})" style="background:none;border:1px solid #1e2d45;color:#94a3b8;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">✏️</button>
-            <button onclick="deleteIpo(${r.id})" style="background:none;border:1px solid #3f1515;color:#f87171;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">🗑️</button>
-          </div>
+          ${editDel(r.id)}
         </div>
         <div style="margin-top:8px;font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:10px">
-          ${r.date_sub_start ? `<span>📅 청약 ${r.date_sub_start} ~ ${r.date_sub_end||''}</span>` : ''}
-          ${r.date_list && alloc > 0 ? `<span>🚀 상장 ${r.date_list}</span>` : ''}
+          ${r.date_list ? `<span>🚀 상장 ${r.date_list}</span>` : ''}
           ${r.price_ipo ? `<span>💰 공모가 ${r.price_ipo.toLocaleString()}원</span>` : ''}
-          ${allotDate && subDone && !alloc && !['청약포기','배정실패'].includes(r.status) ? `<span style="color:#fbbf24">📬 배정확인 ${allotDate}</span>` : ''}
+          ${buyAmt !== null ? `<span style="color:#fbbf24">📌 실제 매수금 ${buyAmt.toLocaleString()}원 (${alloc}주)</span>` : ''}
         </div>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-            <input type="checkbox" ${subDone ? 'checked' : ''} onchange="toggleSubscribed(${r.id}, this.checked)"
-              style="width:16px;height:16px;cursor:pointer">
-            <span style="color:${subDone ? '#34d399' : '#94a3b8'}">${subDone ? '✅ 청약 완료' : '⬜ 청약 완료 (체크하면 배정일 캘린더에 표시)'}</span>
-          </label>
-        </div>
-        ${allocSection}
-        ${['상장예정','상장완료'].includes(r.status) && alloc > 0 ? `
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
           <span style="font-size:12px;color:#94a3b8;white-space:nowrap">💰 매도가</span>
-          <input type="number" id="list-price-input-${r.id}" value="${r.price_open||''}" min="0" placeholder="매도가 입력"
-            style="width:120px;padding:6px 8px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <input type="number" id="list-price-input-${r.id}" value="${r.price_open||''}" min="0" placeholder="시초가 매도 후 입력"
+            style="flex:1;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
           <button onclick="saveListPrice(${r.id})"
-            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
+            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">저장</button>
           ${r.price_open ? `<span style="color:#34d399;font-size:12px">✅ ${r.price_open.toLocaleString()}원</span>` : ''}
-        </div>` : ''}
-        ${r.status === '상장완료' && r.price_open && r.price_ipo && alloc > 0 ? (() => {
-          const profit = (r.price_open - r.price_ipo) * alloc;
-          const pct = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(1);
-          const c = profit >= 0 ? '#34d399' : '#f87171';
-          return `<div style="margin-top:8px;padding:10px;background:#0f172a;border-radius:8px;font-size:13px">
-            <div style="font-size:11px;color:#64748b;margin-bottom:4px">수익 계산</div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-              <strong style="color:${c};font-size:16px">${profit >= 0 ? '+' : ''}${profit.toLocaleString()}원</strong>
-              <span style="color:${c}">(${profit >= 0 ? '+' : ''}${pct}%)</span>
-              <span style="font-size:11px;color:#64748b">공모가 ${r.price_ipo.toLocaleString()} → 매도가 ${r.price_open.toLocaleString()}</span>
-            </div>
-          </div>`;
-        })() : ''}
+        </div>
       </div>`;
+    }
+
+    // ── 청약예정 / 청약중 ────────────────────────────────────
+    const subDone  = r.subscribed;
+    const bgColor  = r.status === '청약중' ? '#050a16' : '#0f172a';
+    const brdColor = r.status === '청약중' ? '#1e3a5f' : '#1e2d45';
+    return `<div style="border:1px solid ${brdColor};border-radius:10px;padding:14px;margin-bottom:10px;background:${bgColor}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span style="font-weight:700;font-size:15px">${IPO_STATUS[r.status]||'⚪'} ${r.name}</span>
+          ${r.broker ? `<span style="font-size:11px;color:#64748b;margin-left:8px">${r.broker}</span>` : ''}
+          <span style="font-size:11px;background:#1e2d45;color:#94a3b8;border-radius:20px;padding:2px 8px;margin-left:6px">${r.status}</span>
+        </div>
+        ${editDel(r.id)}
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:10px">
+        ${r.date_sub_start ? `<span>📅 ${r.date_sub_start} ~ ${r.date_sub_end||''}</span>` : ''}
+        ${r.price_ipo ? `<span>💰 공모가 ${r.price_ipo.toLocaleString()}원</span>` : ''}
+        ${minAmt !== null ? `<span style="color:#a5b4fc">💳 최소청약금 ${minAmt.toLocaleString()}원</span>` : ''}
+        ${r.score != null ? `<span style="color:${r.score >= 70 ? '#34d399' : r.score >= 50 ? '#fbbf24' : '#94a3b8'}">⭐ ${r.score}점 ${r.recommendation||''}</span>` : ''}
+        ${allotDate && subDone && !alloc ? `<span style="color:#fbbf24">📬 배정확인 ${allotDate}</span>` : ''}
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" ${subDone ? 'checked' : ''} onchange="toggleSubscribed(${r.id}, this.checked)"
+            style="width:16px;height:16px;cursor:pointer">
+          <span style="color:${subDone ? '#34d399' : '#94a3b8'}">${subDone ? '✅ 청약 완료' : '⬜ 청약 완료'}</span>
+        </label>
+      </div>
+      ${!['상장완료','청약포기','배정실패'].includes(r.status) ? `
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;color:#94a3b8;white-space:nowrap">📬 배정주수</span>
+        <input type="number" id="alloc-input-${r.id}" value="${alloc}" min="0"
+          style="width:90px;padding:6px 8px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:13px">
+        <button onclick="saveAlloc(${r.id})"
+          style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
+        ${alloc > 0 ? `<span style="color:#34d399;font-size:12px">✅ ${alloc}주 확정</span>` : `<span style="color:#94a3b8;font-size:12px">(0 = 배정실패)</span>`}
+      </div>` : ''}
+    </div>`;
   }).join('');
 }
 
@@ -2079,6 +1918,20 @@ function kpiCard(label, value) {
 }
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
+// 모달: 최소청약금 자동 계산
+function calcMinSub() {
+  const apply = parseInt(document.getElementById('if-apply')?.value) || 0;
+  const price = parseInt(document.getElementById('if-price')?.value) || 0;
+  const disp  = document.getElementById('if-min-sub-display');
+  const val   = document.getElementById('if-min-sub-val');
+  if (apply > 0 && price > 0) {
+    val.textContent = (apply * price * 0.5).toLocaleString() + '원';
+    disp.style.display = 'block';
+  } else {
+    disp.style.display = 'none';
+  }
+}
+
 function openIpoModal(prefill) {
   const p = prefill || {};
   document.getElementById('if-id').value = p.id || '';
@@ -2094,6 +1947,7 @@ function openIpoModal(prefill) {
   document.getElementById('if-memo').value = p.memo || '';
   document.getElementById('ipo-modal-title').textContent = p.id ? '공모주 편집' : '공모주 추가';
   document.getElementById('ipo-modal').style.display = 'block';
+  calcMinSub();
 }
 
 function closeIpoModal() {
