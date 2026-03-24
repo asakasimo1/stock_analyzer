@@ -817,6 +817,8 @@ async function initDashboard() {
     _ipoRecords = (ipoData.records && ipoData.records.length)
       ? ipoData.records
       : (_dashData.ipo || []);
+    // id 없는 레코드에 자동 id 부여
+    if (ensureIds(_ipoRecords)) saveIpoRecords();
     // 항상 동기화: 캘린더의 ipo 객체와 _ipoRecords가 같은 참조를 공유
     _dashData.ipo = _ipoRecords;
   } catch(e) {
@@ -1021,10 +1023,10 @@ function renderCalendar(data) {
       }
     }
 
-    // 상장일 — 배정주수 확정된 항목
-    const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
-    if (ipo.date_list && hasAlloc) {
-      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`, ipo);
+    // 상장일 — date_list가 있으면 표시 (배정주수 없어도 예정 표시)
+    if (ipo.date_list && !['청약포기','배정실패'].includes(status)) {
+      const allocLabel = (ipo.shares_alloc > 0) ? ` (${ipo.shares_alloc}주)` : '';
+      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장${allocLabel}`, ipo);
     }
   });
 
@@ -1695,6 +1697,16 @@ function autoStatus(r) {
   return '청약예정';
 }
 
+// id 없는 레코드에 순번 id 부여 (이전 버전 데이터 호환)
+function ensureIds(records) {
+  let maxId = Math.max(0, ...records.map(r => Number(r.id) || 0));
+  let changed = false;
+  records.forEach(r => {
+    if (!r.id) { r.id = ++maxId; changed = true; }
+  });
+  return changed;
+}
+
 async function loadIpoRecords() {
   try {
     const r = await fetch('/api/ipo');
@@ -1703,6 +1715,7 @@ async function loadIpoRecords() {
   } catch (e) {
     _ipoRecords = [];
   }
+  if (ensureIds(_ipoRecords)) await saveIpoRecords();  // id 없으면 자동 저장
   renderIpoManage();
 }
 
@@ -1712,8 +1725,8 @@ async function saveIpoRecords() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ records: _ipoRecords }),
   });
-  // 대시보드 캐시 초기화
-  _dashData = null;
+  // _dashData 유지하되 ipo 부분만 최신화 (_dashData=null로 초기화하면 캘린더가 비워짐)
+  if (_dashData) _dashData.ipo = _ipoRecords;
 }
 
 // ── 목록 렌더링 ───────────────────────────────────────────────────────────────
