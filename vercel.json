@@ -6,7 +6,8 @@
     { "src": "api/ipo.js", "use": "@vercel/node" },
     { "src": "api/etf.js", "use": "@vercel/node" },
     { "src": "api/etf-search.js", "use": "@vercel/node" },
-    { "src": "api/quote.js", "use": "@vercel/node" }
+    { "src": "api/quote.js", "use": "@vercel/node" },
+    { "src": "api/dividend.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -15,6 +16,7 @@
     { "src": "/api/ipo", "dest": "/api/ipo.js" },
     { "src": "/api/etf", "dest": "/api/etf.js" },
     { "src": "/api/etf-search", "dest": "/api/etf-search.js" },
-    { "src": "/api/quote", "dest": "/api/quote.js" }
+    { "src": "/api/quote", "dest": "/api/quote.js" },
+    { "src": "/api/dividend", "dest": "/api/dividend.js" }
   ]
 }

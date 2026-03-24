@@ -693,6 +693,46 @@
   .etf-ac-item:last-child { border-bottom: none; }
   .etf-ac-item:hover, .etf-ac-item:focus { background: var(--secondary); }
   .etf-ac-ticker { font-size: 11px; color: var(--primary); font-weight: 600; }
+
+  /* ── 배당 수령 내역 ──────────────────────────────────── */
+  .div-hist-section {
+    border-top: 2px solid var(--border);
+    padding-top: 20px;
+  }
+  .div-hist-kpi-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-bottom: 16px;
+  }
+  .div-month-group {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 10px;
+  }
+  .div-month-header {
+    padding: 7px 14px; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--text);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .div-month-total { font-size: 11px; color: #16a34a; font-weight: 700; }
+  .div-record-row {
+    display: grid; grid-template-columns: 1fr auto auto;
+    align-items: center; gap: 12px;
+    padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .div-record-row:last-child { border-bottom: none; }
+  .div-record-info { display: flex; flex-direction: column; gap: 2px; }
+  .div-record-name { font-weight: 600; color: var(--text); }
+  .div-record-detail { font-size: 11px; color: var(--muted); }
+  .div-record-amounts { text-align: right; display: flex; flex-direction: column; gap: 1px; }
+  .div-record-net { font-size: 13px; font-weight: 700; color: #16a34a; }
+  .div-record-gross { font-size: 10px; color: var(--muted); }
+  .div-del-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 7px; font-size: 11px;
+    cursor: pointer; color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .div-del-btn:hover { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -862,6 +902,28 @@
 
   <!-- 카드 목록 -->
   <div id="etf-card-list"><div style="text-align:center;color:var(--muted);padding:48px 20px">로딩 중...</div></div>
+
+  <!-- 배당 수령 내역 -->
+  <div class="div-hist-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;color:var(--text)">💰 배당 수령 내역</div>
+    </div>
+    <div class="div-hist-kpi-row">
+      <div class="etf-kpi">
+        <div class="etf-div-kpi-label">📥 총 누적 (세전)</div>
+        <div class="etf-div-kpi-val" id="div-k-gross">-</div>
+      </div>
+      <div class="etf-kpi">
+        <div class="etf-div-kpi-label">💰 총 누적 (세후)</div>
+        <div class="etf-div-kpi-val" id="div-k-net">-</div>
+      </div>
+      <div class="etf-kpi">
+        <div class="etf-div-kpi-label">📅 올해 수령 (세후)</div>
+        <div class="etf-div-kpi-val" id="div-k-this-year">-</div>
+      </div>
+    </div>
+    <div id="div-hist-list"><div style="text-align:center;color:var(--muted);padding:32px">수령 내역이 없습니다.<br><small>ETF 카드의 💰 버튼으로 입력하세요.</small></div></div>
+  </div>
 
 </div>
 </div><!-- /tab-etf -->
@@ -2398,6 +2460,7 @@ async function loadEtfRecords() {
   }
   if (ensureEtfIds(_etfRecords)) await saveEtfRecords();
   renderEtfCards();
+  loadDivRecords();
 }
 
 async function saveEtfRecords() {
@@ -2497,6 +2560,7 @@ function renderEtfCards() {
           ${r.price_chg_pct != null ? `<span class="etf-price-chg ${chgCls}">${chgSgn}${r.price_chg_pct}%</span>` : ''}
         </div>
         <div class="etf-head-actions" onclick="event.stopPropagation()">
+          <button onclick="openDivModal(${r.id})" title="배당 수령 입력">💰</button>
           <button onclick="editEtf(${r.id})">✏️</button>
           <button class="del" onclick="deleteEtf(${r.id})">🗑️</button>
         </div>
@@ -2665,6 +2729,167 @@ async function deleteEtf(id) {
   _etfRecords = _etfRecords.filter(r => r.id != id);
   await saveEtfRecords();
   renderEtfCards();
+}
+
+// ══════════════════════════════════════════════════════════
+// 배당 수령 기록
+// ══════════════════════════════════════════════════════════
+let _divRecords = [];
+
+async function loadDivRecords() {
+  try {
+    const r = await fetch('/api/dividend');
+    const data = await r.json();
+    _divRecords = data.records || [];
+  } catch (e) {
+    _divRecords = [];
+  }
+  renderDivHistory();
+}
+
+function openDivModal(etfId) {
+  const r = _etfRecords.find(x => x.id == etfId);
+  if (!r) return;
+  document.getElementById('dv-etf-id').value = r.id;
+  document.getElementById('dv-etf-name').textContent = r.name + (r.ticker ? ` (${r.ticker})` : '');
+  const today = new Date();
+  document.getElementById('dv-ym').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  document.getElementById('dv-per-share').value = r.recent_div || '';
+  document.getElementById('dv-qty').value = r.qty || '';
+  document.getElementById('dv-note').value = '';
+  calcDivPreview();
+  document.getElementById('div-modal').style.display = 'block';
+}
+
+function closeDivModal() {
+  document.getElementById('div-modal').style.display = 'none';
+}
+
+function calcDivPreview() {
+  const perShare = parseFloat(document.getElementById('dv-per-share').value) || 0;
+  const qty      = parseInt(document.getElementById('dv-qty').value) || 0;
+  const preview  = document.getElementById('dv-preview');
+  if (!perShare || !qty) { preview.style.display = 'none'; return; }
+  const gross = Math.round(perShare * qty);
+  const net   = Math.round(gross * (1 - TAX_RATE));
+  document.getElementById('dv-gross-val').textContent = gross.toLocaleString() + '원';
+  document.getElementById('dv-net-val').textContent   = net.toLocaleString() + '원';
+  preview.style.display = 'block';
+}
+
+async function saveDivEntry() {
+  const etfId   = document.getElementById('dv-etf-id').value;
+  const ym      = document.getElementById('dv-ym').value;
+  const perShare = parseFloat(document.getElementById('dv-per-share').value) || 0;
+  const qty     = parseInt(document.getElementById('dv-qty').value) || 0;
+  const note    = document.getElementById('dv-note').value.trim();
+
+  if (!ym)       { alert('배당 기준월을 입력하세요'); return; }
+  if (!perShare) { alert('주당 배당금을 입력하세요'); return; }
+  if (!qty)      { alert('수량을 입력하세요'); return; }
+
+  const etf   = _etfRecords.find(x => x.id == etfId);
+  const gross = Math.round(perShare * qty);
+  const net   = Math.round(gross * (1 - TAX_RATE));
+  const record = {
+    id: Date.now(),
+    etf_id: Number(etfId),
+    ticker: etf?.ticker || '',
+    name:   etf?.name   || '',
+    ym,
+    per_share: perShare,
+    qty,
+    gross,
+    net,
+    note,
+  };
+
+  const btn = document.getElementById('dv-save-btn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    const resp = await fetch('/api/dividend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record }),
+    });
+    if (!resp.ok) throw new Error('저장 실패');
+    _divRecords.push(record);
+    renderDivHistory();
+    closeDivModal();
+  } catch (e) {
+    alert('저장 중 오류: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '저장';
+  }
+}
+
+async function deleteDivRecord(id) {
+  if (!confirm('이 배당 수령 기록을 삭제하시겠습니까?')) return;
+  try {
+    await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
+    _divRecords = _divRecords.filter(r => r.id != id);
+    renderDivHistory();
+  } catch (e) {
+    alert('삭제 중 오류: ' + e.message);
+  }
+}
+
+function renderDivHistory() {
+  const grossTotal   = _divRecords.reduce((s, r) => s + (r.gross || 0), 0);
+  const netTotal     = _divRecords.reduce((s, r) => s + (r.net   || 0), 0);
+  const thisYear     = new Date().getFullYear();
+  const netThisYear  = _divRecords
+    .filter(r => r.ym && r.ym.startsWith(String(thisYear)))
+    .reduce((s, r) => s + (r.net || 0), 0);
+
+  const el = id => document.getElementById(id);
+  if (el('div-k-gross'))     el('div-k-gross').textContent    = grossTotal  ? grossTotal.toLocaleString()   + '원' : '-';
+  if (el('div-k-net'))       el('div-k-net').textContent      = netTotal    ? netTotal.toLocaleString()     + '원' : '-';
+  if (el('div-k-this-year')) el('div-k-this-year').textContent = netThisYear ? netThisYear.toLocaleString() + '원' : '-';
+
+  const list = document.getElementById('div-hist-list');
+  if (!list) return;
+
+  if (!_divRecords.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:32px">수령 내역이 없습니다.<br><small>ETF 카드의 💰 버튼으로 입력하세요.</small></div>';
+    return;
+  }
+
+  // 월별 그룹, 내림차순
+  const byMonth = {};
+  [..._divRecords].sort((a, b) => (b.ym > a.ym ? 1 : -1)).forEach(r => {
+    const key = r.ym || '날짜없음';
+    if (!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(r);
+  });
+
+  list.innerHTML = Object.entries(byMonth).map(([ym, records]) => {
+    const monthGross = records.reduce((s, r) => s + (r.gross || 0), 0);
+    const monthNet   = records.reduce((s, r) => s + (r.net   || 0), 0);
+    const [y, m]     = ym.split('-');
+    const monthLabel = y && m ? `${y}년 ${parseInt(m)}월` : ym;
+
+    const rows = records.map(r => `
+      <div class="div-record-row">
+        <div class="div-record-info">
+          <span class="div-record-name">${r.name || '-'}</span>
+          <span class="div-record-detail">${r.ticker ? r.ticker + ' · ' : ''}${(r.per_share || 0).toLocaleString()}원/주 × ${(r.qty || 0).toLocaleString()}주${r.note ? ' · ' + r.note : ''}</span>
+        </div>
+        <div class="div-record-amounts">
+          <span class="div-record-net">세후 ${(r.net   || 0).toLocaleString()}원</span>
+          <span class="div-record-gross">세전 ${(r.gross || 0).toLocaleString()}원</span>
+        </div>
+        <button class="div-del-btn" onclick="deleteDivRecord(${r.id})">삭제</button>
+      </div>`).join('');
+
+    return `<div class="div-month-group">
+      <div class="div-month-header">
+        <span>${monthLabel}</span>
+        <span class="div-month-total">세후 ${monthNet.toLocaleString()}원 / 세전 ${monthGross.toLocaleString()}원</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
 }
 
 function editEtf(id) { openEtfModal(id); }
@@ -2929,6 +3154,52 @@ async function refreshAllEtfPrices() {
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
         <button onclick="closeEtfModal()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;color:var(--text)">취소</button>
         <button onclick="saveEtfRecord()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 배당 수령 입력 모달 -->
+<div id="div-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto;padding:20px">
+  <div style="background:var(--surface);border-radius:16px;max-width:420px;margin:80px auto;padding:24px;border:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3 style="margin:0;color:var(--text);font-size:16px">💰 배당 수령 입력</h3>
+      <button onclick="closeDivModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:grid;gap:14px">
+      <input id="dv-etf-id" type="hidden">
+      <div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;font-weight:700;color:var(--text)" id="dv-etf-name"></div>
+      <div>
+        <label style="font-size:12px;color:var(--muted)">배당 기준월</label>
+        <input id="dv-ym" type="month" style="width:100%">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:12px;color:var(--muted)">주당 배당금 (세전, 원)</label>
+          <input id="dv-per-share" type="number" min="0" placeholder="86" oninput="calcDivPreview()">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted)">수량 (주)</label>
+          <input id="dv-qty" type="number" min="0" placeholder="100" oninput="calcDivPreview()">
+        </div>
+      </div>
+      <div id="dv-preview" style="display:none;background:#f0fdf4;border-radius:8px;padding:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--muted)">세전 합계</span>
+          <span id="dv-gross-val" style="font-size:13px;font-weight:700;color:var(--text)"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:12px;color:var(--muted)">세후 합계 <small style="color:#15803d">(15.4% 차감)</small></span>
+          <span id="dv-net-val" style="font-size:15px;font-weight:700;color:#16a34a"></span>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--muted)">메모 (선택)</label>
+        <input id="dv-note" type="text" placeholder="예: 재투자 예정">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+        <button onclick="closeDivModal()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;color:var(--text)">취소</button>
+        <button id="dv-save-btn" onclick="saveDivEntry()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">저장</button>
       </div>
     </div>
   </div>
