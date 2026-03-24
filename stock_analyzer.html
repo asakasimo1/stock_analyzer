@@ -1252,18 +1252,18 @@ function renderCalendar(data) {
       }
     }
 
-    // 배정일 (청약 완료 + 배정주수 미입력)
-    if (subscribed && ipo.date_sub_end) {
+    // 배정일 — subscribed 여부 무관, 배정주수 미입력 + 활성 상태면 표시
+    if (ipo.date_sub_end && !['상장완료','청약포기'].includes(status)) {
       const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
       const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
-      if (allotDate && !hasAlloc && status !== '청약포기') {
+      if (allotDate && !hasAlloc) {
         add(allotDate, 'ipo-allot', `📬 ${name} 배정확인`, ipo);
       }
     }
 
-    // 상장일 — 배정 확정(subscribed + shares_alloc > 0)된 항목만 표시
+    // 상장일 — 배정주수 확정된 항목
     const hasAlloc = ipo.shares_alloc && ipo.shares_alloc > 0;
-    if (ipo.date_list && subscribed && hasAlloc) {
+    if (ipo.date_list && hasAlloc) {
       add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장일 (${ipo.shares_alloc}주)`, ipo);
     }
   });
@@ -1943,11 +1943,10 @@ function renderIpoManage() {
     ${kpiCard('총 수익', totalProfit ? (totalProfit >= 0 ? '🟢 ' : '🔴 ') + totalProfit.toLocaleString() + '원' : '-')}
   `;
 
-  // 알림 배너 (배정 확인일 도래)
+  // 알림 배너 (배정 확인일 도래 — subscribed 여부 무관)
   let alerts = '';
   _ipoRecords.forEach(r => {
-    if (!r.subscribed) return;
-    if (r.shares_alloc > 0 || r.status === '청약포기') return;
+    if (r.shares_alloc > 0 || r.status === '청약포기' || r.status === '상장완료') return;
     const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
     if (allotDate && allotDate <= today) {
       alerts += `
@@ -1978,9 +1977,9 @@ function renderIpoManage() {
     const alloc = r.shares_alloc || 0;
     const subDone = r.subscribed;
 
-    // 배정주수 영역
+    // 배정주수 영역 — subscribed 여부 무관, 활성 상태면 항상 표시
     let allocSection = '';
-    if (subDone && r.status !== '상장완료') {
+    if (!['상장완료','청약포기'].includes(r.status)) {
       allocSection = `
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
           <span style="font-size:12px;color:#94a3b8;white-space:nowrap">📬 배정주수</span>
