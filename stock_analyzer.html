@@ -948,7 +948,7 @@ function calMove(dir) {
   _calMonth += dir;
   if (_calMonth > 11) { _calMonth = 0; _calYear++; }
   if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
-  renderCalendar(_dashData || {});
+  if (_dashData) renderCalendar(_dashData); else renderCalendar({ ipo: _ipoRecords });
 }
 
 function calcAllotDate(dateSubEnd) {
@@ -1998,13 +1998,13 @@ async function saveIpoRecord() {
     competition_inst: parseFloat(document.getElementById('if-comp').value) || 0,
     lockup_rate:      parseFloat(document.getElementById('if-lockup').value) || 0,
     memo:             document.getElementById('if-memo').value,
-    subscribed:       id ? (_ipoRecords.find(r => r.id === id)?.subscribed || false) : false,
-    shares_alloc:     id ? (_ipoRecords.find(r => r.id === id)?.shares_alloc || 0) : 0,
+    subscribed:       id ? (_ipoRecords.find(r => r.id == id)?.subscribed || false) : false,
+    shares_alloc:     id ? (_ipoRecords.find(r => r.id == id)?.shares_alloc || 0) : 0,
   };
   rec.status = autoStatus(rec);
 
   if (id) {
-    const idx = _ipoRecords.findIndex(r => r.id === id);
+    const idx = _ipoRecords.findIndex(r => r.id == id);
     if (idx !== -1) _ipoRecords[idx] = rec;
   } else {
     _ipoRecords.push(rec);
@@ -2016,20 +2016,20 @@ async function saveIpoRecord() {
 }
 
 function editIpo(id) {
-  const rec = _ipoRecords.find(r => r.id === id);
+  const rec = _ipoRecords.find(r => r.id == id);
   if (rec) openIpoModal(rec);
 }
 
 async function deleteIpo(id) {
-  const rec = _ipoRecords.find(r => r.id === id);
+  const rec = _ipoRecords.find(r => r.id == id);
   if (!confirm(`"${rec?.name}" 을(를) 삭제할까요?`)) return;
-  _ipoRecords = _ipoRecords.filter(r => r.id !== id);
+  _ipoRecords = _ipoRecords.filter(r => r.id != id);
   await saveIpoRecords();
   renderIpoManage();
 }
 
 async function toggleSubscribed(id, checked) {
-  const idx = _ipoRecords.findIndex(r => r.id === id);
+  const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].subscribed = checked;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
@@ -2040,20 +2040,20 @@ async function toggleSubscribed(id, checked) {
 async function saveAlloc(id) {
   const input = document.getElementById(`alloc-input-${id}`);
   const alloc = parseInt(input?.value) || 0;
-  const idx = _ipoRecords.findIndex(r => r.id === id);
+  const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].shares_alloc = alloc;
   _ipoRecords[idx].allot_done = true;
   _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : (_ipoRecords[idx].subscribed ? '배정실패' : '청약포기');
   await saveIpoRecords();
   renderIpoManage();
-  renderCalendar(_dashData || {});
+  if (_dashData) renderCalendar(_dashData); else renderCalendar({ ipo: _ipoRecords });
 }
 
 async function quickAllot(id) {
   const alloc = parseInt(prompt('배정주수를 입력하세요 (0 = 미배정)')) ?? null;
   if (alloc === null) return;
-  const idx = _ipoRecords.findIndex(r => r.id === id);
+  const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].shares_alloc = alloc;
   _ipoRecords[idx].subscribed = true;
@@ -2061,7 +2061,7 @@ async function quickAllot(id) {
   _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '배정실패';
   await saveIpoRecords();
   renderIpoManage();
-  renderCalendar(_dashData || {});
+  if (_dashData) renderCalendar(_dashData); else renderCalendar({ ipo: _ipoRecords });
 }
 
 async function saveAllotFromModal(id) {
@@ -2070,8 +2070,11 @@ async function saveAllotFromModal(id) {
   const shares = parseInt(sharesEl?.value) || 0;
   const price  = parseInt(priceEl?.value)  || 0;
 
-  const idx = _ipoRecords.findIndex(r => r.id === id);
-  if (idx === -1) return;
+  const idx = _ipoRecords.findIndex(r => r.id == id);
+  if (idx === -1) {
+    alert(`레코드를 찾을 수 없습니다 (id=${id}, 로드된 레코드 수: ${_ipoRecords.length})`);
+    return;
+  }
 
   _ipoRecords[idx].shares_alloc = shares;
   _ipoRecords[idx].subscribed   = true;
@@ -2080,7 +2083,9 @@ async function saveAllotFromModal(id) {
 
   await saveIpoRecords();
   renderIpoManage();
-  renderCalendar(_dashData || {});
+  // 캘린더 갱신: _dashData.ipo는 saveIpoRecords에서 이미 _ipoRecords와 동기화됨
+  if (_dashData) renderCalendar(_dashData);
+  else renderCalendar({ ipo: _ipoRecords });
 
   // 모달 닫기
   document.getElementById('day-modal-overlay').classList.remove('open');
@@ -2106,7 +2111,8 @@ async function markSubscribed(id) {
   _ipoRecords[idx].subscribed = true;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
   await saveIpoRecords();
-  renderCalendar(_dashData || {});
+  if (_dashData) renderCalendar(_dashData);
+  else renderCalendar({ ipo: _ipoRecords });
   document.getElementById('day-modal-overlay').classList.remove('open');
   const r = _ipoRecords[idx];
   const allotDate = r.date_allot || calcAllotDate(r.date_sub_end);
@@ -2118,7 +2124,7 @@ async function saveListPriceFromModal(id) {
   const priceEl = document.getElementById(`list-price-${id}`);
   const price = parseInt(priceEl?.value) || 0;
   if (!price) { alert('매도가를 입력하세요'); return; }
-  const idx = _ipoRecords.findIndex(r => r.id === id);
+  const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].price_open = price;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
@@ -2142,13 +2148,13 @@ function gotoIpoTab() {
 async function saveListPrice(id) {
   const input = document.getElementById(`list-price-input-${id}`);
   const price = parseInt(input?.value) || 0;
-  const idx = _ipoRecords.findIndex(r => r.id === id);
+  const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].price_open = price;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
   await saveIpoRecords();
   renderIpoManage();
-  renderCalendar(_dashData || {});
+  if (_dashData) renderCalendar(_dashData); else renderCalendar({ ipo: _ipoRecords });
 }
 
 </script>
