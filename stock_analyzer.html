@@ -2604,13 +2604,17 @@ function showEtfAc(items) {
   const list = document.getElementById('etf-ac-list');
   if (!list) return;
   if (!items.length) { list.style.display = 'none'; return; }
-  list.innerHTML = items.map(item =>
-    `<div class="etf-ac-item"
-      onmousedown="selectEtfAcItem('${item.name.replace(/'/g,"\\'")}','${item.ticker}')">
-      <span>${item.name}</span>
+  list.innerHTML = items.map(item => {
+    const safeN = item.name.replace(/'/g,"\\'");
+    const safeC = (item.divCycle || '').replace(/'/g,"\\'");
+    const badge = item.divCycle
+      ? `<span class="etf-ac-ticker" style="background:#f0fdf4;color:#16a34a;margin-left:4px">${item.divCycle}</span>` : '';
+    return `<div class="etf-ac-item"
+      onmousedown="selectEtfAcItem('${safeN}','${item.ticker}','${safeC}')">
+      <span>${item.name}${badge}</span>
       <span class="etf-ac-ticker">${item.ticker}</span>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
   list.style.display = 'block';
 }
 
@@ -2621,9 +2625,14 @@ function hideEtfAc() {
   }, 150);
 }
 
-async function selectEtfAcItem(name, ticker) {
+async function selectEtfAcItem(name, ticker, divCycle) {
   document.getElementById('ef-name').value   = name;
   document.getElementById('ef-ticker').value = ticker;
+  // 검색 목록에서 알려진 배당주기 즉시 적용 (quote API 응답 전에도 표시)
+  if (divCycle) {
+    const el = document.getElementById('ef-div-cycle');
+    if (el) el.value = divCycle;
+  }
   hideEtfAc();
   await fetchAndFillQuote(ticker);
 }
