@@ -2575,7 +2575,7 @@ async function onEtfTickerBlur(ticker) {
   if (/^\d{6}$/.test(t)) await fetchAndFillQuote(t);
 }
 
-// ── 종목명 + 현재가/등락률 자동 채움 ─────────────────────
+// ── 종목명 + 현재가 + 배당정보 자동 채움 ─────────────────
 async function fetchAndFillQuote(ticker) {
   const tickerEl = document.getElementById('ef-ticker');
   const nameEl   = document.getElementById('ef-name');
@@ -2584,17 +2584,20 @@ async function fetchAndFillQuote(ticker) {
   if (!ticker || !priceEl) return;
 
   tickerEl.style.borderColor = 'var(--primary)';
-  const prevPlaceholder = priceEl.placeholder;
+  const prevPh = priceEl.placeholder;
   priceEl.placeholder = '조회 중...';
 
   try {
     const r = await fetch(`/api/quote?ticker=${ticker}`);
     const d = await r.json();
     if (d.price) {
+      // 가격
       priceEl.value = d.price;
       chgEl.value   = d.chgPct ?? '';
-      // 종목명이 비어있을 때만 자동 채움
+      // 종목명 (비어있을 때만)
       if (d.name && !nameEl.value.trim()) nameEl.value = d.name;
+      // 배당 정보 자동 채움
+      _fillDivFields(d);
       tickerEl.style.borderColor = 'var(--green)';
       calcEtfPreview();
     } else {
@@ -2603,8 +2606,17 @@ async function fetchAndFillQuote(ticker) {
   } catch {
     tickerEl.style.borderColor = 'var(--red)';
   }
-  priceEl.placeholder = prevPlaceholder;
+  priceEl.placeholder = prevPh;
   setTimeout(() => { tickerEl.style.borderColor = ''; }, 2000);
+}
+
+function _fillDivFields(d) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; };
+  if (d.divCycle)      set('ef-div-cycle', d.divCycle);
+  if (d.divMonths)     set('ef-div-months', d.divMonths);
+  if (d.recentDiv)     set('ef-recent-div', d.recentDiv);
+  if (d.recentDivRate) set('ef-recent-div-rate', d.recentDivRate);
+  if (d.annualDivRate) set('ef-annual-div-rate', d.annualDivRate);
 }
 
 // ── 현재가 일괄 업데이트 ──────────────────────────────────
@@ -2622,6 +2634,12 @@ async function refreshAllEtfPrices() {
       if (d.price) {
         r.current_price  = d.price;
         r.price_chg_pct  = d.chgPct ?? r.price_chg_pct;
+        // 배당 정보 업데이트 (기존 값 유지 우선, 없을 때만 덮어씀)
+        if (d.divCycle)      r.div_cycle        = d.divCycle;
+        if (d.divMonths)     r.div_months       = d.divMonths;
+        if (d.recentDiv)     r.recent_div       = d.recentDiv;
+        if (d.recentDivRate) r.recent_div_rate  = d.recentDivRate;
+        if (d.annualDivRate) r.annual_div_rate  = d.annualDivRate;
         updated++;
       }
     } catch {}
