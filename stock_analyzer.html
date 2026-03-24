@@ -1427,7 +1427,27 @@ function showDayDetail(key) {
           ${ipo.broker ? ` · ${ipo.broker}` : ''}
         </div>
         ${(ipo.shares_alloc||0) > 0
-          ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">배정: ${ipo.shares_alloc}주</div>` : ''}
+          ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">✅ 배정: ${ipo.shares_alloc}주 입력됨</div>` : ''}
+        ${ev.type === 'ipo-allot' ? `
+        <div style="margin-top:12px;padding:12px;background:#1e2d45;border-radius:8px">
+          <div style="font-size:12px;color:#fde68a;font-weight:600;margin-bottom:10px">📬 배정 결과 입력</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">배정주수 (0 = 미배정)</label>
+              <input type="number" id="allot-shares-${ipo.id}" min="0" value="${ipo.shares_alloc||0}"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">실제 시초가 (원, 선택)</label>
+              <input type="number" id="allot-price-${ipo.id}" min="0" value="${ipo.price_open||''}" placeholder="상장 후 입력"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+            </div>
+          </div>
+          <button onclick="saveAllotFromModal(${ipo.id})"
+            style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
+            ✅ 저장
+          </button>
+        </div>` : ''}
         ${ipo.score != null ? (() => {
           const sc = ipo.score;
           const color = sc >= 70 ? 'var(--green)' : sc >= 50 ? '#f59e0b' : 'var(--muted)';
@@ -2105,9 +2125,39 @@ async function quickAllot(id) {
   const idx = _ipoRecords.findIndex(r => r.id === id);
   if (idx === -1) return;
   _ipoRecords[idx].shares_alloc = alloc;
+  _ipoRecords[idx].subscribed = true;
   _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
   await saveIpoRecords();
   renderIpoManage();
+  renderCalendar(_dashData || {});
+}
+
+async function saveAllotFromModal(id) {
+  const sharesEl = document.getElementById(`allot-shares-${id}`);
+  const priceEl  = document.getElementById(`allot-price-${id}`);
+  const shares = parseInt(sharesEl?.value) || 0;
+  const price  = parseInt(priceEl?.value)  || 0;
+
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+
+  _ipoRecords[idx].shares_alloc = shares;
+  _ipoRecords[idx].subscribed   = true;
+  if (price > 0) _ipoRecords[idx].price_open = price;
+  _ipoRecords[idx].status = shares > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+
+  await saveIpoRecords();
+  renderIpoManage();
+  renderCalendar(_dashData || {});
+
+  // 모달 닫기
+  document.getElementById('day-modal-overlay').classList.remove('open');
+
+  // 결과 메시지
+  alert(shares > 0
+    ? `🎉 ${_ipoRecords[idx].name} ${shares.toLocaleString()}주 배정 완료!\n캘린더가 업데이트됐습니다.`
+    : `😢 ${_ipoRecords[idx].name} 미배정으로 처리됐습니다.`
+  );
 }
 
 </script>
