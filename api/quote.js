@@ -9,7 +9,8 @@ function inferDivCycle(monthsStr) {
   if (!monthsStr) return '';
   const cnt = monthsStr.split(',').filter(Boolean).length;
   if (cnt >= 11) return '월배당';
-  if (cnt >= 3)  return '분기배당';
+  if (cnt >= 4)  return '분기배당';
+  if (cnt === 3) return '분기배당';
   if (cnt === 2) return '반기배당';
   if (cnt === 1) return '연배당';
   return '';
@@ -52,19 +53,27 @@ export default async function handler(req, res) {
     if (!price) throw new Error('가격 정보 없음');
 
     // ── 배당 정보 ──────────────────────────────────────────────────
-    const monthsStr   = d.dividendMonthsThisYear ?? '';   // "1,2"
-    const annualDiv   = Number(d.dividendPerShareTtm ?? 0);  // 연간 배당금 합계
-    const annualDivRate = Number(d.dividendYieldTtm ?? 0);   // 연간 배당률(%)
+    const monthsStr = d.dividendMonthsThisYear ?? '';  // "1,2,3"
+    const annualDiv = Number(d.dividendPerShareTtm ?? 0);  // TTM 연간 배당금 합계(원)
 
     const divCycle  = inferDivCycle(monthsStr);
     const divMonths = formatDivMonths(monthsStr);
 
-    // 최근 배당금 추정: 연간 배당금 / 배당 횟수
-    const divCount  = monthsStr ? monthsStr.split(',').filter(Boolean).length : 0;
+    // 배당 횟수: 올해 배당 월 수
+    const divCount = monthsStr ? monthsStr.split(',').filter(Boolean).length : 0;
+
+    // 최근 1회 배당금 추정: TTM 합계 / 올해 배당 횟수
     const recentDiv = (annualDiv && divCount) ? Math.round(annualDiv / divCount) : 0;
 
-    // 최근 배당률 추정: 최근배당금 / 현재가 × 100
-    const recentDivRate = (recentDiv && price) ? Number((recentDiv / price * 100).toFixed(2)) : 0;
+    // 최근 배당률: 최근 1회 배당금 / 현재가 × 100
+    const recentDivRate = (recentDiv && price)
+      ? Number((recentDiv / price * 100).toFixed(2)) : 0;
+
+    // 연간 배당률: TTM 배당금 합계 / 현재가 × 100 (현재가 기준 재계산)
+    // → Naver dividendYieldTtm은 과거 기준가 기준이라 현재가로 재계산이 더 정확
+    const annualDivRate = (annualDiv && price)
+      ? Number((annualDiv / price * 100).toFixed(2))
+      : Number(d.dividendYieldTtm ?? 0);
 
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
