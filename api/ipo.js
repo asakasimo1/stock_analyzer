@@ -13,12 +13,16 @@ export default async function handler(req, res) {
   const gistId  = process.env.GIST_ID;
   const ghToken = process.env.GH_TOKEN;
 
-  if (!gistId || !ghToken) {
-    return res.status(500).json({ error: 'GIST_ID 또는 GH_TOKEN 미설정' });
+  if (!gistId) {
+    return res.status(500).json({ error: 'GIST_ID 미설정' });
+  }
+  // POST(저장)는 GH_TOKEN 필수, GET(읽기)은 공개 Gist라면 없어도 됨
+  if (!ghToken && req.method === 'POST') {
+    return res.status(500).json({ error: 'GH_TOKEN 미설정 (저장 불가)' });
   }
 
   const ghHeaders = {
-    Authorization: `Bearer ${ghToken}`,
+    ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
     Accept: 'application/vnd.github+json',
     'User-Agent': 'stock-analyzer',
   };
