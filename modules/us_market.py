@@ -38,8 +38,8 @@ def get_us_market() -> dict:
         return {"date": "", "indices": [], "summary": "yfinance 미설치"}
 
     result_indices = []
-    end   = datetime.today()
-    start = end - timedelta(days=7)  # 충분한 범위로 조회
+    end   = datetime.today() + timedelta(days=1)  # yfinance end는 exclusive라 +1일
+    start = end - timedelta(days=8)  # 충분한 범위로 조회
 
     for name, ticker in _INDICES.items():
         try:
