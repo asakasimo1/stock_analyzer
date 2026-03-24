@@ -2722,14 +2722,14 @@ async function selectEtfAcItem(name, ticker, divCycle) {
 let _etfTickerTimer = null;
 function onEtfTickerInput(val) {
   clearTimeout(_etfTickerTimer);
-  const t = val.trim();
-  if (!/^\d{6}$/.test(t)) return;
+  const t = val.trim().toUpperCase();
+  if (!/^[A-Z0-9]{6}$/.test(t)) return;
   _etfTickerTimer = setTimeout(() => fetchAndFillQuote(t), 400);
 }
 
 async function onEtfTickerBlur(ticker) {
-  const t = ticker.trim();
-  if (/^\d{6}$/.test(t)) await fetchAndFillQuote(t);
+  const t = ticker.trim().toUpperCase();
+  if (/^[A-Z0-9]{6}$/.test(t)) await fetchAndFillQuote(t);
 }
 
 // ── 종목명 + 현재가 + 배당정보 자동 채움 ─────────────────

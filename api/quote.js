@@ -158,8 +158,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const ticker = (req.query.ticker || '').trim().replace(/^A/, '');
-  if (!/^\d{6}$/.test(ticker)) return res.status(400).json({ error: '유효한 티커(6자리)를 입력하세요' });
+  const ticker = (req.query.ticker || '').trim().toUpperCase().replace(/^A/, '');
+  if (!/^[A-Z0-9]{6}$/.test(ticker)) return res.status(400).json({ error: '유효한 티커(6자리)를 입력하세요' });
 
   try {
     const url = `https://m.stock.naver.com/api/etf/${ticker}/basic`;
