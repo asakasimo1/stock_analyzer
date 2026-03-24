@@ -557,77 +557,106 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
   }
+  .etf-card:hover { box-shadow: 0 2px 12px rgba(61,90,254,.10); }
   .etf-card-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px;
+    padding: 9px 14px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
-    flex-wrap: wrap; gap: 8px;
+    flex-wrap: wrap; gap: 6px;
   }
   .etf-card-name {
-    font-size: 15px; font-weight: 700; color: var(--text);
-    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 6px;
   }
   .etf-ticker-badge {
-    font-size: 11px; font-weight: 600;
+    font-size: 10px; font-weight: 600;
     background: var(--secondary); color: var(--primary);
-    border-radius: 6px; padding: 2px 8px;
+    border-radius: 5px; padding: 1px 6px;
     white-space: nowrap;
   }
   .etf-price-block {
-    display: flex; align-items: baseline; gap: 6px; flex-shrink: 0;
+    display: flex; align-items: baseline; gap: 5px; flex-shrink: 0;
   }
-  .etf-price-val { font-size: 16px; font-weight: 700; color: var(--text); }
-  .etf-price-chg { font-size: 13px; font-weight: 600; }
+  .etf-price-val { font-size: 13px; font-weight: 700; color: var(--text); }
+  .etf-price-chg { font-size: 11px; font-weight: 600; }
   .etf-price-chg.up { color: var(--green); }
   .etf-price-chg.dn { color: var(--red); }
-  .etf-head-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .etf-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .etf-head-actions button {
     background: none; border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 10px;
-    font-size: 12px; cursor: pointer; color: var(--muted);
+    border-radius: 5px; padding: 2px 8px;
+    font-size: 11px; cursor: pointer; color: var(--muted);
     transition: border-color 0.15s, color 0.15s;
   }
   .etf-head-actions button:hover { color: var(--primary); border-color: var(--primary); }
   .etf-head-actions button.del:hover { color: var(--red); border-color: var(--red); }
+
+  /* 컴팩트 요약행 */
+  .etf-card-compact {
+    display: flex; align-items: stretch; flex-wrap: nowrap;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .etf-ci {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 7px 6px; text-align: center; gap: 2px;
+    border-right: 1px solid var(--border);
+  }
+  .etf-ci:last-child { border-right: none; }
+  .etf-ci-label { font-size: 10px; color: var(--muted); }
+  .etf-ci-val { font-weight: 700; color: var(--text); font-size: 12px; }
+  .etf-ci-val.up { color: var(--green); }
+  .etf-ci-val.dn { color: var(--red); }
+
+  /* 펼침 상세 영역 */
+  .etf-card-detail {
+    display: none;
+    border-top: 1px solid var(--border);
+  }
+  .etf-card-detail.open { display: block; }
   .etf-card-body {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
-  .etf-col { padding: 14px 18px; }
+  .etf-col { padding: 10px 14px; }
   .etf-col:first-child { border-right: 1px solid var(--border); }
   .etf-col-title {
-    font-size: 11px; font-weight: 700;
+    font-size: 10px; font-weight: 700;
     color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .etf-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 3px 0; font-size: 13px;
+    padding: 2px 0; font-size: 12px;
   }
   .etf-row-label { color: var(--muted); }
   .etf-row-val { font-weight: 600; color: var(--text); }
   .etf-row-val.up { color: var(--green); }
   .etf-row-val.dn { color: var(--red); }
   .etf-pnl-bar {
-    grid-column: 1 / -1;
-    padding: 10px 18px;
+    padding: 7px 14px;
     border-top: 1px solid var(--border);
-    display: flex; align-items: center; gap: 24px;
+    display: flex; align-items: center; gap: 20px;
     background: var(--bg); flex-wrap: wrap;
   }
-  .etf-pnl-group { display: flex; align-items: center; gap: 8px; }
-  .etf-pnl-label { font-size: 12px; color: var(--muted); }
-  .etf-pnl-val { font-size: 15px; font-weight: 700; }
+  .etf-pnl-group { display: flex; align-items: center; gap: 6px; }
+  .etf-pnl-label { font-size: 11px; color: var(--muted); }
+  .etf-pnl-val { font-size: 13px; font-weight: 700; }
   .etf-pnl-val.up { color: var(--green); }
   .etf-pnl-val.dn { color: var(--red); }
-  .etf-refdate { font-size: 11px; color: var(--muted); }
+  .etf-refdate { font-size: 10px; color: var(--muted); }
+  .etf-expand-hint { font-size: 10px; color: var(--muted); padding: 4px 14px; text-align: right; }
   @media (max-width: 768px) {
-    .etf-wrap { padding: 16px; }
+    .etf-wrap { padding: 12px; }
     .etf-kpi-row { grid-template-columns: repeat(2, 1fr); }
     .etf-card-body { grid-template-columns: 1fr; }
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+    .etf-ci { padding: 6px 4px; }
   }
 
   /* ETF 티커 조회 상태 피드백 — border-color는 JS로 직접 제어 */
@@ -2380,50 +2409,88 @@ function renderEtfCards() {
     const chgSgn = (r.price_chg_pct || 0) >= 0 ? '+' : '';
     const hasDIV = r.div_cycle && r.div_cycle !== '무배당';
 
-    return `<div class="etf-card" style="margin-bottom:12px">
+    const pnlStr  = pPct !== null
+      ? `${ps}${profit.toLocaleString()}원 (${ps}${pPct.toFixed(2)}%)`
+      : (buy_ ? `${ps}${profit.toLocaleString()}원` : '-');
+    const rdStr   = r.recent_div ? r.recent_div.toLocaleString() + '원' : '-';
+    const rateStr = (r.recent_div_rate || r.annual_div_rate)
+      ? `${r.recent_div_rate || 0}% / ${r.annual_div_rate || 0}%` : '-';
+
+    return `<div class="etf-card" style="margin-bottom:8px" onclick="toggleEtfExpand(${r.id})">
       <div class="etf-card-head">
         <div style="flex:1;min-width:0">
           <div class="etf-card-name">
             <span>${r.name || '종목명 없음'}</span>
             ${r.ticker ? `<span class="etf-ticker-badge">${r.ticker}</span>` : ''}
+            ${r.div_cycle ? `<span class="etf-ticker-badge" style="background:#f0fdf4;color:#16a34a">${r.div_cycle}</span>` : ''}
           </div>
-          ${r.ref_date ? `<div class="etf-refdate" style="margin-top:2px">기준일: ${r.ref_date}</div>` : ''}
         </div>
         <div class="etf-price-block">
           ${r.current_price ? `<span class="etf-price-val">${r.current_price.toLocaleString()}원</span>` : ''}
           ${r.price_chg_pct != null ? `<span class="etf-price-chg ${chgCls}">${chgSgn}${r.price_chg_pct}%</span>` : ''}
         </div>
-        <div class="etf-head-actions">
+        <div class="etf-head-actions" onclick="event.stopPropagation()">
           <button onclick="editEtf(${r.id})">✏️</button>
           <button class="del" onclick="deleteEtf(${r.id})">🗑️</button>
         </div>
       </div>
-      <div class="etf-card-body">
-        <div class="etf-col">
-          <div class="etf-col-title">배당 정보</div>
-          ${r.div_cycle ? `<div class="etf-row"><span class="etf-row-label">배당주기</span><span class="etf-row-val">${r.div_cycle}</span></div>` : ''}
-          ${hasDIV && r.div_months ? `<div class="etf-row"><span class="etf-row-label">배당월</span><span class="etf-row-val">${r.div_months}</span></div>` : ''}
-          ${hasDIV && r.recent_div ? `<div class="etf-row"><span class="etf-row-label">최근 배당</span><span class="etf-row-val">${r.recent_div.toLocaleString()}원${r.recent_div_date ? ` (${r.recent_div_date})` : ''}</span></div>` : ''}
-          ${hasDIV && r.recent_div_rate ? `<div class="etf-row"><span class="etf-row-label">최근/연간 배당률</span><span class="etf-row-val">${r.recent_div_rate}% / ${r.annual_div_rate || 0}%</span></div>` : ''}
-          ${!hasDIV ? `<div class="etf-row"><span class="etf-row-val" style="color:var(--muted)">${r.div_cycle || '배당 정보 없음'}</span></div>` : ''}
+      <div class="etf-card-compact">
+        <div class="etf-ci">
+          <span class="etf-ci-label">보유수량</span>
+          <span class="etf-ci-val">${(r.qty || 0).toLocaleString()}주</span>
         </div>
-        <div class="etf-col">
-          <div class="etf-col-title">보유 정보</div>
-          <div class="etf-row"><span class="etf-row-label">보유수량</span><span class="etf-row-val">${(r.qty || 0).toLocaleString()}주</span></div>
-          <div class="etf-row"><span class="etf-row-label">평균매수가</span><span class="etf-row-val">${(r.avg_price || 0).toLocaleString()}원</span></div>
-          <div class="etf-row"><span class="etf-row-label">매입금액</span><span class="etf-row-val">${buy_.toLocaleString()}원</span></div>
-          <div class="etf-row"><span class="etf-row-label">평가금액</span><span class="etf-row-val">${eval_.toLocaleString()}원</span></div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">평균매수가</span>
+          <span class="etf-ci-val">${(r.avg_price || 0).toLocaleString()}원</span>
+        </div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">최근배당</span>
+          <span class="etf-ci-val">${rdStr}</span>
+        </div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">최근/연간배당률</span>
+          <span class="etf-ci-val">${rateStr}</span>
+        </div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">평가손익</span>
+          <span class="etf-ci-val ${pc}">${pnlStr}</span>
         </div>
       </div>
-      <div class="etf-pnl-bar">
-        <div class="etf-pnl-group">
-          <span class="etf-pnl-label">평가손익</span>
-          <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원</span>
+      <div class="etf-card-detail" id="etf-detail-${r.id}">
+        <div class="etf-card-body">
+          <div class="etf-col">
+            <div class="etf-col-title">배당 정보</div>
+            ${r.div_cycle ? `<div class="etf-row"><span class="etf-row-label">배당주기</span><span class="etf-row-val">${r.div_cycle}</span></div>` : ''}
+            ${hasDIV && r.div_months ? `<div class="etf-row"><span class="etf-row-label">배당월</span><span class="etf-row-val">${r.div_months}</span></div>` : ''}
+            ${hasDIV && r.recent_div ? `<div class="etf-row"><span class="etf-row-label">최근 배당</span><span class="etf-row-val">${r.recent_div.toLocaleString()}원${r.recent_div_date ? ` (${r.recent_div_date})` : ''}</span></div>` : ''}
+            ${hasDIV ? `<div class="etf-row"><span class="etf-row-label">최근/연간 배당률</span><span class="etf-row-val">${r.recent_div_rate || 0}% / ${r.annual_div_rate || 0}%</span></div>` : ''}
+            ${!hasDIV ? `<div class="etf-row"><span class="etf-row-val" style="color:var(--muted)">${r.div_cycle || '배당 정보 없음'}</span></div>` : ''}
+          </div>
+          <div class="etf-col">
+            <div class="etf-col-title">보유 정보</div>
+            <div class="etf-row"><span class="etf-row-label">보유수량</span><span class="etf-row-val">${(r.qty || 0).toLocaleString()}주</span></div>
+            <div class="etf-row"><span class="etf-row-label">평균매수가</span><span class="etf-row-val">${(r.avg_price || 0).toLocaleString()}원</span></div>
+            <div class="etf-row"><span class="etf-row-label">매입금액</span><span class="etf-row-val">${buy_.toLocaleString()}원</span></div>
+            <div class="etf-row"><span class="etf-row-label">평가금액</span><span class="etf-row-val">${eval_.toLocaleString()}원</span></div>
+            ${r.ref_date ? `<div class="etf-row"><span class="etf-row-label">기준일</span><span class="etf-row-val">${r.ref_date}</span></div>` : ''}
+          </div>
         </div>
-        ${pPct !== null ? `<div class="etf-pnl-group"><span class="etf-pnl-label">수익률</span><span class="etf-pnl-val ${pc}">${ps}${pPct.toFixed(2)}%</span></div>` : ''}
+        <div class="etf-pnl-bar">
+          <div class="etf-pnl-group">
+            <span class="etf-pnl-label">평가손익</span>
+            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원</span>
+          </div>
+          ${pPct !== null ? `<div class="etf-pnl-group"><span class="etf-pnl-label">수익률</span><span class="etf-pnl-val ${pc}">${ps}${pPct.toFixed(2)}%</span></div>` : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleEtfExpand(id) {
+  const el = document.getElementById('etf-detail-' + id);
+  if (!el) return;
+  el.classList.toggle('open');
 }
 
 function openEtfModal(id) {
