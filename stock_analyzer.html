@@ -800,6 +800,7 @@ function switchTab(name) {
 // 대시보드 데이터 로드
 // ══════════════════════════════════════════════════════════
 let _dashData = null;
+let _ipoRecords = [];   // ← Script 1에서 선언: initDashboard·markSubscribed 모두 이 변수 공유
 
 async function initDashboard() {
   if (_dashData) { renderDashboard(_dashData); return; }
@@ -1060,11 +1061,13 @@ function renderCalendar(data) {
     const isToday = y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
     const evs = events[key] || [];
     const hasReal = evs.some(e => !e.text.startsWith('⏰'));
+    // 캘린더 셀에는 공모주 이벤트만 표시 (브리핑/추천/신호는 클릭 시 모달에서만 확인)
+    const cellEvs = evs.filter(e => e.type.startsWith('ipo'));
 
     html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}" onclick="showDayDetail('${key}')">
       <div class="cal-day${dow===0?' sun':dow===6?' sat':''}">${d}</div>
-      ${evs.slice(0,3).map(e => `<div class="cal-event ${e.type}">${e.text}</div>`).join('')}
-      ${evs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${evs.length-3}개</div>` : ''}
+      ${cellEvs.slice(0,3).map(e => `<div class="cal-event ${e.type}">${e.text}</div>`).join('')}
+      ${cellEvs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${cellEvs.length-3}개</div>` : ''}
     </div>`;
   }
 
@@ -1664,7 +1667,7 @@ initDashboard();
 // ══════════════════════════════════════════════════════════════════════════════
 // 공모주 관리 (웹 CRUD)
 // ══════════════════════════════════════════════════════════════════════════════
-let _ipoRecords = [];
+// _ipoRecords는 Script 1에서 선언됨 (위)
 
 const IPO_STATUS = {
   '청약예정': '🔵', '청약중': '🟡', '상장예정': '🟠', '상장완료': '🟢', '청약포기': '⚫', '배정실패': '❌',
