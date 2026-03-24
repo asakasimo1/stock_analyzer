@@ -522,6 +522,158 @@ c5.metric("기술 신호", score_label, f"점수: {score:+d}",
 
 st.divider()
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 배당 재투자 계산기 다이얼로그
+# ══════════════════════════════════════════════════════════════════════════════
+
+@st.dialog("💰 5년 배당 재투자 계산기", width="large")
+def drip_calculator(current_price: float, default_div_yield: float, stock_name: str):
+    """배당금을 재투자했을 때의 5년 시뮬레이션"""
+    st.caption(f"📌 {stock_name} | 현재가 {current_price:,.0f}원 기준")
+    st.divider()
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        invest_amt = st.number_input(
+            "초기 투자금 (만원)",
+            min_value=10, max_value=100_000, value=1_000, step=100,
+            help="처음 투자할 금액 (만원 단위)"
+        ) * 10_000
+
+        div_yield = st.number_input(
+            "연 배당률 / 분배율 (%)",
+            min_value=0.0, max_value=30.0,
+            value=float(round(default_div_yield, 2)) if default_div_yield else 3.0,
+            step=0.1,
+            help="현재 배당률 또는 ETF 분배율"
+        )
+
+    with col_b:
+        price_growth = st.number_input(
+            "연 주가 상승률 (%)",
+            min_value=-20.0, max_value=50.0, value=5.0, step=0.5,
+            help="매년 예상 주가 상승률"
+        )
+        div_growth = st.number_input(
+            "연 배당 성장률 (%)",
+            min_value=0.0, max_value=30.0, value=3.0, step=0.5,
+            help="매년 배당금이 증가하는 비율"
+        )
+
+    years = st.slider("시뮬레이션 기간", min_value=1, max_value=10, value=5, step=1, format="%d년")
+
+    st.divider()
+
+    # ── 계산 ──
+    shares       = invest_amt / current_price   # 최초 주식 수
+    price        = current_price
+    annual_yield = div_yield / 100
+    pg_rate      = price_growth / 100
+    dg_rate      = div_growth / 100
+
+    rows        = []
+    cumul_div   = 0.0
+    total_extra = 0   # 배당 재투자로 추가 취득 주식 수
+
+    for yr in range(1, years + 1):
+        # 연말 주가 (복리 상승)
+        price_eoy  = current_price * ((1 + pg_rate) ** yr)
+        # 당해 배당률 (배당 성장 반영)
+        yr_yield   = annual_yield * ((1 + dg_rate) ** (yr - 1))
+        # 배당금 (기초 주식 수 × 연말 주가 × 배당률)
+        dividend   = shares * price_eoy * yr_yield
+        cumul_div += dividend
+        # 배당 재투자 → 추가 주식
+        extra_shares = dividend / price_eoy
+        shares      += extra_shares
+        total_extra += extra_shares
+        # 연말 평가액
+        eval_amt    = shares * price_eoy
+
+        rows.append({
+            "연도":           f"{yr}년 후",
+            "보유 주식(주)":  f"{shares:,.2f}",
+            "연간 배당금":    f"{dividend:,.0f}원",
+            "누적 배당금":    f"{cumul_div:,.0f}원",
+            "연말 평가금액":  f"{eval_amt:,.0f}원",
+            "총 수익률":      f"{(eval_amt / invest_amt - 1) * 100:+.1f}%",
+        })
+
+    df_result = pd.DataFrame(rows)
+
+    # ── 요약 지표 ──
+    final_price   = current_price * ((1 + pg_rate) ** years)
+    final_shares  = shares
+    final_eval    = final_shares * final_price
+    total_return  = (final_eval / invest_amt - 1) * 100
+    no_drip_eval  = (invest_amt / current_price) * final_price  # 재투자 없는 경우
+    drip_bonus    = final_eval - no_drip_eval
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("초기 투자금",   f"{invest_amt/10_000:,.0f}만원")
+    m2.metric("최종 평가금액", f"{final_eval/10_000:,.0f}만원",
+              delta=f"{total_return:+.1f}%")
+    m3.metric("누적 배당 수령", f"{cumul_div/10_000:,.0f}만원")
+    m4.metric("재투자 추가 효과", f"{drip_bonus/10_000:,.0f}만원",
+              help="배당 재투자 vs 단순 보유 차이")
+
+    # ── 차트 ──
+    chart_years  = list(range(years + 1))
+    eval_vals    = []
+    no_drip_vals = []
+    sh_tmp       = invest_amt / current_price
+
+    eval_vals.append(invest_amt)
+    no_drip_vals.append(invest_amt)
+
+    sh_sim = invest_amt / current_price
+    for yr in range(1, years + 1):
+        p_eoy = current_price * ((1 + pg_rate) ** yr)
+        y_yld = annual_yield * ((1 + dg_rate) ** (yr - 1))
+        div_y = sh_sim * p_eoy * y_yld
+        sh_sim += div_y / p_eoy
+        eval_vals.append(sh_sim * p_eoy)
+        no_drip_vals.append((invest_amt / current_price) * p_eoy)
+
+    fig_drip = go.Figure()
+    fig_drip.add_trace(go.Scatter(
+        x=chart_years, y=[v / 10_000 for v in eval_vals],
+        name="배당 재투자",
+        mode="lines+markers",
+        line=dict(color="#00e676", width=2.5),
+        fill="tozeroy", fillcolor="rgba(0,230,118,0.08)",
+        hovertemplate="%{x}년: %{y:,.0f}만원<extra>배당 재투자</extra>",
+    ))
+    fig_drip.add_trace(go.Scatter(
+        x=chart_years, y=[v / 10_000 for v in no_drip_vals],
+        name="단순 보유 (재투자 없음)",
+        mode="lines+markers",
+        line=dict(color="#42A5F5", width=2, dash="dash"),
+        hovertemplate="%{x}년: %{y:,.0f}만원<extra>단순 보유</extra>",
+    ))
+    fig_drip.update_layout(
+        height=320,
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#111827",
+        font=dict(color="#e2e8f0"),
+        legend=dict(orientation="h", y=1.08, bgcolor="rgba(0,0,0,0)"),
+        margin=dict(l=10, r=10, t=30, b=10),
+        yaxis_title="평가금액 (만원)",
+        xaxis=dict(tickvals=chart_years, ticktext=[f"{y}년" for y in chart_years],
+                   gridcolor="#1e2d45"),
+        yaxis=dict(gridcolor="#1e2d45"),
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig_drip, use_container_width=True)
+
+    # ── 연도별 상세 테이블 ──
+    st.markdown("##### 연도별 상세")
+    st.dataframe(df_result, hide_index=True, use_container_width=True)
+
+    st.caption("⚠️ 본 계산기는 참고용 시뮬레이션입니다. 실제 수익률은 시장 상황에 따라 다를 수 있습니다.")
+
+
 # ── 탭 ──
 tab_chart, tab_signal, tab_us, tab_news = st.tabs(
     ["📊 차트 분석", "📡 기술 신호", "🌍 미국 증시", "📰 뉴스 · 재무"]
@@ -695,8 +847,14 @@ with tab_news:
                 if divs:
                     st.markdown("**최근 분배금**")
                     st.dataframe(pd.DataFrame(divs[:8]), hide_index=True, use_container_width=True)
+
+                st.divider()
+                if st.button("💰 5년 배당 재투자 계산기 열기", type="primary", use_container_width=True, key="drip_etf"):
+                    drip_calculator(last, etf_i.get("annual_div_yield", 0.0), name)
             else:
                 st.info("ETF 상세 정보를 가져올 수 없습니다.")
+                if st.button("💰 5년 배당 재투자 계산기 열기", use_container_width=True, key="drip_etf_empty"):
+                    drip_calculator(last, 0.0, name)
         else:
             # 기본 지표
             st.markdown("#### 📊 기본 지표 (PER / PBR / ROE)")
@@ -707,8 +865,13 @@ with tab_news:
                 f2.metric("PBR",    f"{fund_b.get('PBR', 0):.1f}x")
                 f3.metric("ROE",    f"{fund_b.get('ROE', 0):.1f}%")
                 f4.metric("배당률", f"{fund_b.get('DIV', 0):.1f}%")
+                st.divider()
+                if st.button("💰 5년 배당 재투자 계산기 열기", type="primary", use_container_width=True, key="drip_stock"):
+                    drip_calculator(last, float(fund_b.get("DIV", 0)), name)
             else:
                 st.info("기본 지표 데이터를 가져올 수 없습니다.")
+                if st.button("💰 5년 배당 재투자 계산기 열기", use_container_width=True, key="drip_stock_empty"):
+                    drip_calculator(last, 0.0, name)
 
             # 연간 재무제표
             st.markdown("#### 📈 연간 재무제표")
