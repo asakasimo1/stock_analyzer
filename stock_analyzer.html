@@ -804,11 +804,19 @@ let _dashData = null;
 async function initDashboard() {
   if (_dashData) { renderDashboard(_dashData); return; }
   try {
-    const r = await fetch('/api/data');
-    if (!r.ok) throw new Error('API 오류');
-    _dashData = await r.json();
+    // 대시보드 데이터와 IPO 레코드를 동시에 로드
+    // (_ipoRecords가 없으면 캘린더 모달의 청약완료·배정입력 버튼이 동작하지 않음)
+    const [rDash, rIpo] = await Promise.all([
+      fetch('/api/data'),
+      fetch('/api/ipo'),
+    ]);
+    _dashData = rDash.ok ? await rDash.json() : { briefing: [], picks: [], signals: [] };
+    const ipoData = rIpo.ok ? await rIpo.json() : {};
+    _ipoRecords = ipoData.records || [];
+    // _dashData.ipo가 비어있으면 _ipoRecords로 채워 캘린더에 표시
+    if (!(_dashData.ipo || []).length) _dashData.ipo = _ipoRecords;
   } catch(e) {
-    _dashData = { briefing: [], picks: [], signals: [] };
+    _dashData = _dashData || { briefing: [], picks: [], signals: [] };
     console.warn('대시보드 데이터 로드 실패:', e.message);
   }
   renderDashboard(_dashData);
