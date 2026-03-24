@@ -536,6 +536,22 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
   }
+  .etf-div-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .etf-div-kpi-label {
+    font-size: 10px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+    margin-bottom: 4px;
+  }
+  .etf-div-kpi-val {
+    font-size: 16px; font-weight: 700; color: #16a34a;
+  }
+  .etf-div-kpi-sub {
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+  }
   .etf-kpi {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -654,6 +670,7 @@
   @media (max-width: 768px) {
     .etf-wrap { padding: 12px; }
     .etf-kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .etf-div-kpi-row { grid-template-columns: repeat(3, 1fr); }
     .etf-card-body { grid-template-columns: 1fr; }
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
     .etf-ci { padding: 6px 4px; }
@@ -813,6 +830,25 @@
     <div class="etf-kpi"><div class="etf-kpi-label">총 매입금</div><div class="etf-kpi-val" id="etf-k-buy">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">총 평가금</div><div class="etf-kpi-val" id="etf-k-eval">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">평가손익</div><div class="etf-kpi-val" id="etf-k-pnl">-</div></div>
+  </div>
+
+  <!-- 배당 요약 KPI -->
+  <div class="etf-div-kpi-row">
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">📥 연간 배당 (세전)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-pre">-</div>
+      <div class="etf-div-kpi-sub" id="etf-k-div-pre-sub"></div>
+    </div>
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">💰 연간 배당 (세후)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-post">-</div>
+      <div class="etf-div-kpi-sub" style="color:#16a34a;font-size:10px">배당소득세 15.4% 차감</div>
+    </div>
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">📅 월 환산 배당 (세후)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-monthly">-</div>
+      <div class="etf-div-kpi-sub" id="etf-k-div-monthly-sub"></div>
+    </div>
   </div>
 
   <!-- 목록 헤더 -->
@@ -2372,6 +2408,8 @@ async function saveEtfRecords() {
   });
 }
 
+const TAX_RATE = 0.154; // 배당소득세 14% + 지방소득세 1.4%
+
 function renderEtfCards() {
   const list = document.getElementById('etf-card-list');
   if (!list) return;
@@ -2384,6 +2422,16 @@ function renderEtfCards() {
   const pnlSign   = pnl >= 0 ? '+' : '';
   const fmtMoney  = v => v ? v.toLocaleString() + '원' : '-';
 
+  // ── 배당 합계 계산 ────────────────────────────────────
+  // 연간 배당(세전) = 현재가 × 연간배당률 × 보유수량
+  const divPreTotal  = _etfRecords.reduce((s, r) => {
+    if (!r.current_price || !r.annual_div_rate || r.div_cycle === '무배당') return s;
+    return s + r.current_price * (r.annual_div_rate / 100) * (r.qty || 0);
+  }, 0);
+  const divPostTotal  = divPreTotal * (1 - TAX_RATE);
+  const divMonthly    = divPostTotal / 12;
+  const divEtfCount   = _etfRecords.filter(r => r.annual_div_rate && r.div_cycle !== '무배당').length;
+
   document.getElementById('etf-k-count').textContent = _etfRecords.length + '개';
   document.getElementById('etf-k-buy').textContent   = fmtMoney(buyTotal);
   document.getElementById('etf-k-eval').textContent  = fmtMoney(evalTotal);
@@ -2392,6 +2440,17 @@ function renderEtfCards() {
   pnlEl.textContent = pnlPct !== null
     ? `${pnlSign}${pnl.toLocaleString()}원 (${pnlSign}${pnlPct.toFixed(2)}%)`
     : '-';
+
+  const divPreEl  = document.getElementById('etf-k-div-pre');
+  const divPostEl = document.getElementById('etf-k-div-post');
+  const divMonEl  = document.getElementById('etf-k-div-monthly');
+  if (divPreEl)  divPreEl.textContent  = divPreTotal  ? Math.round(divPreTotal).toLocaleString()  + '원' : '-';
+  if (divPostEl) divPostEl.textContent = divPostTotal ? Math.round(divPostTotal).toLocaleString() + '원' : '-';
+  if (divMonEl)  divMonEl.textContent  = divMonthly   ? Math.round(divMonthly).toLocaleString()  + '원' : '-';
+  const subEl = document.getElementById('etf-k-div-pre-sub');
+  if (subEl) subEl.textContent = divEtfCount ? `${divEtfCount}개 종목 합산` : '';
+  const monSubEl = document.getElementById('etf-k-div-monthly-sub');
+  if (monSubEl) monSubEl.textContent = divMonthly ? `연간 ÷ 12개월` : '';
 
   if (!_etfRecords.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:48px 20px">등록된 ETF가 없습니다.<br><small>위 버튼으로 추가해보세요.</small></div>';
@@ -2408,6 +2467,14 @@ function renderEtfCards() {
     const chgCls = (r.price_chg_pct || 0) >= 0 ? 'up' : 'dn';
     const chgSgn = (r.price_chg_pct || 0) >= 0 ? '+' : '';
     const hasDIV = r.div_cycle && r.div_cycle !== '무배당';
+
+    // 개별 배당 계산 (세전/세후)
+    const annDivPerShare  = (r.current_price && r.annual_div_rate)
+      ? r.current_price * (r.annual_div_rate / 100) : 0;
+    const annDivPre   = Math.round(annDivPerShare * (r.qty || 0));
+    const annDivPost  = Math.round(annDivPre  * (1 - TAX_RATE));
+    const recDivPre   = Math.round((r.recent_div || 0) * (r.qty || 0));
+    const recDivPost  = Math.round(recDivPre * (1 - TAX_RATE));
 
     const pnlStr  = pPct !== null
       ? `${ps}${profit.toLocaleString()}원 (${ps}${pPct.toFixed(2)}%)`
@@ -2444,12 +2511,12 @@ function renderEtfCards() {
           <span class="etf-ci-val">${(r.avg_price || 0).toLocaleString()}원</span>
         </div>
         <div class="etf-ci">
-          <span class="etf-ci-label">최근배당</span>
-          <span class="etf-ci-val">${rdStr}</span>
+          <span class="etf-ci-label">최근 1회 (세후)</span>
+          <span class="etf-ci-val" style="color:#16a34a">${recDivPost ? recDivPost.toLocaleString() + '원' : '-'}</span>
         </div>
         <div class="etf-ci">
-          <span class="etf-ci-label">최근/연간배당률</span>
-          <span class="etf-ci-val">${rateStr}</span>
+          <span class="etf-ci-label">연간 배당 (세후)</span>
+          <span class="etf-ci-val" style="color:#16a34a">${annDivPost ? annDivPost.toLocaleString() + '원' : '-'}</span>
         </div>
         <div class="etf-ci">
           <span class="etf-ci-label">평가손익</span>
@@ -2462,7 +2529,7 @@ function renderEtfCards() {
             <div class="etf-col-title">배당 정보</div>
             ${r.div_cycle ? `<div class="etf-row"><span class="etf-row-label">배당주기</span><span class="etf-row-val">${r.div_cycle}</span></div>` : ''}
             ${hasDIV && r.div_months ? `<div class="etf-row"><span class="etf-row-label">배당월</span><span class="etf-row-val">${r.div_months}</span></div>` : ''}
-            ${hasDIV && r.recent_div ? `<div class="etf-row"><span class="etf-row-label">최근 배당</span><span class="etf-row-val">${r.recent_div.toLocaleString()}원${r.recent_div_date ? ` (${r.recent_div_date})` : ''}</span></div>` : ''}
+            ${hasDIV && r.recent_div ? `<div class="etf-row"><span class="etf-row-label">주당 최근 배당</span><span class="etf-row-val">${r.recent_div.toLocaleString()}원</span></div>` : ''}
             ${hasDIV ? `<div class="etf-row"><span class="etf-row-label">최근/연간 배당률</span><span class="etf-row-val">${r.recent_div_rate || 0}% / ${r.annual_div_rate || 0}%</span></div>` : ''}
             ${!hasDIV ? `<div class="etf-row"><span class="etf-row-val" style="color:var(--muted)">${r.div_cycle || '배당 정보 없음'}</span></div>` : ''}
           </div>
@@ -2475,6 +2542,20 @@ function renderEtfCards() {
             ${r.ref_date ? `<div class="etf-row"><span class="etf-row-label">기준일</span><span class="etf-row-val">${r.ref_date}</span></div>` : ''}
           </div>
         </div>
+        ${hasDIV && (recDivPre || annDivPre) ? `
+        <div style="padding:8px 14px;border-top:1px solid var(--border);background:#f0fdf4;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.05em">배당 수령 예상</span>
+          ${recDivPre ? `
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <span style="font-size:10px;color:var(--muted)">최근 1회 — 세전 ${recDivPre.toLocaleString()}원</span>
+            <span style="font-size:12px;font-weight:700;color:#16a34a">세후 ${recDivPost.toLocaleString()}원</span>
+          </div>` : ''}
+          ${annDivPre ? `
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <span style="font-size:10px;color:var(--muted)">연간 합계 — 세전 ${annDivPre.toLocaleString()}원</span>
+            <span style="font-size:12px;font-weight:700;color:#16a34a">세후 ${annDivPost.toLocaleString()}원</span>
+          </div>` : ''}
+        </div>` : ''}
         <div class="etf-pnl-bar">
           <div class="etf-pnl-group">
             <span class="etf-pnl-label">평가손익</span>
