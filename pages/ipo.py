@@ -20,8 +20,12 @@ DATA_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ipo_data.j
 
 def load_data() -> list:
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except (json.JSONDecodeError, ValueError):
+            return []
     return []
 
 
