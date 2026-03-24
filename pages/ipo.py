@@ -710,11 +710,10 @@ with tab_review:
 
 
 # ┌─────────────────────────────────────────────────────────────────────────────
-# │ TAB 2 — 배정 입력
+# │ TAB 2 — 배정 입력 (캘린더 선택)
 # └─────────────────────────────────────────────────────────────────────────────
 with tab_allot:
     st.markdown("### 📬 배정 결과 입력")
-    st.caption("청약한 공모주의 배정주수를 날짜별로 클릭해서 입력하세요.")
 
     # 배정 입력 대상: 청약포기/상장완료 제외한 전체
     allot_targets = [
@@ -722,48 +721,77 @@ with tab_allot:
         if r.get("status") not in ("청약포기", "상장완료")
     ]
 
-    if not allot_targets:
-        st.info("배정 입력할 종목이 없습니다. '청약 추가' 탭에서 등록하세요.")
-    else:
-        from collections import defaultdict
-        today_str_allot = date.today().isoformat()
+    # 배정예정일 → 종목 매핑
+    _allot_map: dict = {}
+    for r in allot_targets:
+        d = r.get("date_allot") or calc_allot_date(r.get("date_sub_end", ""))
+        if d:
+            _allot_map.setdefault(d, []).append(r)
 
-        # 배정예정일별 그룹화
-        date_groups: dict = defaultdict(list)
-        for r in allot_targets:
-            allot_date = r.get("date_allot") or calc_allot_date(r.get("date_sub_end", ""))
-            date_groups[allot_date or "날짜 미정"].append(r)
+    # ── 캘린더 (날짜 선택) ────────────────────────────────────────────────────
+    col_cal, col_content = st.columns([1, 2])
 
-        # 오늘 → 과거 → 미래 → 날짜 미정 순 정렬
-        def _allot_sort_key(d: str):
-            if d == today_str_allot:    return (0, d)
-            if d == "날짜 미정":        return (3, d)
-            if d < today_str_allot:     return (1, d)
-            return (2, d)
+    with col_cal:
+        st.markdown("**📅 배정일 선택**")
 
-        for allot_date in sorted(date_groups.keys(), key=_allot_sort_key):
-            group = date_groups[allot_date]
-            is_today = allot_date == today_str_allot
-            is_past  = allot_date != "날짜 미정" and allot_date < today_str_allot
+        # 배정일 목록 (힌트용)
+        if _allot_map:
+            st.caption("배정일이 등록된 날짜 목록:")
+            sorted_allot_dates = sorted(_allot_map.keys())
+            for d in sorted_allot_dates:
+                names_on_day = [r["name"] for r in _allot_map[d]]
+                dot = "🔔" if d == date.today().isoformat() else ("✅" if all(r.get("shares_alloc") for r in _allot_map[d]) else "📬")
+                st.caption(f"{dot} `{d}` — {', '.join(names_on_day)}")
+
+        st.divider()
+
+        # 기본값: 배정일이 오늘인 것 우선, 없으면 오늘
+        _default_date = date.today()
+        _today_str = date.today().isoformat()
+        if _today_str in _allot_map:
+            _default_date = date.today()
+        elif sorted(_allot_map.keys()):
+            # 가장 가까운 과거/미래 배정일
+            _all_dates = sorted(_allot_map.keys())
+            _past = [d for d in _all_dates if d <= _today_str]
+            _default_date = date.fromisoformat(_past[-1]) if _past else date.fromisoformat(_all_dates[0])
+
+        selected_date = st.date_input(
+            "날짜 선택",
+            value=_default_date,
+            label_visibility="collapsed",
+        )
+
+    with col_content:
+        selected_str = selected_date.isoformat()
+        matched = _allot_map.get(selected_str, [])
+
+        if not allot_targets:
+            st.info("배정 입력할 종목이 없습니다. '청약 추가' 탭에서 등록하세요.")
+        elif not matched:
+            st.info(f"**{selected_str}** 에 배정일이 있는 공모주가 없습니다.")
+            if _allot_map:
+                st.caption("왼쪽에서 배정일이 등록된 날짜를 선택하세요.")
+        else:
+            is_today = selected_str == date.today().isoformat()
+            is_past  = selected_str < date.today().isoformat()
 
             if is_today:
-                st.markdown(f"#### 🔔 오늘 배정일 — {allot_date}")
+                st.success(f"🔔 오늘({selected_str}) 배정일 공모주 {len(matched)}건")
             elif is_past:
-                st.markdown(f"#### 📅 {allot_date}  _(배정일 경과)_")
-            elif allot_date == "날짜 미정":
-                st.markdown("#### 📅 날짜 미정")
+                st.warning(f"📅 {selected_str} 배정일 공모주 {len(matched)}건 — 배정일 경과")
             else:
-                st.markdown(f"#### 📅 {allot_date}")
+                st.info(f"📅 {selected_str} 배정일 공모주 {len(matched)}건")
 
-            for r in group:
+            for r in matched:
                 already_alloc = r.get("shares_alloc", 0) or 0
-                done_label = f"  ✔ {already_alloc:,}주 입력됨" if already_alloc else ""
-                icon = "✅" if already_alloc else ("🔔" if is_today or is_past else "📬")
+                icon = "✅" if already_alloc else "📬"
+                done_label = f"  ✔ {already_alloc:,}주 입력됨" if already_alloc else "  ← 클릭해서 입력"
 
                 with st.expander(
                     f"{icon} **{r['name']}** — 공모가 {r.get('price_ipo',0):,}원  |  "
                     f"{r.get('broker','—')}{done_label}",
-                    expanded=(is_today or is_past) and already_alloc == 0,
+                    expanded=already_alloc == 0,
                 ):
                     col_info, col_form = st.columns([1, 1])
 
@@ -783,14 +811,12 @@ with tab_allot:
                                 min_value=0,
                                 value=already_alloc,
                                 step=1,
-                                key=f"alloc_input_{r['id']}",
                             )
                             new_price_open = st.number_input(
                                 "실제 시초가 (원, 선택)",
                                 min_value=0,
                                 value=r.get("price_open") or 0,
                                 step=100,
-                                key=f"open_input_{r['id']}",
                             )
                             if st.form_submit_button("✅ 저장", type="primary", use_container_width=True):
                                 idx = next(
@@ -799,10 +825,8 @@ with tab_allot:
                                 )
                                 if idx is not None:
                                     st.session_state.ipo_records[idx]["shares_alloc"] = int(new_alloc)
-                                    st.session_state.ipo_records[idx]["date_allot"]   = (
-                                        allot_date if allot_date != "날짜 미정" else None
-                                    )
-                                    st.session_state.ipo_records[idx]["subscribed"] = True
+                                    st.session_state.ipo_records[idx]["date_allot"]   = selected_str
+                                    st.session_state.ipo_records[idx]["subscribed"]   = True
                                     if new_price_open:
                                         st.session_state.ipo_records[idx]["price_open"] = int(new_price_open)
                                     if new_alloc == 0:
@@ -813,8 +837,6 @@ with tab_allot:
                                         st.toast(f"🎉 {r['name']} {new_alloc:,}주 배정 완료!")
                                     save_data(st.session_state.ipo_records)
                                     st.rerun()
-
-            st.divider()
 
 
 # ┌─────────────────────────────────────────────────────────────────────────────
