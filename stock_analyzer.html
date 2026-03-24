@@ -2503,20 +2503,24 @@ function renderEtfCards() {
       </div>
       <div class="etf-card-compact">
         <div class="etf-ci">
-          <span class="etf-ci-label">보유수량</span>
-          <span class="etf-ci-val">${(r.qty || 0).toLocaleString()}주</span>
-        </div>
-        <div class="etf-ci">
           <span class="etf-ci-label">평균매수가</span>
           <span class="etf-ci-val">${(r.avg_price || 0).toLocaleString()}원</span>
         </div>
         <div class="etf-ci">
-          <span class="etf-ci-label">최근 1회 (세후)</span>
-          <span class="etf-ci-val" style="color:#16a34a">${recDivPost ? recDivPost.toLocaleString() + '원' : '-'}</span>
+          <span class="etf-ci-label">보유수량</span>
+          <span class="etf-ci-val">${(r.qty || 0).toLocaleString()}주</span>
         </div>
         <div class="etf-ci">
-          <span class="etf-ci-label">연간 배당 (세후)</span>
-          <span class="etf-ci-val" style="color:#16a34a">${annDivPost ? annDivPost.toLocaleString() + '원' : '-'}</span>
+          <span class="etf-ci-label">주당최근배당</span>
+          <span class="etf-ci-val">${r.recent_div ? r.recent_div.toLocaleString() + '원' : '-'}</span>
+        </div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">연간배당률</span>
+          <span class="etf-ci-val">${r.annual_div_rate ? r.annual_div_rate + '%' : '-'}</span>
+        </div>
+        <div class="etf-ci">
+          <span class="etf-ci-label">최근 1회 (세후)</span>
+          <span class="etf-ci-val" style="color:#16a34a">${recDivPost ? recDivPost.toLocaleString() + '원' : '-'}</span>
         </div>
         <div class="etf-ci">
           <span class="etf-ci-label">평가손익</span>
