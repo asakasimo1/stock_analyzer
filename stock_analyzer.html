@@ -630,22 +630,7 @@
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
   }
 
-  /* 자동완성 드롭다운 */
-  .etf-ac-wrap { position: relative; }
-  .etf-ac-list {
-    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
-    background: var(--surface); border: 1.5px solid var(--primary);
-    border-radius: var(--radius); overflow: hidden;
-    box-shadow: 0 4px 16px rgba(0,0,0,.10);
-  }
-  .etf-ac-item {
-    padding: 9px 14px; font-size: 13px; cursor: pointer;
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--border);
-  }
-  .etf-ac-item:last-child { border-bottom: none; }
-  .etf-ac-item:hover { background: var(--secondary); }
-  .etf-ac-ticker { font-size: 11px; color: var(--muted); margin-left: 8px; }
+  /* ETF 티커 조회 상태 피드백 — border-color는 JS로 직접 제어 */
 </style>
 </head>
 <body>
@@ -2516,70 +2501,50 @@ async function deleteEtf(id) {
 
 function editEtf(id) { openEtfModal(id); }
 
-// ── ETF 이름 자동완성 ─────────────────────────────────────
-let _etfAcTimer = null;
-function onEtfNameInput(val) {
-  clearTimeout(_etfAcTimer);
-  if (val.trim().length < 1) { hideEtfAc(); return; }
-  _etfAcTimer = setTimeout(() => fetchEtfAc(val.trim()), 250);
+// ── 티커 입력 → 종목명 + 현재가 자동 조회 ───────────────
+let _etfTickerTimer = null;
+function onEtfTickerInput(val) {
+  clearTimeout(_etfTickerTimer);
+  const t = val.trim();
+  if (!/^\d{6}$/.test(t)) return;
+  _etfTickerTimer = setTimeout(() => fetchAndFillQuote(t), 400);
 }
 
-async function fetchEtfAc(q) {
-  try {
-    const r = await fetch(`/api/etf-search?q=${encodeURIComponent(q)}`);
-    const data = await r.json();
-    showEtfAc(data.items || []);
-  } catch { hideEtfAc(); }
-}
-
-function showEtfAc(items) {
-  const list = document.getElementById('etf-ac-list');
-  if (!items.length) { list.style.display = 'none'; return; }
-  list.innerHTML = items.slice(0, 8).map(item =>
-    `<div class="etf-ac-item" onmousedown="selectEtfAcItem('${item.name.replace(/'/g,"\\'")}','${item.ticker}')">
-      <span>${item.name}</span>
-      <span class="etf-ac-ticker">${item.ticker}</span>
-    </div>`
-  ).join('');
-  list.style.display = 'block';
-}
-
-function hideEtfAc() {
-  setTimeout(() => {
-    const list = document.getElementById('etf-ac-list');
-    if (list) list.style.display = 'none';
-  }, 150);
-}
-
-async function selectEtfAcItem(name, ticker) {
-  document.getElementById('ef-name').value   = name;
-  document.getElementById('ef-ticker').value = ticker;
-  hideEtfAc();
-  await fetchAndFillQuote(ticker);
-}
-
-// ── 티커 직접 입력 후 blur ────────────────────────────────
 async function onEtfTickerBlur(ticker) {
   const t = ticker.trim();
   if (/^\d{6}$/.test(t)) await fetchAndFillQuote(t);
 }
 
-// ── 현재가/등락률 자동 채움 ───────────────────────────────
+// ── 종목명 + 현재가/등락률 자동 채움 ─────────────────────
 async function fetchAndFillQuote(ticker) {
-  const priceEl = document.getElementById('ef-price');
-  const chgEl   = document.getElementById('ef-chg');
+  const tickerEl = document.getElementById('ef-ticker');
+  const nameEl   = document.getElementById('ef-name');
+  const priceEl  = document.getElementById('ef-price');
+  const chgEl    = document.getElementById('ef-chg');
   if (!ticker || !priceEl) return;
+
+  tickerEl.style.borderColor = 'var(--primary)';
+  const prevPlaceholder = priceEl.placeholder;
   priceEl.placeholder = '조회 중...';
+
   try {
     const r = await fetch(`/api/quote?ticker=${ticker}`);
     const d = await r.json();
     if (d.price) {
       priceEl.value = d.price;
       chgEl.value   = d.chgPct ?? '';
+      // 종목명이 비어있을 때만 자동 채움
+      if (d.name && !nameEl.value.trim()) nameEl.value = d.name;
+      tickerEl.style.borderColor = 'var(--green)';
       calcEtfPreview();
+    } else {
+      tickerEl.style.borderColor = 'var(--red)';
     }
-  } catch {}
-  priceEl.placeholder = '25240';
+  } catch {
+    tickerEl.style.borderColor = 'var(--red)';
+  }
+  priceEl.placeholder = prevPlaceholder;
+  setTimeout(() => { tickerEl.style.borderColor = ''; }, 2000);
 }
 
 // ── 현재가 일괄 업데이트 ──────────────────────────────────
@@ -2632,15 +2597,12 @@ async function refreshAllEtfPrices() {
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
         <div>
           <label style="font-size:12px;color:var(--muted)">ETF명 <span style="color:#f87171">*</span></label>
-          <div class="etf-ac-wrap">
-            <input id="ef-name" type="text" placeholder="PLUS 고배당주" autocomplete="off"
-              oninput="onEtfNameInput(this.value)" onblur="hideEtfAc()">
-            <div id="etf-ac-list" class="etf-ac-list" style="display:none"></div>
-          </div>
+          <input id="ef-name" type="text" placeholder="PLUS 고배당주">
         </div>
         <div>
-          <label style="font-size:12px;color:var(--muted)">티커</label>
-          <input id="ef-ticker" type="text" placeholder="161510"
+          <label style="font-size:12px;color:var(--muted)">티커 <small style="color:var(--primary);font-weight:600">← 입력 시 자동조회</small></label>
+          <input id="ef-ticker" type="text" placeholder="161510" maxlength="6"
+            oninput="onEtfTickerInput(this.value)"
             onblur="onEtfTickerBlur(this.value)">
         </div>
       </div>
