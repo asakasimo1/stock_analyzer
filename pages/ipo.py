@@ -520,8 +520,8 @@ st.divider()
 # 탭
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_review, tab_list, tab_add, tab_stats = st.tabs(
-    ["🎯 청약 검토", "📋 전체 목록", "➕ 청약 추가", "📊 수익 분석"]
+tab_review, tab_allot, tab_list, tab_add, tab_stats = st.tabs(
+    ["🎯 청약 검토", "📬 배정 입력", "📋 전체 목록", "➕ 청약 추가", "📊 수익 분석"]
 )
 
 
@@ -710,7 +710,115 @@ with tab_review:
 
 
 # ┌─────────────────────────────────────────────────────────────────────────────
-# │ TAB 2 — 전체 목록
+# │ TAB 2 — 배정 입력
+# └─────────────────────────────────────────────────────────────────────────────
+with tab_allot:
+    st.markdown("### 📬 배정 결과 입력")
+    st.caption("청약한 공모주의 배정주수를 날짜별로 클릭해서 입력하세요.")
+
+    # 배정 입력 대상: 청약포기/상장완료 제외한 전체
+    allot_targets = [
+        r for r in records
+        if r.get("status") not in ("청약포기", "상장완료")
+    ]
+
+    if not allot_targets:
+        st.info("배정 입력할 종목이 없습니다. '청약 추가' 탭에서 등록하세요.")
+    else:
+        from collections import defaultdict
+        today_str_allot = date.today().isoformat()
+
+        # 배정예정일별 그룹화
+        date_groups: dict = defaultdict(list)
+        for r in allot_targets:
+            allot_date = r.get("date_allot") or calc_allot_date(r.get("date_sub_end", ""))
+            date_groups[allot_date or "날짜 미정"].append(r)
+
+        # 오늘 → 과거 → 미래 → 날짜 미정 순 정렬
+        def _allot_sort_key(d: str):
+            if d == today_str_allot:    return (0, d)
+            if d == "날짜 미정":        return (3, d)
+            if d < today_str_allot:     return (1, d)
+            return (2, d)
+
+        for allot_date in sorted(date_groups.keys(), key=_allot_sort_key):
+            group = date_groups[allot_date]
+            is_today = allot_date == today_str_allot
+            is_past  = allot_date != "날짜 미정" and allot_date < today_str_allot
+
+            if is_today:
+                st.markdown(f"#### 🔔 오늘 배정일 — {allot_date}")
+            elif is_past:
+                st.markdown(f"#### 📅 {allot_date}  _(배정일 경과)_")
+            elif allot_date == "날짜 미정":
+                st.markdown("#### 📅 날짜 미정")
+            else:
+                st.markdown(f"#### 📅 {allot_date}")
+
+            for r in group:
+                already_alloc = r.get("shares_alloc", 0) or 0
+                done_label = f"  ✔ {already_alloc:,}주 입력됨" if already_alloc else ""
+                icon = "✅" if already_alloc else ("🔔" if is_today or is_past else "📬")
+
+                with st.expander(
+                    f"{icon} **{r['name']}** — 공모가 {r.get('price_ipo',0):,}원  |  "
+                    f"{r.get('broker','—')}{done_label}",
+                    expanded=(is_today or is_past) and already_alloc == 0,
+                ):
+                    col_info, col_form = st.columns([1, 1])
+
+                    with col_info:
+                        st.markdown(f"**증권사**: {r.get('broker','—')}")
+                        st.markdown(f"**청약일**: {r.get('date_sub_start','')} ~ {r.get('date_sub_end','')}")
+                        st.markdown(f"**청약주수**: {r.get('shares_apply',0):,}주")
+                        st.markdown(f"**증거금**: {r.get('deposit',0):,}원")
+                        st.markdown(f"**상장예정**: {r.get('date_list','—')}")
+                        if r.get("competition_inst"):
+                            st.markdown(f"**기관경쟁률**: {r['competition_inst']:,.0f}:1")
+
+                    with col_form:
+                        with st.form(f"allot_tab_{r['id']}"):
+                            new_alloc = st.number_input(
+                                "배정주수 (0 = 미배정)",
+                                min_value=0,
+                                value=already_alloc,
+                                step=1,
+                                key=f"alloc_input_{r['id']}",
+                            )
+                            new_price_open = st.number_input(
+                                "실제 시초가 (원, 선택)",
+                                min_value=0,
+                                value=r.get("price_open") or 0,
+                                step=100,
+                                key=f"open_input_{r['id']}",
+                            )
+                            if st.form_submit_button("✅ 저장", type="primary", use_container_width=True):
+                                idx = next(
+                                    (i for i, x in enumerate(st.session_state.ipo_records) if x["id"] == r["id"]),
+                                    None,
+                                )
+                                if idx is not None:
+                                    st.session_state.ipo_records[idx]["shares_alloc"] = int(new_alloc)
+                                    st.session_state.ipo_records[idx]["date_allot"]   = (
+                                        allot_date if allot_date != "날짜 미정" else None
+                                    )
+                                    st.session_state.ipo_records[idx]["subscribed"] = True
+                                    if new_price_open:
+                                        st.session_state.ipo_records[idx]["price_open"] = int(new_price_open)
+                                    if new_alloc == 0:
+                                        st.session_state.ipo_records[idx]["status"] = "청약포기"
+                                        st.toast(f"😢 {r['name']} 미배정으로 처리됐습니다.")
+                                    else:
+                                        st.session_state.ipo_records[idx]["status"] = "상장예정"
+                                        st.toast(f"🎉 {r['name']} {new_alloc:,}주 배정 완료!")
+                                    save_data(st.session_state.ipo_records)
+                                    st.rerun()
+
+            st.divider()
+
+
+# ┌─────────────────────────────────────────────────────────────────────────────
+# │ TAB 3 — 전체 목록
 # └─────────────────────────────────────────────────────────────────────────────
 with tab_list:
     filtered = [
