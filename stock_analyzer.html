@@ -1118,10 +1118,10 @@ function renderPicksList(items) {
 // ── 공모주 청약 현황 ─────────────────────────────────────
 function renderIpoList(items) {
   const el = document.getElementById('list-ipo');
-  const STATUS_EMOJI = { '청약예정':'🔵', '청약중':'🟡', '상장예정':'🟠', '상장완료':'🟢', '청약포기':'⚫' };
+  const STATUS_EMOJI = { '청약예정':'🔵', '청약중':'🟡', '상장예정':'🟠', '상장완료':'🟢', '청약포기':'⚫', '배정실패':'❌' };
 
   // 진행중 → 상장완료 순 정렬
-  const order = ['청약중','청약예정','상장예정','상장완료','청약포기'];
+  const order = ['청약중','청약예정','상장예정','상장완료','청약포기','배정실패'];
   const sorted = [...items].sort((a,b) => order.indexOf(a.status||'') - order.indexOf(b.status||''));
 
   if (!sorted.length) { el.innerHTML = '<div class="empty-msg">등록된 공모주가 없습니다</div>'; return; }
@@ -1252,8 +1252,8 @@ function renderCalendar(data) {
       }
     }
 
-    // 배정일 — subscribed 여부 무관, 배정주수 미입력 + 활성 상태면 표시
-    if (ipo.date_sub_end && !['상장완료','청약포기'].includes(status)) {
+    // 배정일 — 청약완료 시에만, 배정주수 미입력 + 활성 상태면 표시 (step2)
+    if (ipo.subscribed && ipo.date_sub_end && !['상장완료','청약포기','배정실패'].includes(status)) {
       const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
       const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
       if (allotDate && !hasAlloc) {
@@ -1415,6 +1415,10 @@ function showDayDetail(key) {
     };
     ipoEvs.forEach(ev => {
       const ipo = ev.detail;
+      const ipoProfit = (ipo.price_open && ipo.price_ipo && ipo.shares_alloc > 0)
+        ? (ipo.price_open - ipo.price_ipo) * ipo.shares_alloc : null;
+      const ipoRetPct = (ipo.price_open && ipo.price_ipo)
+        ? ((ipo.price_open - ipo.price_ipo) / ipo.price_ipo * 100) : null;
       html += `<div class="day-modal-ev">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-weight:700">${ipo.name||''}</span>
@@ -1427,27 +1431,50 @@ function showDayDetail(key) {
           ${ipo.broker ? ` · ${ipo.broker}` : ''}
         </div>
         ${(ipo.shares_alloc||0) > 0
-          ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">✅ 배정: ${ipo.shares_alloc}주 입력됨</div>` : ''}
+          ? `<div style="font-size:12px;margin-top:4px;color:var(--green);font-weight:600">✅ 배정: ${ipo.shares_alloc}주</div>` : ''}
+
+        ${ev.type === 'ipo-sub' ? `
+        <div style="margin-top:12px;padding:12px;background:#1e2d45;border-radius:8px">
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">이 공모주에 청약하셨나요?</div>
+          <button onclick="markSubscribed(${ipo.id})"
+            style="width:100%;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
+            ✅ 청약했어요 → 배정일 캘린더에 추가
+          </button>
+        </div>` : ''}
+
         ${ev.type === 'ipo-allot' ? `
         <div style="margin-top:12px;padding:12px;background:#1e2d45;border-radius:8px">
-          <div style="font-size:12px;color:#fde68a;font-weight:600;margin-bottom:10px">📬 배정 결과 입력</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-            <div>
-              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">배정주수 (0 = 미배정)</label>
-              <input type="number" id="allot-shares-${ipo.id}" min="0" value="${ipo.shares_alloc||0}"
-                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">실제 시초가 (원, 선택)</label>
-              <input type="number" id="allot-price-${ipo.id}" min="0" value="${ipo.price_open||''}" placeholder="상장 후 입력"
-                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
-            </div>
+          <div style="font-size:12px;color:#fde68a;font-weight:600;margin-bottom:10px">📬 배정 결과 입력 (step 3)</div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">배정주수 (0 = 배정실패)</label>
+            <input type="number" id="allot-shares-${ipo.id}" min="0" value="${ipo.shares_alloc||0}"
+              style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
           </div>
           <button onclick="saveAllotFromModal(${ipo.id})"
             style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
             ✅ 저장
           </button>
         </div>` : ''}
+
+        ${ev.type === 'ipo-list' ? `
+        <div style="margin-top:12px;padding:12px;background:#0d2010;border-radius:8px;border:1px solid #166534">
+          <div style="font-size:12px;color:#86efac;font-weight:600;margin-bottom:10px">💰 매도 결과 입력 (step 4)</div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">실제 매도가 (원)</label>
+            <input type="number" id="list-price-${ipo.id}" min="0" value="${ipo.price_open||''}" placeholder="매도한 가격 입력"
+              style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+          </div>
+          ${ipoProfit !== null ? `
+          <div style="padding:8px;background:#111827;border-radius:6px;margin-bottom:10px;font-size:13px">
+            수익: <strong style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'}">${ipoProfit >= 0 ? '+' : ''}${ipoProfit.toLocaleString()}원</strong>
+            <span style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'};margin-left:8px">(${ipoRetPct >= 0 ? '+' : ''}${ipoRetPct.toFixed(1)}%)</span>
+          </div>` : ''}
+          <button onclick="saveListPriceFromModal(${ipo.id})"
+            style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
+            💰 저장 후 공모주 탭에서 수익 확인
+          </button>
+        </div>` : ''}
+
         ${ipo.score != null ? (() => {
           const sc = ipo.score;
           const color = sc >= 70 ? 'var(--green)' : sc >= 50 ? '#f59e0b' : 'var(--muted)';
@@ -1884,7 +1911,7 @@ initDashboard();
 let _ipoRecords = [];
 
 const IPO_STATUS = {
-  '청약예정': '🔵', '청약중': '🟡', '상장예정': '🟠', '상장완료': '🟢', '청약포기': '⚫',
+  '청약예정': '🔵', '청약중': '🟡', '상장예정': '🟠', '상장완료': '🟢', '청약포기': '⚫', '배정실패': '❌',
 };
 
 function calcAllotDateIpo(subEnd) {
@@ -1897,10 +1924,10 @@ function calcAllotDateIpo(subEnd) {
 
 function autoStatus(r) {
   const today = new Date().toISOString().slice(0, 10);
+  if (r.allot_done && !(r.shares_alloc > 0)) return '배정실패';
   if (r.shares_alloc > 0 && r.date_list) {
     return today >= r.date_list ? '상장완료' : '상장예정';
   }
-  if (r.shares_alloc === 0 && r.subscribed && r.date_sub_end && today > r.date_sub_end) return '청약포기';
   if (r.date_sub_end && today > r.date_sub_end) return r.subscribed ? '상장예정' : '청약포기';
   if (r.date_sub_start && today >= r.date_sub_start) return '청약중';
   return '청약예정';
@@ -1946,7 +1973,7 @@ function renderIpoManage() {
   // 알림 배너 (배정 확인일 도래 — subscribed 여부 무관)
   let alerts = '';
   _ipoRecords.forEach(r => {
-    if (r.shares_alloc > 0 || r.status === '청약포기' || r.status === '상장완료') return;
+    if (r.shares_alloc > 0 || ['청약포기','상장완료','배정실패'].includes(r.status)) return;
     const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
     if (allotDate && allotDate <= today) {
       alerts += `
@@ -1963,7 +1990,7 @@ function renderIpoManage() {
   document.getElementById('ipo-alerts').innerHTML = alerts;
 
   // 목록
-  const order = ['청약중','청약예정','상장예정','상장완료','청약포기'];
+  const order = ['청약중','청약예정','상장예정','상장완료','청약포기','배정실패'];
   const sorted = [..._ipoRecords].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
 
   if (!sorted.length) {
@@ -1979,7 +2006,7 @@ function renderIpoManage() {
 
     // 배정주수 영역 — subscribed 여부 무관, 활성 상태면 항상 표시
     let allocSection = '';
-    if (!['상장완료','청약포기'].includes(r.status)) {
+    if (!['상장완료','청약포기','배정실패'].includes(r.status)) {
       allocSection = `
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
           <span style="font-size:12px;color:#94a3b8;white-space:nowrap">📬 배정주수</span>
@@ -2006,18 +2033,40 @@ function renderIpoManage() {
         </div>
         <div style="margin-top:8px;font-size:12px;color:#64748b;display:flex;flex-wrap:wrap;gap:10px">
           ${r.date_sub_start ? `<span>📅 청약 ${r.date_sub_start} ~ ${r.date_sub_end||''}</span>` : ''}
-          ${r.date_list && subDone && alloc > 0 ? `<span>🚀 상장 ${r.date_list}</span>` : ''}
+          ${r.date_list && alloc > 0 ? `<span>🚀 상장 ${r.date_list}</span>` : ''}
           ${r.price_ipo ? `<span>💰 공모가 ${r.price_ipo.toLocaleString()}원</span>` : ''}
-          ${allotDate && subDone && !alloc && r.status !== '청약포기' ? `<span style="color:#fbbf24">📬 배정확인 ${allotDate}</span>` : ''}
+          ${allotDate && subDone && !alloc && !['청약포기','배정실패'].includes(r.status) ? `<span style="color:#fbbf24">📬 배정확인 ${allotDate}</span>` : ''}
         </div>
         <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
             <input type="checkbox" ${subDone ? 'checked' : ''} onchange="toggleSubscribed(${r.id}, this.checked)"
               style="width:16px;height:16px;cursor:pointer">
-            <span style="color:${subDone ? '#34d399' : '#94a3b8'}">${subDone ? '✅ 청약 완료' : '⬜ 청약 완료 (체크 시 배정주수 입력 가능)'}</span>
+            <span style="color:${subDone ? '#34d399' : '#94a3b8'}">${subDone ? '✅ 청약 완료' : '⬜ 청약 완료 (체크하면 배정일 캘린더에 표시)'}</span>
           </label>
         </div>
         ${allocSection}
+        ${['상장예정','상장완료'].includes(r.status) && alloc > 0 ? `
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">💰 매도가</span>
+          <input type="number" id="list-price-input-${r.id}" value="${r.price_open||''}" min="0" placeholder="매도가 입력"
+            style="width:120px;padding:6px 8px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <button onclick="saveListPrice(${r.id})"
+            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
+          ${r.price_open ? `<span style="color:#34d399;font-size:12px">✅ ${r.price_open.toLocaleString()}원</span>` : ''}
+        </div>` : ''}
+        ${r.status === '상장완료' && r.price_open && r.price_ipo && alloc > 0 ? (() => {
+          const profit = (r.price_open - r.price_ipo) * alloc;
+          const pct = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(1);
+          const c = profit >= 0 ? '#34d399' : '#f87171';
+          return `<div style="margin-top:8px;padding:10px;background:#0f172a;border-radius:8px;font-size:13px">
+            <div style="font-size:11px;color:#64748b;margin-bottom:4px">수익 계산</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <strong style="color:${c};font-size:16px">${profit >= 0 ? '+' : ''}${profit.toLocaleString()}원</strong>
+              <span style="color:${c}">(${profit >= 0 ? '+' : ''}${pct}%)</span>
+              <span style="font-size:11px;color:#64748b">공모가 ${r.price_ipo.toLocaleString()} → 매도가 ${r.price_open.toLocaleString()}</span>
+            </div>
+          </div>`;
+        })() : ''}
       </div>`;
   }).join('');
 }
@@ -2113,9 +2162,11 @@ async function saveAlloc(id) {
   const idx = _ipoRecords.findIndex(r => r.id === id);
   if (idx === -1) return;
   _ipoRecords[idx].shares_alloc = alloc;
-  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+  _ipoRecords[idx].allot_done = true;
+  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : (_ipoRecords[idx].subscribed ? '배정실패' : '청약포기');
   await saveIpoRecords();
   renderIpoManage();
+  renderCalendar(_dashData || {});
 }
 
 async function quickAllot(id) {
@@ -2125,7 +2176,8 @@ async function quickAllot(id) {
   if (idx === -1) return;
   _ipoRecords[idx].shares_alloc = alloc;
   _ipoRecords[idx].subscribed = true;
-  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+  _ipoRecords[idx].allot_done = true;
+  _ipoRecords[idx].status = alloc > 0 ? autoStatus(_ipoRecords[idx]) : '배정실패';
   await saveIpoRecords();
   renderIpoManage();
   renderCalendar(_dashData || {});
@@ -2142,8 +2194,8 @@ async function saveAllotFromModal(id) {
 
   _ipoRecords[idx].shares_alloc = shares;
   _ipoRecords[idx].subscribed   = true;
-  if (price > 0) _ipoRecords[idx].price_open = price;
-  _ipoRecords[idx].status = shares > 0 ? autoStatus(_ipoRecords[idx]) : '청약포기';
+  _ipoRecords[idx].allot_done   = true;
+  _ipoRecords[idx].status = shares > 0 ? autoStatus(_ipoRecords[idx]) : '배정실패';
 
   await saveIpoRecords();
   renderIpoManage();
@@ -2153,10 +2205,63 @@ async function saveAllotFromModal(id) {
   document.getElementById('day-modal-overlay').classList.remove('open');
 
   // 결과 메시지
-  alert(shares > 0
-    ? `🎉 ${_ipoRecords[idx].name} ${shares.toLocaleString()}주 배정 완료!\n캘린더가 업데이트됐습니다.`
-    : `😢 ${_ipoRecords[idx].name} 미배정으로 처리됐습니다.`
-  );
+  if (shares > 0) {
+    alert(`🎉 ${_ipoRecords[idx].name} ${shares.toLocaleString()}주 배정!\n상장일이 캘린더에 추가됐습니다.`);
+  } else {
+    alert(`😢 ${_ipoRecords[idx].name} 배정실패로 처리됐습니다.`);
+  }
+}
+
+// step1: 캘린더 청약기간 클릭 → 청약 완료 표시
+async function markSubscribed(id) {
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].subscribed = true;
+  _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  renderCalendar(_dashData || {});
+  document.getElementById('day-modal-overlay').classList.remove('open');
+  const r = _ipoRecords[idx];
+  const allotDate = r.date_allot || calcAllotDate(r.date_sub_end);
+  alert(`✅ ${r.name} 청약완료!\n배정확인일(${allotDate})이 캘린더에 추가됐습니다.`);
+}
+
+// step4: 상장일 모달에서 매도가 저장 → 공모주 탭으로 이동
+async function saveListPriceFromModal(id) {
+  const priceEl = document.getElementById(`list-price-${id}`);
+  const price = parseInt(priceEl?.value) || 0;
+  if (!price) { alert('매도가를 입력하세요'); return; }
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].price_open = price;
+  _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  document.getElementById('day-modal-overlay').classList.remove('open');
+  gotoIpoTab();
+}
+
+// 공모주 탭으로 프로그래매틱 이동
+function gotoIpoTab() {
+  document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-ipo').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(el => {
+    if ((el.getAttribute('onclick') || '').includes("'ipo'")) el.classList.add('active');
+  });
+  loadIpoRecords();
+}
+
+// 공모주 탭 목록에서 매도가 직접 저장
+async function saveListPrice(id) {
+  const input = document.getElementById(`list-price-input-${id}`);
+  const price = parseInt(input?.value) || 0;
+  const idx = _ipoRecords.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  _ipoRecords[idx].price_open = price;
+  _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  renderIpoManage();
+  renderCalendar(_dashData || {});
 }
 
 </script>
