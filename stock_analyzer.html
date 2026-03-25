@@ -846,7 +846,6 @@
   <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
   <button class="tab-btn" onclick="switchTab('market')">📊 시장현황</button>
   <button class="tab-btn" onclick="switchTab('etf')">💹 ETF</button>
-  <button class="tab-btn" onclick="switchTab('ipo')">🏢 공모주</button>
 </nav>
 
 
@@ -960,26 +959,6 @@
 </div><!-- /tab-market -->
 
 <!-- 공모주 관리 탭 -->
-<div id="tab-ipo" class="tab-page">
-<div style="max-width:900px;margin:0 auto;padding:16px">
-
-  <!-- 알림 배너 영역 -->
-  <div id="ipo-alerts"></div>
-
-  <!-- 상단: 요약 지표 -->
-  <div id="ipo-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px"></div>
-
-  <!-- 공모주 목록 -->
-  <div class="card" style="margin-bottom:20px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div class="card-title" style="margin:0">🏢 공모주 목록</div>
-      <button onclick="openIpoModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">+ 공모주 추가</button>
-    </div>
-    <div id="ipo-list-manage"></div>
-  </div>
-
-</div>
-</div><!-- /tab-ipo -->
 
 <!-- ETF 관리 탭 -->
 <div id="tab-etf" class="tab-page">
@@ -1907,6 +1886,9 @@ function closeModal(evt) {
 // ══════════════════════════════════════════════════════════
 const PORTFOLIO_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F2DeIKHRdaD4frxFWwr76SywV5G_bXQAbxjYylXN4O4/gviz/tq?tqx=out:csv';
 let _portData = null;
+let _portFetchedAt = 0;
+let _portAutoTimer = null;
+const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 
 // ── CSV 파싱 ───────────────────────────────────────────────
 function parsePortfolioCsv(csvText) {
@@ -2038,10 +2020,14 @@ function parsePortfolioCsv(csvText) {
 }
 
 // ── fetch + 파싱 ─────────────────────────────────────────
-async function initPortfolio() {
-  if (_portData) { renderPortfolio(_portData); return; }
+async function initPortfolio(force = false) {
+  // 20분 이내 캐시가 있으면 재사용 (force=true면 무조건 재조회)
+  if (!force && _portData && (Date.now() - _portFetchedAt) < PORT_REFRESH_MS) {
+    renderPortfolio(_portData);
+    _startPortAutoRefresh();
+    return;
+  }
 
-  // 로딩 상태
   document.getElementById('port-kpi-row').innerHTML =
     '<div class="port-loading" style="grid-column:1/-1">📡 스프레드시트에서 데이터를 불러오는 중...</div>';
 
@@ -2051,6 +2037,7 @@ async function initPortfolio() {
     const csv = await res.text();
     _portData = parsePortfolioCsv(csv);
     _portData._fetchedAt = new Date().toLocaleString('ko-KR');
+    _portFetchedAt = Date.now();
     renderPortfolio(_portData);
   } catch(e) {
     document.getElementById('port-kpi-row').innerHTML =
@@ -2060,6 +2047,16 @@ async function initPortfolio() {
       </div>`;
     console.error('포트폴리오 로드 실패:', e);
   }
+
+  _startPortAutoRefresh();
+}
+
+function _startPortAutoRefresh() {
+  clearInterval(_portAutoTimer);
+  _portAutoTimer = setInterval(() => {
+    const tab = document.getElementById('tab-portfolio');
+    if (tab && tab.classList.contains('active')) initPortfolio(true);
+  }, PORT_REFRESH_MS);
 }
 
 // ── 렌더링 진입점 ─────────────────────────────────────────
