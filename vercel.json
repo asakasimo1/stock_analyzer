@@ -11,7 +11,9 @@
     { "src": "api/transactions.js", "use": "@vercel/node" },
     { "src": "api/dividend-schedule.js", "use": "@vercel/node" },
     { "src": "api/market.js", "use": "@vercel/node" },
-    { "src": "api/stocks.js", "use": "@vercel/node" }
+    { "src": "api/stocks.js", "use": "@vercel/node" },
+    { "src": "api/stock-search.js", "use": "@vercel/node" },
+    { "src": "api/stock-quote.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -25,6 +27,8 @@
     { "src": "/api/transactions", "dest": "/api/transactions.js" },
     { "src": "/api/dividend-schedule", "dest": "/api/dividend-schedule.js" },
     { "src": "/api/market", "dest": "/api/market.js" },
-    { "src": "/api/stocks", "dest": "/api/stocks.js" }
+    { "src": "/api/stocks", "dest": "/api/stocks.js" },
+    { "src": "/api/stock-search", "dest": "/api/stock-search.js" },
+    { "src": "/api/stock-quote", "dest": "/api/stock-quote.js" }
   ]
 }
