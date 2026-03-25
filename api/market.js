@@ -28,9 +28,9 @@ export default async function handler(req, res) {
     return { price, chg, chgPct };
   };
 
-  /* ── Stooq CSV (미국 지수·환율·금 등) — 최근 30일 범위 지정으로 안정적 데이터 확보 ── */
-  const fetchStooq = async (symbol) => {
-    const d2 = new Date(); const d1 = new Date(d2); d1.setDate(d1.getDate() - 30);
+  /* ── Stooq CSV (미국 지수·환율·금 등) — 최근 60일 범위 ── */
+  const fetchStooq = async (symbol, withHistory = false) => {
+    const d2 = new Date(); const d1 = new Date(d2); d1.setDate(d1.getDate() - 60);
     const fmt = d => d.toISOString().slice(0,10).replace(/-/g,'');
     const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&d1=${fmt(d1)}&d2=${fmt(d2)}&i=d`;
     const r   = await fetch(url, { headers: ua });
@@ -42,7 +42,13 @@ export default async function handler(req, res) {
     const price = parseFloat(last[4]);   // Close
     if (isNaN(price) || price === 0) throw new Error(`Stooq ${symbol}: parse fail`);
     const prevC = lines.length >= 2 ? parseFloat(lines[lines.length - 2].split(',')[4]) : price;
-    return { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
+    const result = { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
+    if (withHistory) {
+      result.history = lines
+        .map(l => { const c = l.split(','); return { date: c[0], close: parseFloat(c[4]) }; })
+        .filter(p => !isNaN(p.close) && p.close > 0);
+    }
+    return result;
   };
 
   /* ── CBOE — VIX 공식 CSV ── */
@@ -103,7 +109,7 @@ export default async function handler(req, res) {
     fetchStooq('^ndq'),     // NASDAQ Composite
     fetchStooq('^spx'),     // S&P 500
     fetchStooq('^dji'),     // Dow Jones
-    fetchStooq('usdkrw'),   // USD/KRW
+    fetchStooq('usdkrw', true),  // USD/KRW + 60일 히스토리
     fetchVIX(),             // CBOE VIX (공식 CSV)
     fetchStooq('xauusd'),   // Gold spot (USD/oz)
     fetchUS10Y(),           // 미국 10년 국채금리 (FRED)
