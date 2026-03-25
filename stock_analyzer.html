@@ -328,6 +328,7 @@
   .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
   .cal-header h2 { font-size: 18px; font-weight: 700; }
   .cal-nav { background: none; border: 1px solid var(--border); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display:flex;align-items:center;justify-content:center; }
+  .cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 0; text-transform: uppercase; }
   .cal-cell {
@@ -408,6 +409,10 @@
   .empty-msg { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
 
   @media (max-width: 768px) {
+    .cal-grid { grid-template-columns: repeat(7, minmax(72px, 1fr)); }
+    .cal-cell { min-height: 72px; padding: 4px; }
+    .cal-day  { font-size: 11px; }
+    .cal-event { font-size: 9px; padding: 2px 4px; }
     header { padding: 0 20px; }
     main { grid-template-columns: 1fr; padding: 16px; }
     .trades-card  { grid-column: 1; grid-row: 2; }
@@ -1401,7 +1406,9 @@
       <span class="cal-event ipo-allot" style="display:inline-block">📬 배정 확인일</span>
       <span class="cal-event ipo-list" style="display:inline-block">🚀 상장일</span>
     </div>
-    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-scroll">
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
   </div>
 
   <!-- 브리핑 히스토리 -->
