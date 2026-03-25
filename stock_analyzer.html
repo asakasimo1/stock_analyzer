@@ -706,20 +706,23 @@
   .div-year-group { margin-bottom: 14px; }
   .div-year-header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 9px 14px; background: #0f1f35;
-    border: 1px solid #2563eb44; border-radius: 10px;
+    padding: 10px 14px; background: #0f1f35;
+    border: 1px solid #2563eb55; border-radius: 10px;
     font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;
+    cursor: pointer; user-select: none;
   }
+  .div-year-header:hover { background: #132840; }
+  .div-toggle-icon { color: #60a5fa; font-size: 10px; transition: transform .15s; }
   .div-month-group {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; margin-bottom: 6px; margin-left: 8px;
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 6px; margin-left: 10px;
   }
   .div-month-header {
     padding: 7px 14px; background: var(--bg);
     border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 700; color: var(--text);
     display: flex; justify-content: space-between; align-items: center;
-    user-select: none;
+    cursor: pointer; user-select: none;
   }
   .div-month-header:hover { background: #1a2640; }
   .div-month-total { font-size: 11px; color: #16a34a; font-weight: 700; }
@@ -3322,21 +3325,29 @@ function renderDivHistory() {
             </div>`).join('');
 
           return `<div class="div-month-group">
-            <div class="div-month-header" style="cursor:pointer" onclick="toggleDivMonth(this)">
-              <span>📅 ${label} <span style="font-size:10px;color:var(--muted)">(${records.length}건)</span></span>
-              <span class="div-month-total">세후 ${fmtW(mNet)} / 세전 ${fmtW(mGross)}</span>
+            <div class="div-month-header" onclick="toggleDivMonth(this)">
+              <span style="display:flex;align-items:center;gap:6px">
+                <span class="div-toggle-icon">▼</span>
+                <span>📅 ${label}</span>
+                <span style="font-size:10px;color:var(--muted)">(${records.length}건)</span>
+              </span>
+              <span class="div-month-total">세후 ${fmtW(mNet)} &nbsp;·&nbsp; 세전 ${fmtW(mGross)}</span>
             </div>
             <div class="div-month-body">${rows}</div>
           </div>`;
         }).join('');
 
-      // 연도 헤더는 전체 보기일 때만, 또는 항상 표시
       return `<div class="div-year-group">
-        <div class="div-year-header">
-          <span>📆 ${yr}년</span>
-          <span style="font-size:12px;color:#60a5fa;font-weight:700">세후 합계 ${fmtW(yrNet)} <span style="color:var(--muted);font-weight:400">/ 세전 ${fmtW(yrGross)}</span></span>
+        <div class="div-year-header" onclick="toggleDivYear(this)">
+          <span style="display:flex;align-items:center;gap:8px">
+            <span class="div-toggle-icon" style="font-size:11px">▼</span>
+            <span>📆 ${yr}년</span>
+          </span>
+          <span style="font-size:12px;color:#60a5fa;font-weight:700">
+            세후 ${fmtW(yrNet)} <span style="color:var(--muted);font-weight:400;margin-left:4px">/ 세전 ${fmtW(yrGross)}</span>
+          </span>
         </div>
-        ${monthBlocks}
+        <div class="div-year-body">${monthBlocks}</div>
       </div>`;
     }).join('');
 }
@@ -3359,9 +3370,19 @@ function setDivYear(val) {
 function toggleDivMonth(header) {
   const body = header.nextElementSibling;
   if (!body) return;
-  const hidden = body.style.display === 'none';
-  body.style.display = hidden ? '' : 'none';
-  header.style.opacity = hidden ? '1' : '0.6';
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  const icon = header.querySelector('.div-toggle-icon');
+  if (icon) icon.textContent = collapsed ? '▼' : '▶';
+}
+
+function toggleDivYear(header) {
+  const body = header.nextElementSibling;
+  if (!body) return;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  const icon = header.querySelector('.div-toggle-icon');
+  if (icon) icon.textContent = collapsed ? '▼' : '▶';
 }
 
 function editEtf(id) { openEtfModal(id); }
