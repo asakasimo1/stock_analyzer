@@ -568,66 +568,97 @@
   }
   .etf-kpi-val.up  { color: var(--green); }
   .etf-kpi-val.dn  { color: var(--red); }
+  /* ── ETF 카드 그리드 ── */
+  #etf-card-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
   .etf-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 14px;
     overflow: hidden;
     cursor: pointer;
-    transition: box-shadow 0.15s;
+    transition: box-shadow 0.15s, border-color 0.15s;
   }
-  .etf-card:hover { box-shadow: 0 2px 12px rgba(61,90,254,.10); }
-  .etf-card-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 14px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    flex-wrap: wrap; gap: 6px;
+  .etf-card:hover { box-shadow: 0 4px 20px rgba(61,90,254,.18); border-color: #334155; }
+
+  /* ── 카드 페이스 (새 디자인) ── */
+  .etf2-face { padding: 14px 14px 0; }
+  .etf2-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
+    margin-bottom: 10px;
   }
-  .etf-card-name {
+  .etf2-name {
     font-size: 13px; font-weight: 700; color: var(--text);
-    display: flex; align-items: center; gap: 6px;
+    line-height: 1.3; word-break: keep-all;
   }
+  .etf2-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
   .etf-ticker-badge {
     font-size: 10px; font-weight: 600;
     background: var(--secondary); color: var(--primary);
-    border-radius: 5px; padding: 1px 6px;
-    white-space: nowrap;
+    border-radius: 5px; padding: 1px 6px; white-space: nowrap;
   }
-  .etf-price-block {
-    display: flex; align-items: baseline; gap: 5px; flex-shrink: 0;
-  }
-  .etf-price-val { font-size: 13px; font-weight: 700; color: var(--text); }
-  .etf-price-chg { font-size: 11px; font-weight: 600; }
-  .etf-price-chg.up { color: var(--green); }
-  .etf-price-chg.dn { color: var(--red); }
   .etf-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .etf-head-actions button {
     background: none; border: 1px solid var(--border);
-    border-radius: 5px; padding: 2px 8px;
+    border-radius: 5px; padding: 2px 7px;
     font-size: 11px; cursor: pointer; color: var(--muted);
     transition: border-color 0.15s, color 0.15s;
   }
   .etf-head-actions button:hover { color: var(--primary); border-color: var(--primary); }
   .etf-head-actions button.del:hover { color: var(--red); border-color: var(--red); }
 
-  /* 컴팩트 요약행 */
-  .etf-card-compact {
-    display: flex; align-items: stretch; flex-wrap: nowrap;
+  /* 현재가 영역 */
+  .etf2-price-area { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+  .etf2-price { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+  .etf2-chg { font-size: 13px; font-weight: 700; }
+  .etf2-chg.up { color: var(--green); }
+  .etf2-chg.dn { color: var(--red); }
+
+  /* 지표 3칸 */
+  .etf2-metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0; border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    font-size: 12px;
+    margin: 0 -14px;
   }
-  .etf-ci {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 7px 6px; text-align: center; gap: 2px;
+  .etf2-metric {
+    padding: 7px 10px; text-align: center;
     border-right: 1px solid var(--border);
   }
-  .etf-ci:last-child { border-right: none; }
-  .etf-ci-label { font-size: 10px; color: var(--muted); }
-  .etf-ci-val { font-weight: 700; color: var(--text); font-size: 12px; }
-  .etf-ci-val.up { color: var(--green); }
-  .etf-ci-val.dn { color: var(--red); }
+  .etf2-metric:last-child { border-right: none; }
+  .etf2-metric-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .etf2-metric-val { font-size: 12px; font-weight: 700; color: var(--text); }
+
+  /* 스파크라인 */
+  .etf2-chart-wrap {
+    padding: 6px 0 2px;
+    margin: 0 -14px;
+    height: 52px; overflow: hidden;
+  }
+
+  /* 하단 보유/손익 */
+  .etf2-footer {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin: 0 -14px;
+    border-top: 1px solid var(--border);
+  }
+  .etf2-footer-item {
+    padding: 8px 14px 12px;
+  }
+  .etf2-footer-item:first-child { border-right: 1px solid var(--border); }
+  .etf2-footer-label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .etf2-footer-val { font-size: 12px; font-weight: 700; color: var(--text); }
+  .etf2-footer-val.up { color: var(--green); }
+  .etf2-footer-val.dn { color: var(--red); }
+
+  /* 펼침 힌트 */
+  .etf2-expand-hint {
+    font-size: 10px; color: var(--muted);
+    text-align: center; padding: 3px 0 8px;
+  }
 
   /* 펼침 상세 영역 */
   .etf-card-detail {
@@ -673,7 +704,8 @@
     .etf-div-kpi-row { grid-template-columns: repeat(3, 1fr); }
     .etf-card-body { grid-template-columns: 1fr; }
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
-    .etf-ci { padding: 6px 4px; }
+    #etf-card-list { grid-template-columns: 1fr; }
+    .etf2-price { font-size: 18px; }
   }
 
   /* ETF 티커 조회 상태 피드백 — border-color는 JS로 직접 제어 */
@@ -2622,6 +2654,35 @@ async function saveEtfRecords() {
 
 const TAX_RATE = 0.154; // 배당소득세 14% + 지방소득세 1.4%
 
+function genSparkline(r, W=300, H=52) {
+  const pnlPct  = (r.avg_price > 0 && r.current_price)
+    ? (r.current_price - r.avg_price) / r.avg_price : 0;
+  const isUp    = pnlPct >= 0;
+  const color   = isUp ? '#34d399' : '#f87171';
+  const fillClr = isUp ? 'rgba(52,211,153,.10)' : 'rgba(248,113,113,.10)';
+  const N = 14;
+  // 티커 기반 결정론적 랜덤 시드
+  let seed = (r.ticker || 'ETF').split('').reduce((a,c) => a + c.charCodeAt(0), 0) * 31 + (r.id || 1);
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+  const pts = [];
+  let v = H * 0.5;
+  const trendSlope = Math.max(-0.4, Math.min(0.4, pnlPct)) * H;
+  for (let i = 0; i < N; i++) {
+    const prog  = i / (N - 1);
+    const noise = (rand() - 0.5) * H * 0.35;
+    v = H * 0.65 - trendSlope * prog + noise;
+    pts.push([W * prog, Math.max(4, Math.min(H - 4, v))]);
+  }
+  const d = pts.map((p,i) => (i===0?'M':'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length-1];
+  const fillD = `${d} L${W},${H} L0,${H} Z`;
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block">
+    <path d="${fillD}" fill="${fillClr}" stroke="none"/>
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3" fill="${color}"/>
+  </svg>`;
+}
+
 function renderEtfCards() {
   const list = document.getElementById('etf-card-list');
   if (!list) return;
@@ -2695,51 +2756,58 @@ function renderEtfCards() {
     const rateStr = (r.recent_div_rate || r.annual_div_rate)
       ? `${r.recent_div_rate || 0}% / ${r.annual_div_rate || 0}%` : '-';
 
-    return `<div class="etf-card" style="margin-bottom:8px" onclick="toggleEtfExpand(${r.id})">
-      <div class="etf-card-head">
-        <div style="flex:1;min-width:0">
-          <div class="etf-card-name">
-            <span>${r.name || '종목명 없음'}</span>
-            ${r.ticker ? `<span class="etf-ticker-badge">${r.ticker}</span>` : ''}
-            ${r.div_cycle ? `<span class="etf-ticker-badge" style="background:#f0fdf4;color:#16a34a">${r.div_cycle}</span>` : ''}
+    return `<div class="etf-card" onclick="toggleEtfExpand(${r.id})">
+      <!-- ── 카드 페이스 ── -->
+      <div class="etf2-face">
+        <div class="etf2-top">
+          <div style="flex:1;min-width:0">
+            <div class="etf2-name">${r.name || '종목명 없음'}</div>
+            <div class="etf2-badges">
+              ${r.ticker ? `<span class="etf-ticker-badge">${r.ticker}</span>` : ''}
+              ${r.div_cycle ? `<span class="etf-ticker-badge" style="background:#052e16;color:#34d399;border:1px solid #166534">${r.div_cycle}</span>` : ''}
+            </div>
+          </div>
+          <div class="etf-head-actions" onclick="event.stopPropagation()">
+            <button onclick="openDivScheduleModal(${r.id})" title="배당 일정">📅</button>
+            <button onclick="openDivModal(${r.id})" title="배당 입력">💰</button>
+            <button onclick="editEtf(${r.id})">✏️</button>
+            <button class="del" onclick="deleteEtf(${r.id})">🗑️</button>
           </div>
         </div>
-        <div class="etf-price-block">
-          ${r.current_price ? `<span class="etf-price-val">${r.current_price.toLocaleString()}원</span>` : ''}
-          ${r.price_chg_pct != null ? `<span class="etf-price-chg ${chgCls}">${chgSgn}${r.price_chg_pct}%</span>` : ''}
+        <div class="etf2-price-area">
+          ${r.current_price
+            ? `<span class="etf2-price">${r.current_price.toLocaleString()}원</span>`
+            : `<span class="etf2-price" style="color:var(--muted)">-</span>`}
+          ${r.price_chg_pct != null
+            ? `<span class="etf2-chg ${chgCls}">${chgSgn}${r.price_chg_pct}%</span>`
+            : ''}
         </div>
-        <div class="etf-head-actions" onclick="event.stopPropagation()">
-          <button onclick="openDivScheduleModal(${r.id})" title="배당 일정 자동계산">📅</button>
-          <button onclick="openDivModal(${r.id})" title="배당 수령 직접 입력">💰</button>
-          <button onclick="editEtf(${r.id})">✏️</button>
-          <button class="del" onclick="deleteEtf(${r.id})">🗑️</button>
+        <div class="etf2-metrics">
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">매입가</div>
+            <div class="etf2-metric-val">${(r.avg_price || 0).toLocaleString()}원</div>
+          </div>
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">분배율</div>
+            <div class="etf2-metric-val">${r.annual_div_rate ? r.annual_div_rate + '%' : '-'}</div>
+          </div>
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">수량</div>
+            <div class="etf2-metric-val">${(r.qty || 0).toLocaleString()}주</div>
+          </div>
         </div>
-      </div>
-      <div class="etf-card-compact">
-        <div class="etf-ci">
-          <span class="etf-ci-label">평균매수가</span>
-          <span class="etf-ci-val">${(r.avg_price || 0).toLocaleString()}원</span>
+        <div class="etf2-chart-wrap">${genSparkline(r)}</div>
+        <div class="etf2-footer">
+          <div class="etf2-footer-item">
+            <span class="etf2-footer-label">보유금액</span>
+            <span class="etf2-footer-val">${eval_ ? eval_.toLocaleString() + '원' : '-'}</span>
+          </div>
+          <div class="etf2-footer-item">
+            <span class="etf2-footer-label">평가손익</span>
+            <span class="etf2-footer-val ${pc}">${ps}${profit.toLocaleString()}원${pPct !== null ? ` (${ps}${pPct.toFixed(1)}%)` : ''}</span>
+          </div>
         </div>
-        <div class="etf-ci">
-          <span class="etf-ci-label">보유수량</span>
-          <span class="etf-ci-val">${(r.qty || 0).toLocaleString()}주</span>
-        </div>
-        <div class="etf-ci">
-          <span class="etf-ci-label">주당최근배당</span>
-          <span class="etf-ci-val">${r.recent_div ? r.recent_div.toLocaleString() + '원' : '-'}</span>
-        </div>
-        <div class="etf-ci">
-          <span class="etf-ci-label">연간배당률</span>
-          <span class="etf-ci-val">${r.annual_div_rate ? r.annual_div_rate + '%' : '-'}</span>
-        </div>
-        <div class="etf-ci">
-          <span class="etf-ci-label">최근 1회 (세후)</span>
-          <span class="etf-ci-val" style="color:#16a34a">${recDivPost ? recDivPost.toLocaleString() + '원' : '-'}</span>
-        </div>
-        <div class="etf-ci">
-          <span class="etf-ci-label">평가손익</span>
-          <span class="etf-ci-val ${pc}">${pnlStr}</span>
-        </div>
+        <div class="etf2-expand-hint">▾ 상세 보기</div>
       </div>
       <div class="etf-card-detail" id="etf-detail-${r.id}">
         <div class="etf-card-body">
