@@ -533,6 +533,22 @@
     .port-summary-row { grid-template-columns: repeat(2, 1fr); }
     .port-mid-grid { grid-template-columns: 1fr; }
     .port-kpi-value { font-size: 18px; }
+    /* KPI 3칸 → 모바일 1행 */
+    .port-kpi-row-3 { grid-template-columns: 1fr 1fr !important; }
+    .port-kpi-row-3 .port-kpi-card:last-child { grid-column: 1 / -1; }
+    /* 카드 패딩 축소 */
+    .port-card { padding: 16px; }
+    .port-card-title { margin-bottom: 12px; }
+    /* 도넛 차트: 세로 정렬 */
+    .port-donut-inner { flex-direction: column !important; align-items: center !important; }
+    .port-donut-inner > div:first-child { align-self: center; }
+    .port-donut-inner > div:last-child { width: 100%; }
+    .port-donut-inner svg { width: 160px !important; height: 160px !important; }
+    /* 테이블 폰트/패딩 축소 */
+    .port-table { font-size: 11px; }
+    .port-table th, .port-table td { padding: 7px 6px; }
+    /* 덜 중요한 컬럼 숨김 */
+    .port-table .col-hide-sm { display: none; }
   }
 
   /* ══════════════════════════════════════════════════
@@ -857,7 +873,7 @@
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
     <!-- KPI 요약 -->
-    <div id="port-kpi-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div id="port-kpi-row" class="port-kpi-row-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
       <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 총 평가금액</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val" id="pk-ipo-profit">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val" id="pk-div-total">-</div></div>
@@ -874,7 +890,7 @@
       <div class="port-card-title">📊 ETF 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>수량</th><th>평균단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th>세후배당</th></tr></thead>
+          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가금액</th><th>수익률</th><th class="col-hide-sm">세후배당</th></tr></thead>
           <tbody id="port-etf-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
@@ -885,7 +901,7 @@
       <div class="port-card-title">🏢 공모주 수익현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>상장일</th><th>공모가</th><th>매도가</th><th>수량</th><th>수익금</th><th>수익률</th></tr></thead>
+          <thead><tr><th>종목명</th><th class="col-hide-sm">상장일</th><th class="col-hide-sm">공모가</th><th class="col-hide-sm">매도가</th><th class="col-hide-sm">수량</th><th>수익금</th><th>수익률</th></tr></thead>
           <tbody id="port-ipo-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
@@ -899,7 +915,7 @@
       </div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>수량</th><th>평균단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
+          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
           <tbody id="port-stock-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
@@ -2037,12 +2053,12 @@ function _renderPortEtf() {
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
-      <td>${qty.toLocaleString()}</td>
-      <td>${avg ? avg.toLocaleString()+'원' : '-'}</td>
-      <td>${cur ? cur.toLocaleString()+'원' : '-'}</td>
+      <td class="col-hide-sm">${qty.toLocaleString()}</td>
+      <td class="col-hide-sm">${avg ? avg.toLocaleString()+'원' : '-'}</td>
+      <td class="col-hide-sm">${cur ? cur.toLocaleString()+'원' : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
-      <td>${div ? div.toLocaleString()+'원' : '-'}</td>
+      <td class="col-hide-sm">${div ? div.toLocaleString()+'원' : '-'}</td>
     </tr>`;
   }).join('');
 }
@@ -2059,10 +2075,10 @@ function _renderPortIpo() {
     const pc     = profit >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}</td>
-      <td>${r.date_list||'-'}</td>
-      <td>${(r.price_ipo||0).toLocaleString()}원</td>
-      <td>${(r.price_open||0).toLocaleString()}원</td>
-      <td>${qty}주</td>
+      <td class="col-hide-sm">${r.date_list||'-'}</td>
+      <td class="col-hide-sm">${(r.price_ipo||0).toLocaleString()}원</td>
+      <td class="col-hide-sm">${(r.price_open||0).toLocaleString()}원</td>
+      <td class="col-hide-sm">${qty}주</td>
       <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
       <td class="${pc}">${rate>=0?'+':''}${rate}%</td>
     </tr>`;
@@ -2081,9 +2097,9 @@ function _renderPortStock() {
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}${r.ticker ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${r.ticker}</span>` : ''}</td>
-      <td>${(r.qty||0).toLocaleString()}</td>
-      <td>${r.avg_price ? r.avg_price.toLocaleString()+'원' : '-'}</td>
-      <td>${r.current_price ? r.current_price.toLocaleString()+'원' : '-'}</td>
+      <td class="col-hide-sm">${(r.qty||0).toLocaleString()}</td>
+      <td class="col-hide-sm">${r.avg_price ? r.avg_price.toLocaleString()+'원' : '-'}</td>
+      <td class="col-hide-sm">${r.current_price ? r.current_price.toLocaleString()+'원' : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
       <td style="text-align:center">
@@ -2135,7 +2151,7 @@ function _renderPortDonut(etfEval, stkEval, ipoProfit) {
   }).join('');
 
   el.innerHTML = `
-    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <div class="port-donut-inner" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
       <div style="position:relative;flex-shrink:0">
         <svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}
           <text x="${CX}" y="${CY-8}" text-anchor="middle" font-size="11" fill="var(--muted)">총 자산</text>
