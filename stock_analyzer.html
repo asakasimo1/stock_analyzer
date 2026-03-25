@@ -1539,6 +1539,8 @@ let _calYear  = new Date().getFullYear();
 let _calMonth = new Date().getMonth();
 
 function calMove(dir) {
+  // 팝업이 열려 있으면 먼저 닫고 월 이동 (오버레이가 클릭을 가로채는 문제 방지)
+  document.getElementById('day-modal-overlay').classList.remove('open');
   _calMonth += dir;
   if (_calMonth > 11) { _calMonth = 0; _calYear++; }
   if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
