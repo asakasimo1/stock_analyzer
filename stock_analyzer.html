@@ -2633,6 +2633,9 @@ function ensureEtfIds(records) {
   return changed;
 }
 
+let _etfAutoRefreshTimer = null;
+const ETF_AUTO_REFRESH_MS = 20 * 60 * 1000; // 20분
+
 async function loadEtfRecords() {
   try {
     const r = await fetch('/api/etf');
@@ -2647,6 +2650,14 @@ async function loadEtfRecords() {
 
   renderEtfCards();
   loadDivRecords();
+
+  // 20분 자동 현재가 업데이트 — 탭이 ETF일 때만 반복
+  clearInterval(_etfAutoRefreshTimer);
+  _etfAutoRefreshTimer = setInterval(async () => {
+    const etfTab = document.getElementById('tab-etf');
+    if (!etfTab || !etfTab.classList.contains('active')) return;
+    await refreshAllEtfPrices(true); // silent=true: 버튼 UI 건드리지 않음
+  }, ETF_AUTO_REFRESH_MS);
 }
 
 async function saveEtfRecords() {
@@ -3669,10 +3680,24 @@ function _fillDivFields(d) {
 }
 
 // ── 현재가 일괄 업데이트 ──────────────────────────────────
-async function refreshAllEtfPrices() {
+let _etfLastRefreshTime = null;
+
+function _updateRefreshBtnLabel() {
+  const btn = document.getElementById('etf-refresh-btn');
+  if (!btn) return;
+  if (!_etfLastRefreshTime) { btn.textContent = '⟳ 현재가 업데이트'; return; }
+  const diffMin = Math.round((Date.now() - _etfLastRefreshTime) / 60000);
+  const nextMin = 20 - diffMin;
+  if (nextMin > 0)
+    btn.textContent = `⟳ 현재가 업데이트 (${nextMin}분 후 자동갱신)`;
+  else
+    btn.textContent = '⟳ 현재가 업데이트';
+}
+
+async function refreshAllEtfPrices(silent = false) {
   if (!_etfRecords.length) return;
   const btn = document.getElementById('etf-refresh-btn');
-  if (btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
+  if (!silent && btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
 
   let updated = 0;
   await Promise.all(_etfRecords.map(async r => {
@@ -3683,7 +3708,6 @@ async function refreshAllEtfPrices() {
       if (d.price) {
         r.current_price  = d.price;
         r.price_chg_pct  = d.chgPct ?? r.price_chg_pct;
-        // 배당 정보 업데이트 (기존 값 유지 우선, 없을 때만 덮어씀)
         if (d.divCycle)      r.div_cycle        = d.divCycle;
         if (d.divMonths)     r.div_months       = d.divMonths;
         if (d.recentDiv)     r.recent_div       = d.recentDiv;
@@ -3695,15 +3719,23 @@ async function refreshAllEtfPrices() {
   }));
 
   if (updated) {
+    _etfLastRefreshTime = Date.now();
     await saveEtfRecords();
     renderEtfCards();
   }
-  if (btn) {
+
+  if (!silent && btn) {
     btn.textContent = updated ? `✔ ${updated}개 업데이트됨` : '⟳ 현재가 업데이트';
     btn.disabled = false;
-    if (updated) setTimeout(() => { btn.textContent = '⟳ 현재가 업데이트'; }, 2500);
+    if (updated) setTimeout(_updateRefreshBtnLabel, 2500);
+    else setTimeout(_updateRefreshBtnLabel, 0);
+  } else if (updated) {
+    setTimeout(_updateRefreshBtnLabel, 0);
   }
 }
+
+// 버튼 라벨 1분마다 갱신 (남은 시간 표시)
+setInterval(_updateRefreshBtnLabel, 60000);
 
 // ══════════════════════════════════════════════════════════════════
 // 배당 재투자 계산기
