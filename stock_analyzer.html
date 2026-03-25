@@ -1803,14 +1803,21 @@ function showDayDetail(key) {
         ${ev.type === 'ipo-allot' ? `
         <div style="margin-top:12px;padding:12px;background:#1e2d45;border-radius:8px">
           <div style="font-size:12px;color:#fde68a;font-weight:600;margin-bottom:10px">📬 배정 결과 입력 (step 3)</div>
-          <div style="margin-bottom:10px">
-            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">배정주수 (0 = 배정실패)</label>
-            <input type="number" id="allot-shares-${ipo.id}" min="0" value="${ipo.shares_alloc||0}"
-              style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">배정주수 (0 = 배정실패)</label>
+              <input type="number" id="allot-shares-${ipo.id}" min="0" value="${ipo.shares_alloc||0}"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">상장일 <span style="color:#64748b">(모르면 추정값)</span></label>
+              <input type="date" id="allot-listdate-${ipo.id}" value="${ipo.date_list || calcEstListDate(ipo.date_sub_end)}"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;box-sizing:border-box">
+            </div>
           </div>
           <button onclick="saveAllotFromModal(${ipo.id})"
             style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
-            ✅ 저장
+            ✅ 저장 → 상장일 캘린더 등록
           </button>
         </div>` : ''}
 
@@ -2312,6 +2319,15 @@ function calcAllotDateIpo(subEnd) {
   return d.toISOString().slice(0, 10);
 }
 
+// 청약마감일 기준 약 5영업일 후 = 추정 상장일
+function calcEstListDate(subEnd) {
+  if (!subEnd) return '';
+  let d = new Date(subEnd + 'T00:00:00');
+  let bdays = 0;
+  while (bdays < 5) { d.setDate(d.getDate() + 1); if (d.getDay() >= 1 && d.getDay() <= 5) bdays++; }
+  return d.toISOString().slice(0, 10);
+}
+
 function autoStatus(r) {
   const today = new Date().toISOString().slice(0, 10);
   if (r.allot_done && !(r.shares_alloc > 0)) return '배정실패';
@@ -2701,34 +2717,31 @@ async function quickAllot(id) {
 }
 
 async function saveAllotFromModal(id) {
-  const sharesEl = document.getElementById(`allot-shares-${id}`);
-  const priceEl  = document.getElementById(`allot-price-${id}`);
-  const shares = parseInt(sharesEl?.value) || 0;
-  const price  = parseInt(priceEl?.value)  || 0;
+  const shares   = parseInt(document.getElementById(`allot-shares-${id}`)?.value)   || 0;
+  const listDate = document.getElementById(`allot-listdate-${id}`)?.value || '';
 
   const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) {
-    alert(`레코드를 찾을 수 없습니다 (id=${id}, 로드된 레코드 수: ${_ipoRecords.length})`);
+    alert(`레코드를 찾을 수 없습니다 (id=${id})`);
     return;
   }
 
   _ipoRecords[idx].shares_alloc = shares;
   _ipoRecords[idx].subscribed   = true;
   _ipoRecords[idx].allot_done   = true;
+  // 상장일: 입력값 우선, 없으면 기존값 유지
+  if (listDate) _ipoRecords[idx].date_list = listDate;
   _ipoRecords[idx].status = shares > 0 ? autoStatus(_ipoRecords[idx]) : '배정실패';
 
   await saveIpoRecords();
-  renderIpoManage();
-  // 캘린더 갱신: _dashData.ipo는 saveIpoRecords에서 이미 _ipoRecords와 동기화됨
-  if (_dashData) renderCalendar(_dashData);
+  if (_dashData) { _dashData.ipo = _ipoRecords; renderCalendar(_dashData); }
   else renderCalendar({ ipo: _ipoRecords });
 
-  // 모달 닫기
   document.getElementById('day-modal-overlay').classList.remove('open');
 
-  // 결과 메시지
   if (shares > 0) {
-    alert(`🎉 ${_ipoRecords[idx].name} ${shares.toLocaleString()}주 배정!\n상장일이 캘린더에 추가됐습니다.`);
+    const ld = _ipoRecords[idx].date_list;
+    alert(`🎉 ${_ipoRecords[idx].name} ${shares.toLocaleString()}주 배정!\n${ld ? `상장일(${ld})이 캘린더에 추가됐습니다.` : '상장일을 확인 후 공모주를 편집해 추가하세요.'}`);
   } else {
     alert(`😢 ${_ipoRecords[idx].name} 배정실패로 처리됐습니다.`);
   }
