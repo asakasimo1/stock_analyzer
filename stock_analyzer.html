@@ -703,16 +703,25 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     margin-bottom: 16px;
   }
+  .div-year-group { margin-bottom: 14px; }
+  .div-year-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 14px; background: #0f1f35;
+    border: 1px solid #2563eb44; border-radius: 10px;
+    font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;
+  }
   .div-month-group {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; margin-bottom: 10px;
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 6px; margin-left: 8px;
   }
   .div-month-header {
     padding: 7px 14px; background: var(--bg);
     border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 700; color: var(--text);
     display: flex; justify-content: space-between; align-items: center;
+    user-select: none;
   }
+  .div-month-header:hover { background: #1a2640; }
   .div-month-total { font-size: 11px; color: #16a34a; font-weight: 700; }
   .div-record-row {
     display: grid; grid-template-columns: 1fr auto auto;
@@ -910,9 +919,11 @@
 
   <!-- 배당 수령 내역 -->
   <div class="div-hist-section">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-size:14px;font-weight:700;color:var(--text)">💰 배당 수령 내역</div>
     </div>
+    <!-- 연도 필터 탭 -->
+    <div id="div-year-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div class="div-hist-kpi-row">
       <div class="etf-kpi">
         <div class="etf-div-kpi-label">📥 총 누적 (세전)</div>
@@ -3235,62 +3246,122 @@ async function deleteDivRecord(id) {
   }
 }
 
+let _divFilterYear = 'all';
+
 function renderDivHistory() {
-  const grossTotal   = _divRecords.reduce((s, r) => s + (r.gross || 0), 0);
-  const netTotal     = _divRecords.reduce((s, r) => s + (r.net   || 0), 0);
-  const thisYear     = new Date().getFullYear();
-  const netThisYear  = _divRecords
+  const el = id => document.getElementById(id);
+
+  // ── 전체 누적 KPI (필터 무관) ──
+  const grossTotal  = _divRecords.reduce((s, r) => s + (r.gross || 0), 0);
+  const netTotal    = _divRecords.reduce((s, r) => s + (r.net   || 0), 0);
+  const thisYear    = new Date().getFullYear();
+  const netThisYear = _divRecords
     .filter(r => r.ym && r.ym.startsWith(String(thisYear)))
     .reduce((s, r) => s + (r.net || 0), 0);
-
-  const el = id => document.getElementById(id);
-  if (el('div-k-gross'))     el('div-k-gross').textContent    = grossTotal  ? grossTotal.toLocaleString()   + '원' : '-';
-  if (el('div-k-net'))       el('div-k-net').textContent      = netTotal    ? netTotal.toLocaleString()     + '원' : '-';
+  if (el('div-k-gross'))     el('div-k-gross').textContent     = grossTotal  ? grossTotal.toLocaleString()   + '원' : '-';
+  if (el('div-k-net'))       el('div-k-net').textContent       = netTotal    ? netTotal.toLocaleString()     + '원' : '-';
   if (el('div-k-this-year')) el('div-k-this-year').textContent = netThisYear ? netThisYear.toLocaleString() + '원' : '-';
 
-  const list = document.getElementById('div-hist-list');
+  const list = el('div-hist-list');
   if (!list) return;
 
   if (!_divRecords.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:32px">수령 내역이 없습니다.<br><small>ETF 카드의 💰 버튼으로 입력하세요.</small></div>';
+    renderDivYearTabs([]);
     return;
   }
 
-  // 월별 그룹, 내림차순
-  const byMonth = {};
-  [..._divRecords].sort((a, b) => (b.ym > a.ym ? 1 : -1)).forEach(r => {
-    const key = r.ym || '날짜없음';
-    if (!byMonth[key]) byMonth[key] = [];
-    byMonth[key].push(r);
+  // ── 연도 목록 수집 ──
+  const years = [...new Set(_divRecords.map(r => (r.ym || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  renderDivYearTabs(years);
+
+  // ── 필터 적용 ──
+  const filtered = _divFilterYear === 'all'
+    ? [..._divRecords]
+    : _divRecords.filter(r => (r.ym || '').startsWith(_divFilterYear));
+
+  filtered.sort((a, b) => (b.ym > a.ym ? 1 : -1));
+
+  // ── 연도 → 월 2단계 그룹핑 ──
+  const byYear = {};
+  filtered.forEach(r => {
+    const yr = (r.ym || 'unknown').slice(0, 4);
+    const mo = r.ym || 'unknown';
+    if (!byYear[yr]) byYear[yr] = {};
+    if (!byYear[yr][mo]) byYear[yr][mo] = [];
+    byYear[yr][mo].push(r);
   });
 
-  list.innerHTML = Object.entries(byMonth).map(([ym, records]) => {
-    const monthGross = records.reduce((s, r) => s + (r.gross || 0), 0);
-    const monthNet   = records.reduce((s, r) => s + (r.net   || 0), 0);
-    const [y, m]     = ym.split('-');
-    const monthLabel = y && m ? `${y}년 ${parseInt(m)}월` : ym;
+  const fmtW = v => v.toLocaleString() + '원';
 
-    const rows = records.map(r => `
-      <div class="div-record-row">
-        <div class="div-record-info">
-          <span class="div-record-name">${r.name || '-'}</span>
-          <span class="div-record-detail">${r.ticker ? r.ticker + ' · ' : ''}${(r.per_share || 0).toLocaleString()}원/주 × ${(r.qty || 0).toLocaleString()}주${r.note ? ' · ' + r.note : ''}</span>
-        </div>
-        <div class="div-record-amounts">
-          <span class="div-record-net">세후 ${(r.net   || 0).toLocaleString()}원</span>
-          <span class="div-record-gross">세전 ${(r.gross || 0).toLocaleString()}원</span>
-        </div>
-        <button class="div-del-btn" onclick="deleteDivRecord(${r.id})">삭제</button>
-      </div>`).join('');
+  list.innerHTML = Object.entries(byYear)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([yr, months]) => {
+      const yrGross = Object.values(months).flat().reduce((s, r) => s + (r.gross || 0), 0);
+      const yrNet   = Object.values(months).flat().reduce((s, r) => s + (r.net   || 0), 0);
 
-    return `<div class="div-month-group">
-      <div class="div-month-header">
-        <span>${monthLabel}</span>
-        <span class="div-month-total">세후 ${monthNet.toLocaleString()}원 / 세전 ${monthGross.toLocaleString()}원</span>
-      </div>
-      ${rows}
-    </div>`;
-  }).join('');
+      const monthBlocks = Object.entries(months)
+        .sort(([a], [b]) => b.localeCompare(a))
+        .map(([ym, records]) => {
+          const mGross = records.reduce((s, r) => s + (r.gross || 0), 0);
+          const mNet   = records.reduce((s, r) => s + (r.net   || 0), 0);
+          const [y, m] = ym.split('-');
+          const label  = y && m ? `${parseInt(m)}월` : ym;
+
+          const rows = records.map(r => `
+            <div class="div-record-row">
+              <div class="div-record-info">
+                <span class="div-record-name">${r.name || '-'}</span>
+                <span class="div-record-detail">${r.ticker ? r.ticker + ' · ' : ''}${(r.per_share || 0).toLocaleString()}원/주 × ${(r.qty || 0).toLocaleString()}주${r.note ? ' · ' + r.note : ''}</span>
+              </div>
+              <div class="div-record-amounts">
+                <span class="div-record-net">세후 ${fmtW(r.net || 0)}</span>
+                <span class="div-record-gross">세전 ${fmtW(r.gross || 0)}</span>
+              </div>
+              <button class="div-del-btn" onclick="deleteDivRecord(${r.id})">삭제</button>
+            </div>`).join('');
+
+          return `<div class="div-month-group">
+            <div class="div-month-header" style="cursor:pointer" onclick="toggleDivMonth(this)">
+              <span>📅 ${label} <span style="font-size:10px;color:var(--muted)">(${records.length}건)</span></span>
+              <span class="div-month-total">세후 ${fmtW(mNet)} / 세전 ${fmtW(mGross)}</span>
+            </div>
+            <div class="div-month-body">${rows}</div>
+          </div>`;
+        }).join('');
+
+      // 연도 헤더는 전체 보기일 때만, 또는 항상 표시
+      return `<div class="div-year-group">
+        <div class="div-year-header">
+          <span>📆 ${yr}년</span>
+          <span style="font-size:12px;color:#60a5fa;font-weight:700">세후 합계 ${fmtW(yrNet)} <span style="color:var(--muted);font-weight:400">/ 세전 ${fmtW(yrGross)}</span></span>
+        </div>
+        ${monthBlocks}
+      </div>`;
+    }).join('');
+}
+
+function renderDivYearTabs(years) {
+  const tabs = document.getElementById('div-year-tabs');
+  if (!tabs) return;
+  const btn = (val, label) => {
+    const active = _divFilterYear === val;
+    return `<button onclick="setDivYear('${val}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${active ? '#3b82f6' : '#1e2d45'};background:${active ? '#1e3a5f' : 'transparent'};color:${active ? '#60a5fa' : 'var(--muted)'};font-size:12px;font-weight:${active ? '700' : '400'};cursor:pointer">${label}</button>`;
+  };
+  tabs.innerHTML = btn('all', '전체') + years.map(y => btn(y, y + '년')).join('');
+}
+
+function setDivYear(val) {
+  _divFilterYear = val;
+  renderDivHistory();
+}
+
+function toggleDivMonth(header) {
+  const body = header.nextElementSibling;
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  header.style.opacity = hidden ? '1' : '0.6';
 }
 
 function editEtf(id) { openEtfModal(id); }
