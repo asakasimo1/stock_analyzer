@@ -1608,12 +1608,17 @@ function renderCalendar(data) {
       }
     }
 
-    // 배정일 — 청약완료 시에만, 배정주수 미입력 + 활성 상태면 표시 (step2)
+    // 배정일 — 청약완료 시에만 표시 (step2)
+    // 배정주수 미입력 OR 배정은 됐지만 상장일이 아직 없는 경우에도 표시
     if (ipo.subscribed && ipo.date_sub_end && !['상장완료','청약포기','배정실패'].includes(status)) {
       const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
       const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
-      if (allotDate && !hasAlloc) {
-        add(allotDate, 'ipo-allot', `📬 ${name} 배정확인`, ipo);
+      const needsListDate = hasAlloc && !ipo.date_list;
+      if (!hasAlloc || needsListDate) {
+        const label = needsListDate ? `📬 ${name} 배정완료 (상장일 미입력)` : `📬 ${name} 배정확인`;
+        // 상장일 미입력 상태면 오늘 날짜에 표시해 현재 월 캘린더에서 바로 찾을 수 있게 함
+        const eventDate = needsListDate ? new Date().toISOString().slice(0, 10) : allotDate;
+        if (eventDate) add(eventDate, 'ipo-allot', label, ipo);
       }
     }
 
@@ -1815,10 +1820,16 @@ function showDayDetail(key) {
                 style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;box-sizing:border-box">
             </div>
           </div>
-          <button onclick="saveAllotFromModal(${ipo.id})"
-            style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
-            ✅ 저장 → 상장일 캘린더 등록
-          </button>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+            <button onclick="saveAllotFromModal(${ipo.id})"
+              style="background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
+              ✅ 저장 → 상장일 캘린더 등록
+            </button>
+            <button onclick="cancelAllot(${ipo.id})" title="배정 입력 취소 (배정전 상태로 되돌림)"
+              style="background:#374151;color:#9ca3af;border:none;border-radius:6px;padding:10px;font-size:13px;cursor:pointer">
+              ↩ 취소
+            </button>
+          </div>
         </div>` : ''}
 
         ${ev.type === 'ipo-list' ? `
@@ -2745,6 +2756,21 @@ async function saveAllotFromModal(id) {
   } else {
     alert(`😢 ${_ipoRecords[idx].name} 배정실패로 처리됐습니다.`);
   }
+}
+
+// 배정 입력 취소 — 배정 전 상태(subscribed=true, allot_done=false)로 되돌림
+async function cancelAllot(id) {
+  if (!confirm('배정 입력을 취소하고 배정 전 상태로 되돌릴까요?')) return;
+  const idx = _ipoRecords.findIndex(r => r.id == id);
+  if (idx === -1) return;
+  _ipoRecords[idx].allot_done   = false;
+  _ipoRecords[idx].shares_alloc = 0;
+  _ipoRecords[idx].date_list    = '';
+  _ipoRecords[idx].status       = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  if (_dashData) { _dashData.ipo = _ipoRecords; renderCalendar(_dashData); }
+  else renderCalendar({ ipo: _ipoRecords });
+  document.getElementById('day-modal-overlay').classList.remove('open');
 }
 
 // step1: 캘린더 청약기간 클릭 → 청약 완료 표시
