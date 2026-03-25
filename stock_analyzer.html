@@ -421,6 +421,9 @@
   /* ══════════════════════════════════════════════════
      포트폴리오 탭
   ══════════════════════════════════════════════════ */
+  .port-kpi-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+  .port-kpi-lbl  { font-size:11px;color:var(--muted);margin-bottom:4px; }
+  .port-kpi-val  { font-size:20px;font-weight:700;color:var(--primary); }
   .port-wrap {
     max-width: 1400px; margin: 0 auto;
     padding: 28px 40px;
@@ -851,77 +854,82 @@
 
 <!-- 포트폴리오 탭 -->
 <div id="tab-portfolio" class="tab-page">
-  <div class="port-wrap">
+  <div style="max-width:960px;margin:0 auto;padding:16px">
 
-    <!-- 상단 요약 카드 -->
-    <div class="port-summary-row" id="port-kpi-row">
-      <div class="port-loading" style="grid-column:1/-1">데이터를 불러오는 중...</div>
+    <!-- KPI 요약 -->
+    <div id="port-kpi-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 총 평가금액</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
+      <div class="port-kpi-card"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val" id="pk-ipo-profit">-</div></div>
+      <div class="port-kpi-card"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val" id="pk-div-total">-</div></div>
     </div>
 
-    <!-- 차트 + 종목 요약 2열 -->
-    <div class="port-mid-grid">
-      <div class="port-card">
-        <div class="port-card-title">📅 월별 배당금 (세후)</div>
-        <svg id="port-chart" class="port-chart-svg" height="220"></svg>
-      </div>
-      <div class="port-card">
-        <div class="port-card-title">💼 보유 종목 요약</div>
-        <div class="port-holdings-list" id="port-holdings-list">
-          <div class="port-loading">로딩 중...</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ETF 보유 상세 -->
-    <div class="port-card">
-      <div class="port-card-title">📊 ETF 보유 현황</div>
+    <!-- ETF 보유현황 -->
+    <div class="port-card" style="margin-bottom:16px">
+      <div class="port-card-title">📊 ETF 보유현황</div>
       <div class="port-table-wrap">
-        <table class="port-table" id="port-etf-table">
-          <thead>
-            <tr>
-              <th>종목명</th>
-              <th>수량</th>
-              <th>현재가</th>
-              <th>수익률</th>
-              <th>수익금</th>
-              <th>배당합계</th>
-              <th>평가금액</th>
-            </tr>
-          </thead>
-          <tbody id="port-etf-tbody">
-            <tr><td colspan="7" class="port-loading">로딩 중...</td></tr>
-          </tbody>
+        <table class="port-table">
+          <thead><tr><th>종목명</th><th>수량</th><th>평균단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th>세후배당</th></tr></thead>
+          <tbody id="port-etf-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- 개별주 보유 상세 -->
-    <div class="port-card">
-      <div class="port-card-title">📌 개별주 보유 현황</div>
+    <!-- 공모주 수익현황 -->
+    <div class="port-card" style="margin-bottom:16px">
+      <div class="port-card-title">🏢 공모주 수익현황</div>
       <div class="port-table-wrap">
-        <table class="port-table" id="port-stock-table">
-          <thead>
-            <tr>
-              <th>종목명</th>
-              <th>수량</th>
-              <th>현재가</th>
-              <th>수익률</th>
-              <th>수익금</th>
-              <th>평가금액</th>
-            </tr>
-          </thead>
-          <tbody id="port-stock-tbody">
-            <tr><td colspan="6" class="port-loading">로딩 중...</td></tr>
-          </tbody>
+        <table class="port-table">
+          <thead><tr><th>종목명</th><th>상장일</th><th>공모가</th><th>매도가</th><th>수량</th><th>수익금</th><th>수익률</th></tr></thead>
+          <tbody id="port-ipo-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- 데이터 갱신 안내 -->
-    <div style="text-align:right;font-size:11px;color:var(--muted)" id="port-updated-at"></div>
+    <!-- 개별주 보유현황 -->
+    <div class="port-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="port-card-title" style="margin:0">📌 개별주 보유현황</div>
+        <button onclick="openStockModal()" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">+ 추가</button>
+      </div>
+      <div class="port-table-wrap">
+        <table class="port-table">
+          <thead><tr><th>종목명</th><th>수량</th><th>평균단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
+          <tbody id="port-stock-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
   </div>
 </div><!-- /tab-portfolio -->
+
+<!-- 개별주 추가/편집 모달 -->
+<div id="stock-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center"
+  onmousedown="_stockMdDown=event.target" onmouseup="if(_stockMdDown===this&&event.target===this)closeStockModal()">
+  <div style="background:var(--surface);border-radius:16px;padding:24px;width:92%;max-width:400px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <strong id="stock-modal-title">개별주 추가</strong>
+      <button onclick="closeStockModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <input type="hidden" id="sm-id">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">종목명 *</label>
+        <input id="sm-name" type="text" placeholder="예: 삼성전자" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">티커(종목코드)</label>
+        <input id="sm-ticker" type="text" placeholder="예: 005930 (선택)" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">보유수량 *</label>
+          <input id="sm-qty" type="number" min="0" placeholder="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+        <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">평균매입단가 *</label>
+          <input id="sm-avg" type="number" min="0" placeholder="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      </div>
+      <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">현재가 (직접 입력)</label>
+        <input id="sm-cur" type="number" min="0" placeholder="0 (빈칸이면 수익률 미표시)" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">메모</label>
+        <input id="sm-note" type="text" placeholder="선택" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+    </div>
+    <button onclick="saveStockRecord()" style="margin-top:16px;width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer">💾 저장</button>
+  </div>
+</div>
 
 <!-- 시장현황 탭 -->
 <div id="tab-market" class="tab-page">
@@ -1929,13 +1937,186 @@ function closeModal(evt) {
 // ══════════════════════════════════════════════════════════
 // 포트폴리오 대시보드
 // ══════════════════════════════════════════════════════════
-const PORTFOLIO_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1F2DeIKHRdaD4frxFWwr76SywV5G_bXQAbxjYylXN4O4/gviz/tq?tqx=out:csv';
-let _portData = null;
-let _portFetchedAt = 0;
 let _portAutoTimer = null;
+let _stockRecords  = [];
+let _stockMdDown   = null;
 const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 
-// ── CSV 파싱 ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// 포트폴리오 (ETF Gist + IPO Gist + 개별주 Gist 기반)
+// ══════════════════════════════════════════════════════════
+
+async function initPortfolio() {
+  // 필요한 데이터 로드 (아직 없으면)
+  const loads = [];
+  if (!_etfRecords.length)  loads.push(fetch('/api/etf').then(r=>r.json()).then(d=>{ _etfRecords=d.records||[]; }));
+  if (!_ipoRecords.length)  loads.push(fetch('/api/ipo').then(r=>r.json()).then(d=>{ _ipoRecords=d.records||[]; }));
+  if (!_divRecords.length)  loads.push(fetch('/api/dividend').then(r=>r.json()).then(d=>{ _divRecords=d.records||[]; }));
+  loads.push(fetch('/api/stocks').then(r=>r.json()).then(d=>{ _stockRecords=d.records||[]; }));
+  if (loads.length) await Promise.allSettled(loads);
+  renderPortfolio();
+  _startPortAutoRefresh();
+}
+
+function _startPortAutoRefresh() {
+  clearInterval(_portAutoTimer);
+  _portAutoTimer = setInterval(() => {
+    const tab = document.getElementById('tab-portfolio');
+    if (tab && tab.classList.contains('active')) initPortfolio(true);
+  }, PORT_REFRESH_MS);
+}
+
+function renderPortfolio() {
+  _renderPortKpi();
+  _renderPortEtf();
+  _renderPortIpo();
+  _renderPortStock();
+}
+
+// ── KPI ────────────────────────────────────────────────────
+function _renderPortKpi() {
+  // ETF 총 평가금액
+  const etfEval = _etfRecords.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
+  document.getElementById('pk-etf-eval').textContent = etfEval ? etfEval.toLocaleString() + '원' : '-';
+
+  // 공모주 누적 수익 (매도 완료된 것만)
+  const ipoProfit = _ipoRecords
+    .filter(r => r.price_open > 0 && r.price_ipo > 0)
+    .reduce((s, r) => {
+      const qty = r.sell_qty || r.shares_alloc || 0;
+      return s + (r.price_open - r.price_ipo) * qty - 2000;
+    }, 0);
+  const el = document.getElementById('pk-ipo-profit');
+  el.textContent = _ipoRecords.some(r => r.price_open > 0) ? (ipoProfit >= 0 ? '+' : '') + ipoProfit.toLocaleString() + '원' : '-';
+  el.style.color = ipoProfit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // 세후 배당 누적
+  const divTotal = _divRecords.reduce((s, r) => s + (r.net || 0), 0);
+  document.getElementById('pk-div-total').textContent = divTotal ? divTotal.toLocaleString() + '원' : '-';
+}
+
+// ── ETF 보유현황 ───────────────────────────────────────────
+function _renderPortEtf() {
+  const tbody = document.getElementById('port-etf-tbody');
+  if (!_etfRecords.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
+  const divByEtf = {};
+  _divRecords.forEach(r => { divByEtf[r.etf_id] = (divByEtf[r.etf_id]||0) + (r.net||0); });
+
+  tbody.innerHTML = _etfRecords.map(r => {
+    const avg   = r.avg_price || 0;
+    const cur   = r.current_price || 0;
+    const qty   = r.qty || 0;
+    const buy   = avg * qty;
+    const eval_ = cur * qty;
+    const profit= eval_ - buy;
+    const rate  = buy > 0 ? profit / buy * 100 : null;
+    const div   = divByEtf[r.id] || 0;
+    const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    return `<tr>
+      <td>${r.name||r.ticker||'-'}</td>
+      <td>${qty.toLocaleString()}</td>
+      <td>${avg ? avg.toLocaleString()+'원' : '-'}</td>
+      <td>${cur ? cur.toLocaleString()+'원' : '-'}</td>
+      <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
+      <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
+      <td>${div ? div.toLocaleString()+'원' : '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 공모주 수익현황 ────────────────────────────────────────
+function _renderPortIpo() {
+  const tbody = document.getElementById('port-ipo-tbody');
+  const sold  = _ipoRecords.filter(r => r.price_open > 0 && r.price_ipo > 0);
+  if (!sold.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">매도 기록 없음</td></tr>'; return; }
+  tbody.innerHTML = sold.map(r => {
+    const qty    = r.sell_qty || r.shares_alloc || 0;
+    const profit = (r.price_open - r.price_ipo) * qty - 2000;
+    const rate   = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
+    const pc     = profit >= 0 ? 'up' : 'dn';
+    return `<tr>
+      <td>${r.name||'-'}</td>
+      <td>${r.date_list||'-'}</td>
+      <td>${(r.price_ipo||0).toLocaleString()}원</td>
+      <td>${(r.price_open||0).toLocaleString()}원</td>
+      <td>${qty}주</td>
+      <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
+      <td class="${pc}">${rate>=0?'+':''}${rate}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 개별주 보유현황 ────────────────────────────────────────
+function _renderPortStock() {
+  const tbody = document.getElementById('port-stock-tbody');
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  tbody.innerHTML = _stockRecords.map(r => {
+    const buy   = (r.qty||0) * (r.avg_price||0);
+    const eval_ = (r.qty||0) * (r.current_price||0);
+    const profit= eval_ - buy;
+    const rate  = buy > 0 && r.current_price ? profit / buy * 100 : null;
+    const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    return `<tr>
+      <td>${r.name||'-'}${r.ticker ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${r.ticker}</span>` : ''}</td>
+      <td>${(r.qty||0).toLocaleString()}</td>
+      <td>${r.avg_price ? r.avg_price.toLocaleString()+'원' : '-'}</td>
+      <td>${r.current_price ? r.current_price.toLocaleString()+'원' : '-'}</td>
+      <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
+      <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
+      <td style="text-align:center">
+        <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
+        <button onclick="deleteStockRecord(${r.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 개별주 모달 ────────────────────────────────────────────
+function openStockModal(id) {
+  const r = id ? _stockRecords.find(s => s.id == id) : null;
+  document.getElementById('stock-modal-title').textContent = r ? '개별주 편집' : '개별주 추가';
+  document.getElementById('sm-id').value      = r?.id || '';
+  document.getElementById('sm-name').value    = r?.name || '';
+  document.getElementById('sm-ticker').value  = r?.ticker || '';
+  document.getElementById('sm-qty').value     = r?.qty || '';
+  document.getElementById('sm-avg').value     = r?.avg_price || '';
+  document.getElementById('sm-cur').value     = r?.current_price || '';
+  document.getElementById('sm-note').value    = r?.note || '';
+  document.getElementById('stock-modal-overlay').style.display = 'flex';
+}
+function closeStockModal() { document.getElementById('stock-modal-overlay').style.display = 'none'; }
+
+async function saveStockRecord() {
+  const name = document.getElementById('sm-name').value.trim();
+  const qty  = parseFloat(document.getElementById('sm-qty').value) || 0;
+  const avg  = parseFloat(document.getElementById('sm-avg').value) || 0;
+  if (!name) { alert('종목명을 입력하세요'); return; }
+  const record = {
+    id:            parseInt(document.getElementById('sm-id').value) || undefined,
+    name,
+    ticker:        document.getElementById('sm-ticker').value.trim(),
+    qty,
+    avg_price:     avg,
+    current_price: parseFloat(document.getElementById('sm-cur').value) || 0,
+    note:          document.getElementById('sm-note').value.trim(),
+  };
+  const res = await fetch('/api/stocks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({record}) });
+  const d   = await res.json();
+  if (!d.ok) { alert('저장 실패: ' + (d.error||'')); return; }
+  const idx = _stockRecords.findIndex(s => s.id == d.record.id);
+  if (idx !== -1) _stockRecords[idx] = d.record; else _stockRecords.push(d.record);
+  closeStockModal();
+  renderPortfolio();
+}
+
+async function deleteStockRecord(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await fetch('/api/stocks?id=' + id, { method:'DELETE' });
+  _stockRecords = _stockRecords.filter(s => s.id != id);
+  renderPortfolio();
+}
+
+// ── CSV 파싱 (레거시 보존) ─────────────────────────────────
 function parsePortfolioCsv(csvText) {
   // 줄 단위로 분리
   const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
