@@ -533,9 +533,11 @@
     .port-summary-row { grid-template-columns: repeat(2, 1fr); }
     .port-mid-grid { grid-template-columns: 1fr; }
     .port-kpi-value { font-size: 18px; }
-    /* KPI 3칸 → 모바일 1행 */
+    /* KPI 3칸 → 모바일 2열 */
     .port-kpi-row-3 { grid-template-columns: 1fr 1fr !important; }
     .port-kpi-row-3 .port-kpi-card:last-child { grid-column: 1 / -1; }
+    /* KPI 4칸 → 모바일 2×2 */
+    .port-kpi-row-4 { grid-template-columns: 1fr 1fr !important; }
     /* 카드 패딩 축소 */
     .port-card { padding: 16px; }
     .port-card-title { margin-bottom: 12px; }
@@ -873,8 +875,9 @@
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
     <!-- KPI 요약 -->
-    <div id="port-kpi-row" class="port-kpi-row-3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 총 평가금액</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
+    <div id="port-kpi-row" class="port-kpi-row-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+      <div class="port-kpi-card"><div class="port-kpi-lbl">개별주 평가금액</div><div class="port-kpi-val" id="pk-stk-eval">-</div></div>
+      <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 평가손익</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val" id="pk-ipo-profit">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val" id="pk-div-total">-</div></div>
     </div>
@@ -2008,30 +2011,38 @@ function renderPortfolio() {
 
 // ── KPI ────────────────────────────────────────────────────
 function _renderPortKpi() {
-  // ETF 총 평가금액
-  const etfEval = _portEtf.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
-  document.getElementById('pk-etf-eval').textContent = etfEval ? etfEval.toLocaleString() + '원' : '-';
+  const colorVal = (el, val) => { el.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--primary)'; };
+  const signFmt  = v => (v > 0 ? '+' : '') + v.toLocaleString() + '원';
 
-  // 개별주 총 평가금액
+  // 개별주 평가금액
   const stkEval = _stockRecords.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
+  document.getElementById('pk-stk-eval').textContent = stkEval ? stkEval.toLocaleString() + '원' : '-';
+
+  // ETF 평가손익 (현재가 있는 것만)
+  const etfProfit = _portEtf.reduce((s, r) => {
+    if (!r.current_price) return s;
+    return s + (r.current_price - (r.avg_price||0)) * (r.qty||0);
+  }, 0);
+  const etfEl = document.getElementById('pk-etf-eval');
+  etfEl.textContent = _portEtf.some(r => r.current_price) ? signFmt(etfProfit) : '-';
+  colorVal(etfEl, etfProfit);
 
   // 공모주 누적 수익 (매도 완료된 것만)
   const ipoProfit = _portIpo
     .filter(r => r.price_open > 0 && r.price_ipo > 0)
-    .reduce((s, r) => {
-      const qty = r.sell_qty || r.shares_alloc || 0;
-      return s + (r.price_open - r.price_ipo) * qty - 2000;
-    }, 0);
-  const el = document.getElementById('pk-ipo-profit');
-  el.textContent = _portIpo.some(r => r.price_open > 0) ? (ipoProfit >= 0 ? '+' : '') + ipoProfit.toLocaleString() + '원' : '-';
-  el.style.color = ipoProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    .reduce((s, r) => s + (r.price_open - r.price_ipo) * (r.sell_qty || r.shares_alloc || 0) - 2000, 0);
+  const ipoEl = document.getElementById('pk-ipo-profit');
+  ipoEl.textContent = _portIpo.some(r => r.price_open > 0) ? signFmt(ipoProfit) : '-';
+  colorVal(ipoEl, ipoProfit);
 
   // 세후 배당 누적
   const divTotal = _portDiv.reduce((s, r) => s + (r.net || 0), 0);
-  document.getElementById('pk-div-total').textContent = divTotal ? divTotal.toLocaleString() + '원' : '-';
+  const divEl = document.getElementById('pk-div-total');
+  divEl.textContent = divTotal ? divTotal.toLocaleString() + '원' : '-';
+  colorVal(divEl, divTotal);
 
-  // 도넛 차트
-  _renderPortDonut(etfEval, stkEval, ipoProfit);
+  // 도넛 차트 (수익 기준)
+  _renderPortDonut(etfProfit, ipoProfit, divTotal);
 }
 
 // ── ETF 보유현황 ───────────────────────────────────────────
@@ -2110,17 +2121,20 @@ function _renderPortStock() {
   }).join('');
 }
 
-// ── 자산 배분 도넛 차트 ────────────────────────────────────
-function _renderPortDonut(etfEval, stkEval, ipoProfit) {
+// ── 수익 현황 도넛 차트 ────────────────────────────────────
+function _renderPortDonut(etfProfit, ipoProfit, divTotal) {
   const el = document.getElementById('port-donut-wrap');
   if (!el) return;
-  const total = etfEval + stkEval + Math.max(0, ipoProfit);
-  if (total <= 0) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">자산 데이터 없음</div>'; return; }
+  const total = Math.max(0, etfProfit) + Math.max(0, ipoProfit) + Math.max(0, divTotal);
+  if (total <= 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">수익 데이터 없음 (손익이 모두 0 이하)</div>';
+    return;
+  }
 
   const slices = [
-    { label: 'ETF',    val: etfEval,            color: '#3D5AFE' },
-    { label: '개별주', val: stkEval,             color: '#00C853' },
-    { label: '공모주', val: Math.max(0,ipoProfit), color: '#FF9100' },
+    { label: 'ETF 수익',   val: Math.max(0, etfProfit),  color: '#3D5AFE' },
+    { label: '공모주 수익', val: Math.max(0, ipoProfit),  color: '#FF9100' },
+    { label: '배당 수익',  val: Math.max(0, divTotal),   color: '#00C853' },
   ].filter(s => s.val > 0);
 
   const W = 200, CX = 100, CY = 100, R = 80, r = 48;
@@ -2138,14 +2152,14 @@ function _renderPortDonut(etfEval, stkEval, ipoProfit) {
     startAngle = endAngle;
   });
 
-  const totalFmt = total >= 1e8 ? (total/1e8).toFixed(1)+'억' : Math.round(total/1e4).toLocaleString()+'만';
+  const totalFmt = total >= 1e8 ? (total/1e8).toFixed(1)+'억' : total >= 1e4 ? Math.round(total/1e4).toLocaleString()+'만' : total.toLocaleString();
   const legend = slices.map(s => {
     const pct = (s.val / total * 100).toFixed(1);
-    const fmt = s.val >= 1e8 ? (s.val/1e8).toFixed(1)+'억' : Math.round(s.val/1e4).toLocaleString()+'만';
+    const fmt = s.val >= 1e8 ? (s.val/1e8).toFixed(1)+'억' : s.val >= 1e4 ? Math.round(s.val/1e4).toLocaleString()+'만' : s.val.toLocaleString();
     return `<div style="display:flex;align-items:center;gap:6px;font-size:12px">
       <span style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
       <span style="color:var(--muted)">${s.label}</span>
-      <span style="margin-left:auto;font-weight:600">${fmt}원</span>
+      <span style="margin-left:auto;font-weight:600;color:var(--green)">+${fmt}원</span>
       <span style="color:var(--muted);min-width:38px;text-align:right">${pct}%</span>
     </div>`;
   }).join('');
@@ -2154,8 +2168,8 @@ function _renderPortDonut(etfEval, stkEval, ipoProfit) {
     <div class="port-donut-inner" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
       <div style="position:relative;flex-shrink:0">
         <svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}
-          <text x="${CX}" y="${CY-8}" text-anchor="middle" font-size="11" fill="var(--muted)">총 자산</text>
-          <text x="${CX}" y="${CY+10}" text-anchor="middle" font-size="15" font-weight="700" fill="var(--text)">${totalFmt}원</text>
+          <text x="${CX}" y="${CY-8}" text-anchor="middle" font-size="11" fill="var(--muted)">총 수익</text>
+          <text x="${CX}" y="${CY+10}" text-anchor="middle" font-size="15" font-weight="700" fill="var(--green)">+${totalFmt}원</text>
         </svg>
       </div>
       <div style="flex:1;min-width:140px;display:flex;flex-direction:column;gap:10px">${legend}</div>
