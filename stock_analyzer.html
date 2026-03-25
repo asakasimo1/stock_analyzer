@@ -3163,17 +3163,57 @@ async function loadDivRecords() {
 }
 
 function openDivModal(etfId) {
-  const r = _etfRecords.find(x => x.id == etfId);
-  if (!r) return;
-  document.getElementById('dv-etf-id').value = r.id;
-  document.getElementById('dv-etf-name').textContent = r.name + (r.ticker ? ` (${r.ticker})` : '');
+  // ETF 콤보박스 채우기
+  const sel = document.getElementById('dv-etf-select');
+  sel.innerHTML = '<option value="">ETF를 선택하세요</option>' +
+    [..._etfRecords]
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(r => `<option value="${r.id}">${r.name}${r.ticker ? ' (' + r.ticker + ')' : ''}</option>`)
+      .join('');
+
+  // 기준월 = 현재월
   const today = new Date();
-  document.getElementById('dv-ym').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  document.getElementById('dv-per-share').value = r.recent_div || '';
-  document.getElementById('dv-qty').value = r.qty || '';
+  document.getElementById('dv-ym').value =
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
   document.getElementById('dv-note').value = '';
-  calcDivPreview();
+
+  // ETF 사전 선택 및 기본값 채우기
+  if (etfId) sel.value = etfId;
+  fillDivDefaults(sel.value);
+
   document.getElementById('div-modal').style.display = 'block';
+}
+
+function onDivEtfChange() {
+  fillDivDefaults(document.getElementById('dv-etf-select').value);
+}
+
+function fillDivDefaults(etfId) {
+  document.getElementById('dv-etf-id').value = etfId || '';
+
+  if (!etfId) {
+    document.getElementById('dv-per-share').value = '';
+    document.getElementById('dv-qty').value = '';
+    calcDivPreview();
+    return;
+  }
+
+  // 마지막 배당 내역에서 per_share, qty 가져오기
+  const lastRec = [..._divRecords]
+    .filter(r => String(r.etf_id) === String(etfId))
+    .sort((a, b) => (b.ym || '') > (a.ym || '') ? 1 : -1)[0];
+
+  // 주당 배당금: 마지막 기록값 (없으면 ETF 레코드의 recent_div)
+  const etfRec = _etfRecords.find(x => String(x.id) === String(etfId));
+  document.getElementById('dv-per-share').value =
+    lastRec?.per_share || etfRec?.recent_div || '';
+
+  // 수량: 마지막 기록의 수량 (없으면 ETF 현재 보유 수량)
+  document.getElementById('dv-qty').value =
+    lastRec?.qty || etfRec?.qty || '';
+
+  calcDivPreview();
 }
 
 function closeDivModal() {
@@ -3199,6 +3239,7 @@ async function saveDivEntry() {
   const qty     = parseInt(document.getElementById('dv-qty').value) || 0;
   const note    = document.getElementById('dv-note').value.trim();
 
+  if (!etfId)    { alert('ETF를 선택하세요'); return; }
   if (!ym)       { alert('배당 기준월을 입력하세요'); return; }
   if (!perShare) { alert('주당 배당금을 입력하세요'); return; }
   if (!qty)      { alert('수량을 입력하세요'); return; }
@@ -3327,27 +3368,27 @@ function renderDivHistory() {
           return `<div class="div-month-group">
             <div class="div-month-header" onclick="toggleDivMonth(this)">
               <span style="display:flex;align-items:center;gap:6px">
-                <span class="div-toggle-icon">▼</span>
+                <span class="div-toggle-icon">▶</span>
                 <span>📅 ${label}</span>
                 <span style="font-size:10px;color:var(--muted)">(${records.length}건)</span>
               </span>
               <span class="div-month-total">세후 ${fmtW(mNet)} &nbsp;·&nbsp; 세전 ${fmtW(mGross)}</span>
             </div>
-            <div class="div-month-body">${rows}</div>
+            <div class="div-month-body" style="display:none">${rows}</div>
           </div>`;
         }).join('');
 
       return `<div class="div-year-group">
         <div class="div-year-header" onclick="toggleDivYear(this)">
           <span style="display:flex;align-items:center;gap:8px">
-            <span class="div-toggle-icon" style="font-size:11px">▼</span>
+            <span class="div-toggle-icon" style="font-size:11px">▶</span>
             <span>📆 ${yr}년</span>
           </span>
           <span style="font-size:12px;color:#60a5fa;font-weight:700">
             세후 ${fmtW(yrNet)} <span style="color:var(--muted);font-weight:400;margin-left:4px">/ 세전 ${fmtW(yrGross)}</span>
           </span>
         </div>
-        <div class="div-year-body">${monthBlocks}</div>
+        <div class="div-year-body" style="display:none">${monthBlocks}</div>
       </div>`;
     }).join('');
 }
@@ -3901,7 +3942,13 @@ function calcDrip() {
     </div>
     <div style="display:grid;gap:14px">
       <input id="dv-etf-id" type="hidden">
-      <div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;font-weight:700;color:var(--text)" id="dv-etf-name"></div>
+      <div>
+        <label style="font-size:12px;color:var(--muted)">ETF 선택</label>
+        <select id="dv-etf-select" onchange="onDivEtfChange()"
+          style="width:100%;margin-top:4px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer">
+          <option value="">ETF를 선택하세요</option>
+        </select>
+      </div>
       <div>
         <label style="font-size:12px;color:var(--muted)">배당 기준월</label>
         <input id="dv-ym" type="month" style="width:100%">
