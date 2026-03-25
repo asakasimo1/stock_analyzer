@@ -45,20 +45,44 @@ export default async function handler(req, res) {
     return { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
   };
 
-  /* ── FRED CSV — 미국 10년 국채금리 (DGS10) ── */
-  const fetchUS10Y = async () => {
-    const r = await fetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10', { headers: ua });
-    if (!r.ok) throw new Error(`FRED HTTP ${r.status}`);
+  /* ── CBOE — VIX 공식 CSV ── */
+  const fetchVIX = async () => {
+    const r = await fetch('https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv', { headers: ua });
+    if (!r.ok) throw new Error(`CBOE VIX HTTP ${r.status}`);
     const text  = await r.text();
-    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('DATE'));
-    // FRED는 결측값을 "." 으로 표기 — 뒤에서부터 유효값 탐색
-    let last = null, prev = null;
-    for (let i = lines.length - 1; i >= 0 && (!last || !prev); i--) {
-      const val = parseFloat(lines[i].split(',')[1]);
-      if (!isNaN(val) && val > 0) { if (!last) last = val; else if (!prev) prev = val; }
+    // 형식: DATE,OPEN,HIGH,LOW,CLOSE  (헤더 제외, 최신 데이터가 맨 아래)
+    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('DATE') && !l.startsWith('"DATE'));
+    if (lines.length < 1) throw new Error('CBOE VIX: no data');
+    const parse = l => parseFloat(l.split(',')[4]);  // CLOSE = index 4
+    const last  = parse(lines[lines.length - 1]);
+    const prevC = lines.length >= 2 ? parse(lines[lines.length - 2]) : last;
+    if (isNaN(last) || last === 0) throw new Error('CBOE VIX: parse fail');
+    return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
+  };
+
+  /* ── 미국 재무부 — 10년 국채금리 ── */
+  const fetchUS10Y = async () => {
+    const year = new Date().getFullYear();
+    const url  = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&download=true`;
+    const r = await fetch(url, { headers: ua });
+    if (!r.ok) throw new Error(`Treasury HTTP ${r.status}`);
+    const text  = await r.text();
+    const lines = text.trim().split('\n').filter(l => l.trim());
+    // 헤더 행 찾기: "Date," 로 시작
+    const hdrIdx = lines.findIndex(l => l.startsWith('"Date') || l.startsWith('Date'));
+    if (hdrIdx === -1) throw new Error('Treasury: header not found');
+    const headers = lines[hdrIdx].split(',').map(h => h.replace(/"/g, '').trim());
+    const col10y  = headers.findIndex(h => h === '10 Yr');
+    if (col10y === -1) throw new Error('Treasury: 10Yr column not found');
+    // 뒤에서부터 유효값 탐색 (주말/공휴일은 N/A)
+    let last = NaN, prevC = NaN;
+    for (let i = lines.length - 1; i > hdrIdx && (isNaN(last) || isNaN(prevC)); i--) {
+      const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+      const val  = parseFloat(cols[col10y]);
+      if (!isNaN(val) && val > 0) { isNaN(last) ? (last = val) : (prevC = val); }
     }
-    if (!last) throw new Error('FRED DGS10: no valid data');
-    const prevC = prev ?? last;
+    if (isNaN(last)) throw new Error('Treasury: no valid 10Yr data');
+    if (isNaN(prevC)) prevC = last;
     return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
   };
 
@@ -80,7 +104,7 @@ export default async function handler(req, res) {
     fetchStooq('^spx'),     // S&P 500
     fetchStooq('^dji'),     // Dow Jones
     fetchStooq('usdkrw'),   // USD/KRW
-    fetchStooq('^vix'),     // CBOE VIX (30일 범위로 안정적)
+    fetchVIX(),             // CBOE VIX (공식 CSV)
     fetchStooq('xauusd'),   // Gold spot (USD/oz)
     fetchUS10Y(),           // 미국 10년 국채금리 (FRED)
     fetchFearGreed(),
