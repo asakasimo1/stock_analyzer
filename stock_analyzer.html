@@ -957,8 +957,109 @@
     <div class="etf-kpi"><div class="etf-kpi-label">평가손익</div><div class="etf-kpi-val" id="etf-k-pnl">-</div></div>
   </div>
 
+  <!-- 배당 재투자 계산기 버튼 -->
+  <button onclick="openDripModal()" style="width:100%;margin-top:16px;padding:14px;background:linear-gradient(135deg,#1e3a5f,#1e2d45);color:#60a5fa;border:1.5px solid #2563eb;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.3px">
+    💰 배당 재투자 계산기 (5년 시뮬레이션)
+  </button>
+
 </div>
 </div><!-- /tab-etf -->
+
+<!-- 배당 재투자 계산기 모달 -->
+<div id="drip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow-y:auto;padding:20px" onclick="closeDripModal(event)">
+  <div style="background:#1e2d45;border-radius:16px;max-width:680px;margin:32px auto;padding:24px" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h3 style="margin:0;color:#f1f5f9;font-size:16px">💰 배당 재투자 시뮬레이션</h3>
+      <button onclick="closeDripModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <p style="margin:0 0 16px;font-size:12px;color:#64748b">배당금을 전액 재투자했을 때의 복리 효과를 시뮬레이션합니다.</p>
+
+    <!-- 입력 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div>
+        <label style="font-size:11px;color:#94a3b8">초기 투자금 (만원)</label>
+        <input id="drip-invest" type="number" value="1000" min="10" step="100"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box"
+          oninput="calcDrip()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">연 배당률 / 분배율 (%)</label>
+        <input id="drip-yield" type="number" value="4.0" min="0" max="30" step="0.1"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box"
+          oninput="calcDrip()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">연 주가 상승률 (%)</label>
+        <input id="drip-price-growth" type="number" value="5.0" min="-20" max="50" step="0.5"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box"
+          oninput="calcDrip()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">연 배당 성장률 (%)</label>
+        <input id="drip-div-growth" type="number" value="3.0" min="0" max="30" step="0.5"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box"
+          oninput="calcDrip()">
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;color:#94a3b8">시뮬레이션 기간: <span id="drip-years-label">5년</span></label>
+      <input id="drip-years" type="range" min="1" max="10" value="5"
+        style="width:100%;margin-top:6px;accent-color:#3b82f6"
+        oninput="document.getElementById('drip-years-label').textContent=this.value+'년';calcDrip()">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569;margin-top:2px"><span>1년</span><span>10년</span></div>
+    </div>
+
+    <!-- 요약 지표 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">초기 투자금</div>
+        <div id="drip-s-invest" style="font-size:14px;font-weight:700;color:#f1f5f9">-</div>
+      </div>
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">최종 평가금액</div>
+        <div id="drip-s-final" style="font-size:14px;font-weight:700;color:#34d399">-</div>
+        <div id="drip-s-return" style="font-size:10px;color:#6ee7b7;margin-top:2px">-</div>
+      </div>
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">누적 배당 수령</div>
+        <div id="drip-s-div" style="font-size:14px;font-weight:700;color:#60a5fa">-</div>
+      </div>
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">재투자 추가 효과</div>
+        <div id="drip-s-bonus" style="font-size:14px;font-weight:700;color:#f59e0b">-</div>
+      </div>
+    </div>
+
+    <!-- SVG 차트 -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:8px">📈 재투자 vs 단순 보유 비교</div>
+      <svg id="drip-chart" width="100%" height="180" style="overflow:visible;display:block"></svg>
+      <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:#94a3b8">
+        <span><span style="display:inline-block;width:12px;height:3px;background:#34d399;vertical-align:middle;margin-right:4px;border-radius:2px"></span>배당 재투자</span>
+        <span><span style="display:inline-block;width:12px;height:3px;background:#3b82f6;vertical-align:middle;margin-right:4px;border-radius:2px;opacity:0.6"></span>단순 보유</span>
+      </div>
+    </div>
+
+    <!-- 연도별 테이블 -->
+    <div style="font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:8px">📋 연도별 상세</div>
+    <div style="overflow-x:auto;border-radius:8px;border:1px solid #1e2d45">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:#111827;color:#64748b">
+            <th style="padding:8px 10px;text-align:center;font-weight:600">연도</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">보유 주식</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">연간 배당금</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">누적 배당금</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">평가금액</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">수익률</th>
+          </tr>
+        </thead>
+        <tbody id="drip-table-body"></tbody>
+      </table>
+    </div>
+    <p style="margin:12px 0 0;font-size:10px;color:#475569;text-align:center">⚠️ 본 계산기는 참고용 시뮬레이션입니다. 실제 수익은 시장 상황에 따라 다를 수 있습니다.</p>
+  </div>
+</div>
 
 <!-- 공모주 추가/편집 모달 -->
 <div id="ipo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;overflow-y:auto;padding:20px">
@@ -3342,6 +3443,134 @@ async function refreshAllEtfPrices() {
     btn.disabled = false;
     if (updated) setTimeout(() => { btn.textContent = '⟳ 현재가 업데이트'; }, 2500);
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 배당 재투자 계산기
+// ══════════════════════════════════════════════════════════════════
+
+function openDripModal() {
+  // 현재 ETF 평균 분배율을 기본값으로 세팅 (보유 ETF가 있으면)
+  if (_etfRecords && _etfRecords.length > 0) {
+    const yields = _etfRecords.filter(r => r.annual_div_rate > 0).map(r => r.annual_div_rate);
+    if (yields.length > 0) {
+      const avg = (yields.reduce((a,b) => a+b, 0) / yields.length).toFixed(1);
+      document.getElementById('drip-yield').value = avg;
+    }
+  }
+  document.getElementById('drip-modal').style.display = 'block';
+  calcDrip();
+}
+
+function closeDripModal(e) {
+  if (e && e.target !== document.getElementById('drip-modal')) return;
+  document.getElementById('drip-modal').style.display = 'none';
+}
+
+function fmtW(val) {
+  const abs = Math.abs(val);
+  if (abs >= 1e8)  return (val/1e8).toFixed(1) + '억원';
+  if (abs >= 1e4)  return Math.round(val/1e4) + '만원';
+  return Math.round(val).toLocaleString() + '원';
+}
+
+function calcDrip() {
+  const invest    = (parseFloat(document.getElementById('drip-invest').value) || 0) * 10000;
+  const divYield  = (parseFloat(document.getElementById('drip-yield').value) || 0) / 100;
+  const priceGrow = (parseFloat(document.getElementById('drip-price-growth').value) || 0) / 100;
+  const divGrow   = (parseFloat(document.getElementById('drip-div-growth').value) || 0) / 100;
+  const years     = parseInt(document.getElementById('drip-years').value) || 5;
+
+  if (invest <= 0) return;
+
+  const basePrice = 10000; // 기준가 (주가 비율 계산용)
+  let shares = invest / basePrice;
+  let cumulDiv = 0;
+  const rows = [];
+  const evalVals = [invest];
+  const noReinvVals = [invest];
+
+  for (let yr = 1; yr <= years; yr++) {
+    const priceEoy  = basePrice * Math.pow(1 + priceGrow, yr);
+    const yrYield   = divYield * Math.pow(1 + divGrow, yr - 1);
+    const dividend  = shares * priceEoy * yrYield;
+    cumulDiv += dividend;
+    const extra = dividend / priceEoy;
+    shares += extra;
+    const evalAmt = shares * priceEoy;
+    const ret = (evalAmt / invest - 1) * 100;
+    evalVals.push(evalAmt);
+    noReinvVals.push((invest / basePrice) * priceEoy);
+    rows.push({ yr, shares, dividend, cumulDiv, evalAmt, ret });
+  }
+
+  const finalEval   = evalVals[years];
+  const noReinvFinal = noReinvVals[years];
+  const totalRet    = (finalEval / invest - 1) * 100;
+  const bonus       = finalEval - noReinvFinal;
+
+  // 요약 지표
+  document.getElementById('drip-s-invest').textContent = fmtW(invest);
+  document.getElementById('drip-s-final').textContent  = fmtW(finalEval);
+  document.getElementById('drip-s-return').textContent = (totalRet >= 0 ? '+' : '') + totalRet.toFixed(1) + '%';
+  document.getElementById('drip-s-div').textContent    = fmtW(cumulDiv);
+  document.getElementById('drip-s-bonus').textContent  = fmtW(bonus);
+
+  // 테이블
+  const tbody = document.getElementById('drip-table-body');
+  tbody.innerHTML = rows.map(r => `
+    <tr style="border-top:1px solid #1e2d45;color:#f1f5f9">
+      <td style="padding:8px 10px;text-align:center;color:#94a3b8">${r.yr}년 후</td>
+      <td style="padding:8px 10px;text-align:right">${r.shares.toFixed(2)}주</td>
+      <td style="padding:8px 10px;text-align:right">${fmtW(r.dividend)}</td>
+      <td style="padding:8px 10px;text-align:right">${fmtW(r.cumulDiv)}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600">${fmtW(r.evalAmt)}</td>
+      <td style="padding:8px 10px;text-align:right;color:${r.ret>=0?'#34d399':'#f87171'};font-weight:600">${r.ret>=0?'+':''}${r.ret.toFixed(1)}%</td>
+    </tr>`).join('');
+
+  // SVG 차트
+  const svg = document.getElementById('drip-chart');
+  const W = svg.parentElement.offsetWidth || 600;
+  const H = 180;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const maxVal = Math.max(...evalVals, ...noReinvVals);
+  const PAD = { left: 10, right: 10, top: 12, bottom: 28 };
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top - PAD.bottom;
+
+  const xPos = (i) => PAD.left + (i / years) * cw;
+  const yPos = (v) => PAD.top + ch - (v / maxVal) * ch;
+
+  const toPath = (vals) =>
+    vals.map((v, i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(v).toFixed(1)}`).join(' ');
+
+  const drip_path = toPath(evalVals);
+  const nori_path = toPath(noReinvVals);
+
+  // 그리드 라인
+  let gridLines = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (ch / 4) * i;
+    const val = maxVal * (1 - i / 4);
+    gridLines += `<line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${W-PAD.right}" y2="${y.toFixed(1)}" stroke="#1e2d45" stroke-width="1"/>`;
+    gridLines += `<text x="${PAD.left}" y="${(y-3).toFixed(1)}" fill="#475569" font-size="9" text-anchor="start">${fmtW(val)}</text>`;
+  }
+
+  // X축 라벨
+  let xLabels = '';
+  for (let i = 0; i <= years; i++) {
+    xLabels += `<text x="${xPos(i).toFixed(1)}" y="${H-4}" fill="#475569" font-size="9" text-anchor="middle">${i}년</text>`;
+  }
+
+  svg.innerHTML = `
+    ${gridLines}
+    ${xLabels}
+    <path d="${nori_path}" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.6"/>
+    <path d="${drip_path}" fill="none" stroke="#34d399" stroke-width="2.5"/>
+    ${evalVals.map((v,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(v).toFixed(1)}" r="3.5" fill="#34d399"/>`).join('')}
+    ${noReinvVals.map((v,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(v).toFixed(1)}" r="2.5" fill="#3b82f6" opacity="0.6"/>`).join('')}
+  `;
 }
 
 </script>
