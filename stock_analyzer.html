@@ -306,6 +306,15 @@
   .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
   .tab-page { display: none; }
   .tab-page.active { display: block; }
+  .mkt-index-card { background:#111827;border:1px solid #1e2d45;border-radius:12px;padding:16px; }
+  .mkt-loading { color:#64748b;font-size:12px;text-align:center;padding:8px 0; }
+  .mkt-name { font-size:12px;color:#64748b;margin-bottom:6px; }
+  .mkt-price { font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:4px; }
+  .mkt-chg-up { color:#34d399;font-size:13px;font-weight:600; }
+  .mkt-chg-dn { color:#f87171;font-size:13px;font-weight:600; }
+  .mkt-chg-neu { color:#94a3b8;font-size:13px; }
+  .mkt-fg-bar { height:8px;border-radius:4px;background:linear-gradient(to right,#f87171,#fbbf24,#34d399);margin:8px 0;position:relative; }
+  .mkt-fg-dot { width:12px;height:12px;background:#fff;border-radius:50%;position:absolute;top:-2px;margin-left:-6px;box-shadow:0 0 4px rgba(0,0,0,.5); }
 
   /* ── 대시보드 ── */
   .dash-grid {
@@ -835,8 +844,9 @@
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('dashboard')">📊 대시보드</button>
   <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
-  <button class="tab-btn" onclick="switchTab('ipo')">🏢 공모주</button>
+  <button class="tab-btn" onclick="switchTab('market')">📊 시장현황</button>
   <button class="tab-btn" onclick="switchTab('etf')">💹 ETF</button>
+  <button class="tab-btn" onclick="switchTab('ipo')">🏢 공모주</button>
 </nav>
 
 
@@ -913,6 +923,41 @@
 
   </div>
 </div><!-- /tab-portfolio -->
+
+<!-- 시장현황 탭 -->
+<div id="tab-market" class="tab-page">
+<div style="max-width:900px;margin:0 auto;padding:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="margin:0;font-size:18px;color:#f1f5f9;font-weight:700">📊 시장현황</h2>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="mkt-updated" style="font-size:11px;color:#64748b"></span>
+      <button onclick="loadMarketData()" id="mkt-refresh-btn" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">⟳ 새로고침</button>
+    </div>
+  </div>
+
+  <!-- 한국 시장 -->
+  <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">🇰🇷 한국 시장</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div id="mkt-kospi" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-kosdaq" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+  </div>
+
+  <!-- 미국 시장 -->
+  <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">🇺🇸 미국 시장</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div id="mkt-nasdaq" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-sp500" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+  </div>
+
+  <!-- 주요 지표 -->
+  <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">📉 주요 지표</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div id="mkt-usdkrw" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-vix" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-feargreed" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+  </div>
+</div>
+</div><!-- /tab-market -->
 
 <!-- 공모주 관리 탭 -->
 <div id="tab-ipo" class="tab-page">
@@ -1362,6 +1407,7 @@ function switchTab(name) {
   if (name === 'dashboard') initDashboard();
   if (name === 'portfolio') initPortfolio();
   if (name === 'ipo') loadIpoRecords();
+  if (name === 'market') loadMarketData();
   if (name === 'etf') loadEtfRecords();
 }
 
@@ -2306,8 +2352,9 @@ function renderIpoManage() {
   const active    = _ipoRecords.filter(r => ['청약예정','청약중','상장예정'].includes(r.status)).length;
   const completed = _ipoRecords.filter(r => r.status === '상장완료');
   const totalInvest = completed.reduce((s, r) => s + (r.price_ipo||0) * (r.shares_alloc||0), 0);
-  const totalSell   = completed.reduce((s, r) => s + (r.price_open||0) * (r.shares_alloc||0), 0);
-  const totalProfit = totalSell - totalInvest;
+  const totalSell   = completed.reduce((s, r) => s + (r.price_open||0) * (r.sell_qty||r.shares_alloc||0), 0);
+  const totalFee    = completed.filter(r => r.price_open).length * 2000;
+  const totalProfit = totalSell - totalInvest - totalFee;
   const profitRate  = totalInvest > 0 ? totalProfit / totalInvest * 100 : null;
   const pc = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
   const ps = totalProfit >= 0 ? '+' : '';
@@ -2368,9 +2415,11 @@ function renderIpoManage() {
     const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
     const alloc     = r.shares_alloc || 0;
     const minAmt    = (r.shares_apply && r.price_ipo) ? r.shares_apply * r.price_ipo * 0.5 : null;
+    const sellQty   = r.sell_qty || alloc;
     const buyAmt    = alloc > 0 && r.price_ipo  ? alloc * r.price_ipo  : null;
-    const sellAmt   = alloc > 0 && r.price_open ? alloc * r.price_open : null;
-    const profit    = buyAmt !== null && sellAmt !== null ? sellAmt - buyAmt : null;
+    const sellAmt   = sellQty > 0 && r.price_open ? sellQty * r.price_open : null;
+    const FEE       = 2000;
+    const profit    = buyAmt !== null && sellAmt !== null ? sellAmt - alloc * r.price_ipo - FEE : null;
     const profitPct = buyAmt && profit !== null ? profit / buyAmt * 100 : null;
     const isFailed  = ['배정실패','청약포기'].includes(r.status);
     const isComp    = r.status === '상장완료';
@@ -2426,16 +2475,20 @@ function renderIpoManage() {
       // 상장완료지만 매도가 미입력
       return `<div style="border:1px solid #166534;border-radius:10px;padding:14px;margin-bottom:10px;background:#0a1a0a">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span style="font-weight:700">🟢 ${r.name} <span style="font-size:11px;color:#64748b">· 매도가 미입력</span></span>
+          <span style="font-weight:700">🟢 ${r.name} <span style="font-size:11px;color:#64748b">· 매도 미입력</span></span>
           ${editDel(r.id)}
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">💰 매도가</span>
-          <input type="number" id="list-price-input-${r.id}" min="0" placeholder="매도한 가격 입력"
-            style="flex:1;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
+        <div style="display:grid;grid-template-columns:1fr 80px 120px auto;gap:8px;align-items:center">
+          <input type="number" id="list-price-input-${r.id}" min="0" placeholder="매도가 (원)"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <input type="number" id="list-qty-input-${r.id}" min="0" placeholder="수량" value="${alloc}"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;text-align:center">
+          <input type="date" id="list-date-input-${r.id}" value="${r.sell_date||''}"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:12px">
           <button onclick="saveListPrice(${r.id})"
-            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">저장</button>
+            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">저장</button>
         </div>
+        <div style="font-size:11px;color:#475569;margin-top:6px">수수료 2,000원 자동 차감 · 투자금 = 배정수량 × 공모가</div>
       </div>`;
     }
 
@@ -2455,14 +2508,17 @@ function renderIpoManage() {
           ${r.price_ipo ? `<span>💰 공모가 ${r.price_ipo.toLocaleString()}원</span>` : ''}
           ${buyAmt !== null ? `<span style="color:#fbbf24">📌 실제 매수금 ${buyAmt.toLocaleString()}원 (${alloc}주)</span>` : ''}
         </div>
-        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-          <span style="font-size:12px;color:#94a3b8;white-space:nowrap">💰 매도가</span>
-          <input type="number" id="list-price-input-${r.id}" value="${r.price_open||''}" min="0" placeholder="시초가 매도 후 입력"
-            style="flex:1;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 80px 120px auto;gap:8px;align-items:center">
+          <input type="number" id="list-price-input-${r.id}" value="${r.price_open||''}" min="0" placeholder="매도가 (원)"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px">
+          <input type="number" id="list-qty-input-${r.id}" min="0" placeholder="수량" value="${r.sell_qty||alloc}"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;text-align:center">
+          <input type="date" id="list-date-input-${r.id}" value="${r.sell_date||r.date_list||''}"
+            style="padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:12px">
           <button onclick="saveListPrice(${r.id})"
-            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">저장</button>
-          ${r.price_open ? `<span style="color:#34d399;font-size:12px">✅ ${r.price_open.toLocaleString()}원</span>` : ''}
+            style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">저장</button>
         </div>
+        ${r.price_open ? `<div style="font-size:11px;color:#34d399;margin-top:4px">✅ ${r.price_open.toLocaleString()}원 × ${r.sell_qty||alloc}주 매도 기록됨</div>` : '<div style="font-size:11px;color:#475569;margin-top:4px">수수료 2,000원 자동 차감</div>'}
       </div>`;
     }
 
@@ -2708,18 +2764,21 @@ function gotoIpoTab() {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-ipo').classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(el => {
-    if ((el.getAttribute('onclick') || '').includes("'ipo'")) el.classList.add('active');
+    if (el.getAttribute('onclick')?.includes("'ipo'")) el.classList.add('active');
   });
   loadIpoRecords();
 }
 
 // 공모주 탭 목록에서 매도가 직접 저장
 async function saveListPrice(id) {
-  const input = document.getElementById(`list-price-input-${id}`);
-  const price = parseInt(input?.value) || 0;
-  const idx = _ipoRecords.findIndex(r => r.id == id);
+  const price = parseInt(document.getElementById(`list-price-input-${id}`)?.value) || 0;
+  const qty   = parseInt(document.getElementById(`list-qty-input-${id}`)?.value)   || 0;
+  const date  = document.getElementById(`list-date-input-${id}`)?.value || '';
+  const idx   = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].price_open = price;
+  if (qty) _ipoRecords[idx].sell_qty  = qty;
+  if (date) _ipoRecords[idx].sell_date = date;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
   await saveIpoRecords();
   renderIpoManage();
@@ -4189,6 +4248,85 @@ function calcDrip() {
       return `<circle cx="${xPos(mx).toFixed(1)}" cy="${yPos(r.evalAmt).toFixed(1)}" r="3.5" fill="#34d399"/>`;
     }).join('')}
   `;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 시장현황 탭
+// ══════════════════════════════════════════════════════════════════
+function _mktCard(id, name, priceStr, chg, chgPct, extraHtml = '') {
+  const up  = chg >= 0;
+  const sign = up ? '+' : '';
+  const cls  = up ? 'mkt-chg-up' : 'mkt-chg-dn';
+  return `
+    <div class="mkt-name">${name}</div>
+    <div class="mkt-price">${priceStr}</div>
+    <div class="${cls}">${sign}${chg.toFixed(chg > 100 ? 0 : 2)} (${sign}${chgPct.toFixed(2)}%)</div>
+    ${extraHtml}`;
+}
+
+function _fgLabel(v) {
+  if (v <= 25) return { label: '극단적 공포', color: '#f87171' };
+  if (v <= 45) return { label: '공포', color: '#fb923c' };
+  if (v <= 55) return { label: '중립', color: '#facc15' };
+  if (v <= 75) return { label: '탐욕', color: '#4ade80' };
+  return { label: '극단적 탐욕', color: '#34d399' };
+}
+
+async function loadMarketData() {
+  const btn = document.getElementById('mkt-refresh-btn');
+  if (btn) { btn.textContent = '⟳ 로딩 중...'; btn.disabled = true; }
+  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="mkt-loading">로딩 중...</div>';
+  });
+
+  try {
+    const r   = await fetch('/api/market');
+    const d   = await r.json();
+    const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+    const setCard = (id, html) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    };
+
+    if (d.kospi)  setCard('mkt-kospi',  _mktCard('mkt-kospi',  '🇰🇷 코스피',  d.kospi.price.toLocaleString('ko-KR', {maximumFractionDigits:2}),  d.kospi.chg,  d.kospi.chgPct));
+    if (d.kosdaq) setCard('mkt-kosdaq', _mktCard('mkt-kosdaq', '🇰🇷 코스닥',  d.kosdaq.price.toLocaleString('ko-KR', {maximumFractionDigits:2}), d.kosdaq.chg, d.kosdaq.chgPct));
+    if (d.nasdaq) setCard('mkt-nasdaq', _mktCard('mkt-nasdaq', '🇺🇸 나스닥',  d.nasdaq.price.toLocaleString('en-US', {maximumFractionDigits:2}), d.nasdaq.chg, d.nasdaq.chgPct));
+    if (d.sp500)  setCard('mkt-sp500',  _mktCard('mkt-sp500',  '🇺🇸 S&P 500', d.sp500.price.toLocaleString('en-US', {maximumFractionDigits:2}),  d.sp500.chg,  d.sp500.chgPct));
+
+    if (d.usdkrw) setCard('mkt-usdkrw', `
+      <div class="mkt-name">💱 원/달러 환율</div>
+      <div class="mkt-price">${d.usdkrw.price.toFixed(1)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">₩</span></div>
+      <div class="${d.usdkrw.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.usdkrw.chg >= 0 ? '+' : ''}${d.usdkrw.chg.toFixed(2)} (${d.usdkrw.chgPct >= 0 ? '+' : ''}${d.usdkrw.chgPct.toFixed(2)}%)</div>`);
+
+    if (d.vix) setCard('mkt-vix', `
+      <div class="mkt-name">📉 VIX (공포지수)</div>
+      <div class="mkt-price" style="color:${d.vix.price > 30 ? '#f87171' : d.vix.price > 20 ? '#fbbf24' : '#34d399'}">${d.vix.price.toFixed(2)}</div>
+      <div class="${d.vix.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.vix.chg >= 0 ? '+' : ''}${d.vix.chg.toFixed(2)}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:4px">${d.vix.price > 30 ? '⚠️ 고변동성 구간' : d.vix.price > 20 ? '주의 구간' : '안정 구간'}</div>`);
+
+    if (d.feargreed) {
+      const v   = d.feargreed.value;
+      const { label, color } = _fgLabel(v);
+      setCard('mkt-feargreed', `
+        <div class="mkt-name">😱 공포탐욕지수</div>
+        <div class="mkt-price" style="color:${color}">${v}<span style="font-size:14px;color:#94a3b8;margin-left:4px">/ 100</span></div>
+        <div style="font-size:13px;font-weight:600;color:${color}">${label}</div>
+        <div class="mkt-fg-bar"><div class="mkt-fg-dot" style="left:${v}%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569"><span>공포</span><span>중립</span><span>탐욕</span></div>`);
+    }
+
+    const updEl = document.getElementById('mkt-updated');
+    if (updEl) updEl.textContent = `${now} 기준`;
+  } catch (e) {
+    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="mkt-loading" style="color:#f87171">로드 실패</div>`;
+    });
+  }
+
+  if (btn) { btn.textContent = '⟳ 새로고침'; btn.disabled = false; }
 }
 
 </script>
