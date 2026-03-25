@@ -951,10 +951,14 @@
 
   <!-- 주요 지표 -->
   <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">📉 주요 지표</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
     <div id="mkt-usdkrw" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-vix" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-feargreed" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div id="mkt-gold" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-us10y" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
   </div>
 </div>
 </div><!-- /tab-market -->
@@ -4362,7 +4366,7 @@ function _fgLabel(v) {
 async function loadMarketData() {
   const btn = document.getElementById('mkt-refresh-btn');
   if (btn) { btn.textContent = '⟳ 로딩 중...'; btn.disabled = true; }
-  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-us10y'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="mkt-loading">로딩 중...</div>';
   });
@@ -4389,9 +4393,11 @@ async function loadMarketData() {
     d.sp500  ? setCard('mkt-sp500',  _mktCard('mkt-sp500',  '🇺🇸 S&P 500', d.sp500.price.toLocaleString('en-US', {maximumFractionDigits:2}),  d.sp500.chg,  d.sp500.chgPct))  : noData('mkt-sp500');
     d.dow    ? setCard('mkt-dow',    _mktCard('mkt-dow',    '🇺🇸 다우존스', d.dow.price.toLocaleString('en-US', {maximumFractionDigits:2}),    d.dow.chg,    d.dow.chgPct))    : noData('mkt-dow');
 
-    if (!d.usdkrw) noData('mkt-usdkrw');
-    if (!d.vix) noData('mkt-vix');
+    if (!d.usdkrw)    noData('mkt-usdkrw');
+    if (!d.vix)       noData('mkt-vix');
     if (!d.feargreed) noData('mkt-feargreed');
+    if (!d.gold)      noData('mkt-gold');
+    if (!d.us10y)     noData('mkt-us10y');
     if (d.usdkrw) setCard('mkt-usdkrw', `
       <div class="mkt-name">💱 원/달러 환율</div>
       <div class="mkt-price">${d.usdkrw.price.toFixed(1)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">₩</span></div>
@@ -4402,6 +4408,21 @@ async function loadMarketData() {
       <div class="mkt-price" style="color:${d.vix.price > 30 ? '#f87171' : d.vix.price > 20 ? '#fbbf24' : '#34d399'}">${d.vix.price.toFixed(2)}</div>
       <div class="${d.vix.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.vix.chg >= 0 ? '+' : ''}${d.vix.chg.toFixed(2)}</div>
       <div style="font-size:11px;color:#64748b;margin-top:4px">${d.vix.price > 30 ? '⚠️ 고변동성 구간' : d.vix.price > 20 ? '주의 구간' : '안정 구간'}</div>`);
+
+    if (d.gold) setCard('mkt-gold', `
+      <div class="mkt-name">🥇 금 현물 (XAU/USD)</div>
+      <div class="mkt-price">${d.gold.price.toLocaleString('en-US', {maximumFractionDigits:2})}<span style="font-size:14px;color:#94a3b8;margin-left:4px">$</span></div>
+      <div class="${d.gold.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.gold.chg >= 0 ? '+' : ''}${d.gold.chg.toFixed(2)} (${d.gold.chgPct >= 0 ? '+' : ''}${d.gold.chgPct.toFixed(2)}%)</div>`);
+
+    if (d.us10y) {
+      const r10 = d.us10y.price;
+      const rColor = r10 >= 4.5 ? '#f87171' : r10 >= 3.5 ? '#fbbf24' : '#34d399';
+      setCard('mkt-us10y', `
+        <div class="mkt-name">🏦 미국 10년 국채금리</div>
+        <div class="mkt-price" style="color:${rColor}">${r10.toFixed(3)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">%</span></div>
+        <div class="${d.us10y.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.us10y.chg >= 0 ? '+' : ''}${d.us10y.chg.toFixed(3)}%p</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">${r10 >= 4.5 ? '⚠️ 고금리 구간' : r10 >= 3.5 ? '중립 구간' : '저금리 구간'}</div>`);
+    }
 
     if (d.feargreed) {
       const v   = d.feargreed.value;
@@ -4417,7 +4438,7 @@ async function loadMarketData() {
     const updEl = document.getElementById('mkt-updated');
     if (updEl) updEl.textContent = `${now} 기준`;
   } catch (e) {
-    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-us10y'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = `<div class="mkt-loading" style="color:#f87171">로드 실패<br><span style="font-size:10px;color:#94a3b8">${e.message}</span></div>`;
     });

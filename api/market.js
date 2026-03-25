@@ -28,20 +28,20 @@ export default async function handler(req, res) {
     return { price, chg, chgPct };
   };
 
-  /* ── Stooq CSV (미국 지수·환율·VIX) ── */
+  /* ── Stooq CSV (미국 지수·환율·VIX 등) ── */
   const fetchStooq = async (symbol) => {
     const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&i=d`;
     const r   = await fetch(url, { headers: ua });
     if (!r.ok) throw new Error(`Stooq ${symbol} HTTP ${r.status}`);
     const text  = await r.text();
     const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-    if (lines.length < 2) throw new Error(`Stooq ${symbol}: rows < 2`);
+    if (lines.length < 1) throw new Error(`Stooq ${symbol}: no data`);
     const last  = lines[lines.length - 1].split(',');
-    const prev  = lines[lines.length - 2].split(',');
     const price = parseFloat(last[4]);   // Close
-    const prevC = parseFloat(prev[4]);
-    if (isNaN(price) || isNaN(prevC) || price === 0) throw new Error(`Stooq ${symbol}: parse fail`);
-    return { price, chg: price - prevC, chgPct: (price - prevC) / prevC * 100 };
+    if (isNaN(price) || price === 0) throw new Error(`Stooq ${symbol}: parse fail`);
+    // 전일 데이터가 없으면 변동 0으로 처리
+    const prevC = lines.length >= 2 ? parseFloat(lines[lines.length - 2].split(',')[4]) : price;
+    return { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
   };
 
   /* ── CNN 공포탐욕지수 ── */
@@ -55,14 +55,16 @@ export default async function handler(req, res) {
     return { value: Math.round(fg.score), label: fg.rating };
   };
 
-  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, fg] = await Promise.allSettled([
+  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, gold, us10y, fg] = await Promise.allSettled([
     fetchNaver('KOSPI'),
     fetchNaver('KOSDAQ'),
     fetchStooq('^ndq'),     // NASDAQ Composite
     fetchStooq('^spx'),     // S&P 500
     fetchStooq('^dji'),     // Dow Jones
     fetchStooq('usdkrw'),   // USD/KRW
-    fetchStooq('^vix'),     // CBOE VIX
+    fetchStooq('vix'),      // CBOE VIX (^vix → vix 으로 변경)
+    fetchStooq('xauusd'),   // Gold spot (USD/oz)
+    fetchStooq('us10y.b'),  // 미국 10년 국채금리
     fetchFearGreed(),
   ]);
 
@@ -78,12 +80,15 @@ export default async function handler(req, res) {
     dow:       ok(dow),
     usdkrw:    ok(usdkrw),
     vix:       ok(vix),
+    gold:      ok(gold),
+    us10y:     ok(us10y),
     feargreed: ok(fg),
     ts:        Date.now(),
     _errors: {
       kospi: err(kospi), kosdaq: err(kosdaq),
       nasdaq: err(nasdaq), sp500: err(sp500), dow: err(dow),
-      usdkrw: err(usdkrw), vix: err(vix), feargreed: err(fg),
+      usdkrw: err(usdkrw), vix: err(vix), gold: err(gold),
+      us10y: err(us10y), feargreed: err(fg),
     },
   });
 }
