@@ -4427,12 +4427,27 @@ async function loadMarketData() {
     if (d.feargreed) {
       const v   = d.feargreed.value;
       const { label, color } = _fgLabel(v);
+      const fgScales = [
+        { range: '0–24',  label: '극단적 공포', color: '#f87171', tip: '매수 기회 구간' },
+        { range: '25–44', label: '공포',        color: '#fb923c', tip: '시장 불안 심리' },
+        { range: '45–55', label: '중립',        color: '#facc15', tip: '관망 구간' },
+        { range: '56–75', label: '탐욕',        color: '#4ade80', tip: '과열 주의' },
+        { range: '76–100',label: '극단적 탐욕', color: '#34d399', tip: '매도 고려 구간' },
+      ];
       setCard('mkt-feargreed', `
-        <div class="mkt-name">😱 공포탐욕지수</div>
+        <div class="mkt-name">😱 공포탐욕지수 (CNN)</div>
         <div class="mkt-price" style="color:${color}">${v}<span style="font-size:14px;color:#94a3b8;margin-left:4px">/ 100</span></div>
-        <div style="font-size:13px;font-weight:600;color:${color}">${label}</div>
+        <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:6px">${label}</div>
         <div class="mkt-fg-bar"><div class="mkt-fg-dot" style="left:${v}%"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569"><span>공포</span><span>중립</span><span>탐욕</span></div>`);
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569;margin-bottom:10px"><span>공포</span><span>중립</span><span>탐욕</span></div>
+        <div style="border-top:1px solid #1e293b;padding-top:8px">
+          ${fgScales.map(s => `
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0;${v >= parseInt(s.range) && v <= parseInt(s.range.split('–')[1]) ? 'box-shadow:0 0 5px '+s.color : ''}"></span>
+            <span style="font-size:11px;color:${s.color};font-weight:${label===s.label?'700':'400'};min-width:70px">${s.range} ${s.label}</span>
+            <span style="font-size:10px;color:#475569">${s.tip}</span>
+          </div>`).join('')}
+        </div>`);
     }
 
     const updEl = document.getElementById('mkt-updated');
