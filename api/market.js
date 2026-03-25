@@ -55,11 +55,12 @@ export default async function handler(req, res) {
     return { value: Math.round(fg.score), label: fg.rating };
   };
 
-  const [kospi, kosdaq, nasdaq, sp500, usdkrw, vix, fg] = await Promise.allSettled([
+  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, fg] = await Promise.allSettled([
     fetchNaver('KOSPI'),
     fetchNaver('KOSDAQ'),
     fetchStooq('^ndq'),     // NASDAQ Composite
     fetchStooq('^spx'),     // S&P 500
+    fetchStooq('^dji'),     // Dow Jones
     fetchStooq('usdkrw'),   // USD/KRW
     fetchStooq('^vix'),     // CBOE VIX
     fetchFearGreed(),
@@ -74,13 +75,14 @@ export default async function handler(req, res) {
     kosdaq:    ok(kosdaq),
     nasdaq:    ok(nasdaq),
     sp500:     ok(sp500),
-    usdkrw:   ok(usdkrw),
+    dow:       ok(dow),
+    usdkrw:    ok(usdkrw),
     vix:       ok(vix),
     feargreed: ok(fg),
     ts:        Date.now(),
     _errors: {
       kospi: err(kospi), kosdaq: err(kosdaq),
-      nasdaq: err(nasdaq), sp500: err(sp500),
+      nasdaq: err(nasdaq), sp500: err(sp500), dow: err(dow),
       usdkrw: err(usdkrw), vix: err(vix), feargreed: err(fg),
     },
   });

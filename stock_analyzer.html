@@ -943,9 +943,10 @@
 
   <!-- 미국 시장 -->
   <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">🇺🇸 미국 시장</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
     <div id="mkt-nasdaq" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-sp500" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-dow" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
   </div>
 
   <!-- 주요 지표 -->
@@ -4361,7 +4362,7 @@ function _fgLabel(v) {
 async function loadMarketData() {
   const btn = document.getElementById('mkt-refresh-btn');
   if (btn) { btn.textContent = '⟳ 로딩 중...'; btn.disabled = true; }
-  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="mkt-loading">로딩 중...</div>';
   });
@@ -4381,11 +4382,16 @@ async function loadMarketData() {
       if (el) el.innerHTML = html;
     };
 
-    if (d.kospi)  setCard('mkt-kospi',  _mktCard('mkt-kospi',  '🇰🇷 코스피',  d.kospi.price.toLocaleString('ko-KR', {maximumFractionDigits:2}),  d.kospi.chg,  d.kospi.chgPct));
-    if (d.kosdaq) setCard('mkt-kosdaq', _mktCard('mkt-kosdaq', '🇰🇷 코스닥',  d.kosdaq.price.toLocaleString('ko-KR', {maximumFractionDigits:2}), d.kosdaq.chg, d.kosdaq.chgPct));
-    if (d.nasdaq) setCard('mkt-nasdaq', _mktCard('mkt-nasdaq', '🇺🇸 나스닥',  d.nasdaq.price.toLocaleString('en-US', {maximumFractionDigits:2}), d.nasdaq.chg, d.nasdaq.chgPct));
-    if (d.sp500)  setCard('mkt-sp500',  _mktCard('mkt-sp500',  '🇺🇸 S&P 500', d.sp500.price.toLocaleString('en-US', {maximumFractionDigits:2}),  d.sp500.chg,  d.sp500.chgPct));
+    const noData = (id) => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="mkt-loading" style="color:#475569">데이터 없음</div>'; };
+    d.kospi  ? setCard('mkt-kospi',  _mktCard('mkt-kospi',  '🇰🇷 코스피',  d.kospi.price.toLocaleString('ko-KR', {maximumFractionDigits:2}),  d.kospi.chg,  d.kospi.chgPct))  : noData('mkt-kospi');
+    d.kosdaq ? setCard('mkt-kosdaq', _mktCard('mkt-kosdaq', '🇰🇷 코스닥',  d.kosdaq.price.toLocaleString('ko-KR', {maximumFractionDigits:2}), d.kosdaq.chg, d.kosdaq.chgPct)) : noData('mkt-kosdaq');
+    d.nasdaq ? setCard('mkt-nasdaq', _mktCard('mkt-nasdaq', '🇺🇸 나스닥',  d.nasdaq.price.toLocaleString('en-US', {maximumFractionDigits:2}), d.nasdaq.chg, d.nasdaq.chgPct)) : noData('mkt-nasdaq');
+    d.sp500  ? setCard('mkt-sp500',  _mktCard('mkt-sp500',  '🇺🇸 S&P 500', d.sp500.price.toLocaleString('en-US', {maximumFractionDigits:2}),  d.sp500.chg,  d.sp500.chgPct))  : noData('mkt-sp500');
+    d.dow    ? setCard('mkt-dow',    _mktCard('mkt-dow',    '🇺🇸 다우존스', d.dow.price.toLocaleString('en-US', {maximumFractionDigits:2}),    d.dow.chg,    d.dow.chgPct))    : noData('mkt-dow');
 
+    if (!d.usdkrw) noData('mkt-usdkrw');
+    if (!d.vix) noData('mkt-vix');
+    if (!d.feargreed) noData('mkt-feargreed');
     if (d.usdkrw) setCard('mkt-usdkrw', `
       <div class="mkt-name">💱 원/달러 환율</div>
       <div class="mkt-price">${d.usdkrw.price.toFixed(1)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">₩</span></div>
@@ -4411,7 +4417,7 @@ async function loadMarketData() {
     const updEl = document.getElementById('mkt-updated');
     if (updEl) updEl.textContent = `${now} 기준`;
   } catch (e) {
-    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
+    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = `<div class="mkt-loading" style="color:#f87171">로드 실패<br><span style="font-size:10px;color:#94a3b8">${e.message}</span></div>`;
     });
