@@ -1617,10 +1617,9 @@ function renderCalendar(data) {
       }
     }
 
-    // 상장일 — date_list가 있으면 표시 (배정주수 없어도 예정 표시)
-    if (ipo.date_list && !['청약포기','배정실패'].includes(status)) {
-      const allocLabel = (ipo.shares_alloc > 0) ? ` (${ipo.shares_alloc}주)` : '';
-      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장${allocLabel}`, ipo);
+    // 상장일 — 배정주수가 있는 경우에만 표시
+    if (ipo.date_list && (ipo.shares_alloc > 0) && !['청약포기','배정실패'].includes(status)) {
+      add(ipo.date_list, 'ipo-list', `🚀 ${name} 상장 (${ipo.shares_alloc}주)`, ipo);
     }
   });
 
@@ -1773,9 +1772,10 @@ function showDayDetail(key) {
     };
     ipoEvs.forEach(ev => {
       const ipo = ev.detail;
-      const ipoProfit = (ipo.price_open && ipo.price_ipo && ipo.shares_alloc > 0)
-        ? (ipo.price_open - ipo.price_ipo) * ipo.shares_alloc : null;
-      const ipoRetPct = (ipo.price_open && ipo.price_ipo)
+      const _sellQty  = ipo.sell_qty || ipo.shares_alloc || 0;
+      const ipoProfit = (ipo.price_open && ipo.price_ipo && _sellQty > 0)
+        ? (ipo.price_open - ipo.price_ipo) * _sellQty - 2000 : null;
+      const ipoRetPct = (ipo.price_open && ipo.price_ipo && ipo.shares_alloc > 0)
         ? ((ipo.price_open - ipo.price_ipo) / ipo.price_ipo * 100) : null;
       html += `<div class="day-modal-ev">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -1816,21 +1816,35 @@ function showDayDetail(key) {
 
         ${ev.type === 'ipo-list' ? `
         <div style="margin-top:12px;padding:12px;background:#0d2010;border-radius:8px;border:1px solid #166534">
-          <div style="font-size:12px;color:#86efac;font-weight:600;margin-bottom:10px">💰 매도 결과 입력 (step 4)</div>
-          <div style="margin-bottom:10px">
-            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">실제 매도가 (원)</label>
-            <input type="number" id="list-price-${ipo.id}" min="0" value="${ipo.price_open||''}" placeholder="매도한 가격 입력"
-              style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+          <div style="font-size:12px;color:#86efac;font-weight:600;margin-bottom:10px">💰 매도 결과 입력</div>
+          <div style="display:grid;grid-template-columns:1fr 70px;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">매도가 (원)</label>
+              <input type="number" id="list-price-${ipo.id}" min="0" value="${ipo.price_open||''}" placeholder="매도한 가격"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">수량</label>
+              <input type="number" id="list-qty-${ipo.id}" min="0" value="${ipo.sell_qty||ipo.shares_alloc||''}"
+                style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;box-sizing:border-box;text-align:center">
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">매도일</label>
+            <input type="date" id="list-date-${ipo.id}" value="${ipo.sell_date||ipo.date_list||''}"
+              style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;box-sizing:border-box">
           </div>
           ${ipoProfit !== null ? `
-          <div style="padding:8px;background:#111827;border-radius:6px;margin-bottom:10px;font-size:13px">
-            수익: <strong style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'}">${ipoProfit >= 0 ? '+' : ''}${ipoProfit.toLocaleString()}원</strong>
-            <span style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'};margin-left:8px">(${ipoRetPct >= 0 ? '+' : ''}${ipoRetPct.toFixed(1)}%)</span>
+          <div style="padding:8px;background:#111827;border-radius:6px;margin-bottom:8px;font-size:13px">
+            순수익 (수수료 2,000원 차감):
+            <strong style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'}">${ipoProfit >= 0 ? '+' : ''}${ipoProfit.toLocaleString()}원</strong>
+            ${ipoRetPct !== null ? `<span style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'};margin-left:8px">(${ipoRetPct >= 0 ? '+' : ''}${ipoRetPct.toFixed(1)}%)</span>` : ''}
           </div>` : ''}
           <button onclick="saveListPriceFromModal(${ipo.id})"
             style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
-            💰 저장 후 공모주 탭에서 수익 확인
+            💾 매도 기록 저장
           </button>
+          <div style="font-size:10px;color:#475569;margin-top:6px;text-align:center">투자금 = 배정수량 × 공모가 · 수수료 2,000원 자동 차감</div>
         </div>` : ''}
 
         ${ipo.score != null ? (() => {
@@ -2741,18 +2755,30 @@ async function markSubscribed(id) {
   alert(`✅ ${r.name} 청약완료!\n배정확인일(${allotDate})이 캘린더에 추가됐습니다.`);
 }
 
-// step4: 상장일 모달에서 매도가 저장 → 공모주 탭으로 이동
+// step4: 상장일 모달에서 매도가 저장
 async function saveListPriceFromModal(id) {
-  const priceEl = document.getElementById(`list-price-${id}`);
-  const price = parseInt(priceEl?.value) || 0;
+  const price = parseInt(document.getElementById(`list-price-${id}`)?.value) || 0;
+  const qty   = parseInt(document.getElementById(`list-qty-${id}`)?.value)   || 0;
+  const date  = document.getElementById(`list-date-${id}`)?.value || '';
   if (!price) { alert('매도가를 입력하세요'); return; }
   const idx = _ipoRecords.findIndex(r => r.id == id);
   if (idx === -1) return;
   _ipoRecords[idx].price_open = price;
+  if (qty)  _ipoRecords[idx].sell_qty  = qty;
+  if (date) _ipoRecords[idx].sell_date = date;
   _ipoRecords[idx].status = autoStatus(_ipoRecords[idx]);
   await saveIpoRecords();
   document.getElementById('day-modal-overlay').classList.remove('open');
-  gotoIpoTab();
+  // 대시보드 캘린더 갱신
+  if (_dashData) { _dashData.ipo = _ipoRecords; renderCalendar(_dashData); }
+  const rec = _ipoRecords[idx];
+  const sellQty = rec.sell_qty || rec.shares_alloc || 0;
+  const profit  = rec.price_open && rec.price_ipo && sellQty > 0
+    ? (rec.price_open - rec.price_ipo) * sellQty - 2000 : null;
+  const msg = profit !== null
+    ? `✅ 매도 기록 저장 완료!\n${rec.name}\n순수익: ${profit >= 0 ? '+' : ''}${profit.toLocaleString()}원 (수수료 2,000원 차감)`
+    : `✅ ${rec.name} 매도 기록이 저장됐습니다.`;
+  alert(msg);
 }
 
 // 공모주 탭으로 프로그래매틱 이동
