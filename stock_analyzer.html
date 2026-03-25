@@ -1020,7 +1020,7 @@
 </div><!-- /tab-etf -->
 
 <!-- 월배당 목표 시뮬레이터 모달 -->
-<div id="msim-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;overflow-y:auto;padding:20px" onclick="closeMonthlySim(event)">
+<div id="msim-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;overflow-y:auto;padding:20px" onmousedown="_modalDownTarget=event.target" onmouseup="if(_modalDownTarget===this&&event.target===this)closeMonthlySim()">
   <div style="background:#1e2d45;border-radius:16px;max-width:700px;margin:32px auto;padding:24px" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <h3 style="margin:0;color:#f1f5f9;font-size:16px">🎯 월배당 목표 달성 시뮬레이터</h3>
@@ -1121,7 +1121,7 @@
 </div>
 
 <!-- 배당 재투자 계산기 모달 -->
-<div id="drip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow-y:auto;padding:20px" onclick="closeDripModal(event)">
+<div id="drip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow-y:auto;padding:20px" onmousedown="_modalDownTarget=event.target" onmouseup="if(_modalDownTarget===this&&event.target===this)closeDripModal()">
   <div style="background:#1e2d45;border-radius:16px;max-width:680px;margin:32px auto;padding:24px" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <h3 style="margin:0;color:#f1f5f9;font-size:16px">💰 배당 재투자 시뮬레이션</h3>
@@ -3889,8 +3889,7 @@ function openMonthlySim() {
   calcMonthlySim();
 }
 
-function closeMonthlySim(e) {
-  if (e && e.target !== document.getElementById('msim-modal')) return;
+function closeMonthlySim() {
   document.getElementById('msim-modal').style.display = 'none';
 }
 
@@ -4054,8 +4053,7 @@ function openDripModal() {
   calcDrip();
 }
 
-function closeDripModal(e) {
-  if (e && e.target !== document.getElementById('drip-modal')) return;
+function closeDripModal() {
   document.getElementById('drip-modal').style.display = 'none';
 }
 
