@@ -3270,7 +3270,10 @@ async function saveDivEntry() {
     });
     if (!resp.ok) throw new Error('저장 실패');
     _divRecords.push(record);
+    const expandState = getDivExpandState();
     renderDivHistory();
+    applyDivExpandState(expandState);
+    expandDivYm(ym);   // 새로 저장한 연도·월 자동 펼침
     closeDivModal();
   } catch (e) {
     alert('저장 중 오류: ' + e.message);
@@ -3366,7 +3369,7 @@ function renderDivHistory() {
             </div>`).join('');
 
           return `<div class="div-month-group">
-            <div class="div-month-header" onclick="toggleDivMonth(this)">
+            <div class="div-month-header" data-ym="${ym}" onclick="toggleDivMonth(this)">
               <span style="display:flex;align-items:center;gap:6px">
                 <span class="div-toggle-icon">▶</span>
                 <span>📅 ${label}</span>
@@ -3379,7 +3382,7 @@ function renderDivHistory() {
         }).join('');
 
       return `<div class="div-year-group">
-        <div class="div-year-header" onclick="toggleDivYear(this)">
+        <div class="div-year-header" data-yr="${yr}" onclick="toggleDivYear(this)">
           <span style="display:flex;align-items:center;gap:8px">
             <span class="div-toggle-icon" style="font-size:11px">▶</span>
             <span>📆 ${yr}년</span>
@@ -3424,6 +3427,52 @@ function toggleDivYear(header) {
   body.style.display = collapsed ? '' : 'none';
   const icon = header.querySelector('.div-toggle-icon');
   if (icon) icon.textContent = collapsed ? '▼' : '▶';
+}
+
+// 현재 펼쳐진 연도·월 상태 수집
+function getDivExpandState() {
+  const state = new Set();
+  document.querySelectorAll('.div-year-header').forEach(h => {
+    if (h.querySelector('.div-toggle-icon')?.textContent === '▼')
+      state.add('yr:' + h.dataset.yr);
+  });
+  document.querySelectorAll('.div-month-header').forEach(h => {
+    if (h.querySelector('.div-toggle-icon')?.textContent === '▼')
+      state.add('mo:' + h.dataset.ym);
+  });
+  return state;
+}
+
+// 저장된 상태 복원
+function applyDivExpandState(state) {
+  document.querySelectorAll('.div-year-header').forEach(h => {
+    if (state.has('yr:' + h.dataset.yr)) _openDivSection(h);
+  });
+  document.querySelectorAll('.div-month-header').forEach(h => {
+    if (state.has('mo:' + h.dataset.ym)) _openDivSection(h);
+  });
+}
+
+// 특정 ym의 연도·월 강제 펼침
+function expandDivYm(ym) {
+  if (!ym) return;
+  const yr = ym.slice(0, 4);
+  document.querySelectorAll('.div-year-header').forEach(h => {
+    if (h.dataset.yr === yr) _openDivSection(h);
+  });
+  document.querySelectorAll('.div-month-header').forEach(h => {
+    if (h.dataset.ym === ym) {
+      _openDivSection(h);
+      h.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
+}
+
+function _openDivSection(header) {
+  const body = header.nextElementSibling;
+  if (body) body.style.display = '';
+  const icon = header.querySelector('.div-toggle-icon');
+  if (icon) icon.textContent = '▼';
 }
 
 function editEtf(id) { openEtfModal(id); }
