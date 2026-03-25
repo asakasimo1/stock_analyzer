@@ -1858,10 +1858,16 @@ function showDayDetail(key) {
             <strong style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'}">${ipoProfit >= 0 ? '+' : ''}${ipoProfit.toLocaleString()}원</strong>
             ${ipoRetPct !== null ? `<span style="color:${ipoProfit >= 0 ? '#34d399':'#f87171'};margin-left:8px">(${ipoRetPct >= 0 ? '+' : ''}${ipoRetPct.toFixed(1)}%)</span>` : ''}
           </div>` : ''}
-          <button onclick="saveListPriceFromModal(${ipo.id})"
-            style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
-            💾 매도 기록 저장
-          </button>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+            <button onclick="saveListPriceFromModal(${ipo.id})"
+              style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">
+              💾 매도 기록 저장
+            </button>
+            <button onclick="removeListDate(${ipo.id})" title="상장일 등록 삭제 (배정 완료 상태로 되돌림)"
+              style="background:#374151;color:#9ca3af;border:none;border-radius:6px;padding:10px;font-size:13px;cursor:pointer">
+              🗑 상장일 삭제
+            </button>
+          </div>
           <div style="font-size:10px;color:#475569;margin-top:6px;text-align:center">투자금 = 배정수량 × 공모가 · 수수료 2,000원 자동 차감</div>
         </div>` : ''}
 
@@ -2767,6 +2773,22 @@ async function cancelAllot(id) {
   _ipoRecords[idx].shares_alloc = 0;
   _ipoRecords[idx].date_list    = '';
   _ipoRecords[idx].status       = autoStatus(_ipoRecords[idx]);
+  await saveIpoRecords();
+  if (_dashData) { _dashData.ipo = _ipoRecords; renderCalendar(_dashData); }
+  else renderCalendar({ ipo: _ipoRecords });
+  document.getElementById('day-modal-overlay').classList.remove('open');
+}
+
+// 상장일 삭제 — date_list 초기화 후 배정완료(상장일 미입력) 상태로 복원
+async function removeListDate(id) {
+  if (!confirm('상장일 등록을 삭제할까요?\n(배정 완료 상태로 되돌아갑니다)')) return;
+  const idx = _ipoRecords.findIndex(r => r.id == id);
+  if (idx === -1) return;
+  _ipoRecords[idx].date_list  = '';
+  _ipoRecords[idx].price_open = 0;
+  _ipoRecords[idx].sell_qty   = 0;
+  _ipoRecords[idx].sell_date  = '';
+  _ipoRecords[idx].status     = autoStatus(_ipoRecords[idx]);
   await saveIpoRecords();
   if (_dashData) { _dashData.ipo = _ipoRecords; renderCalendar(_dashData); }
   else renderCalendar({ ipo: _ipoRecords });
