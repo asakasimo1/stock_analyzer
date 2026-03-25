@@ -1006,13 +1006,119 @@
     </div>
   </div>
 
-  <!-- 배당 재투자 계산기 버튼 -->
-  <button onclick="openDripModal()" style="width:100%;margin-top:16px;padding:14px;background:linear-gradient(135deg,#1e3a5f,#1e2d45);color:#60a5fa;border:1.5px solid #2563eb;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.3px">
-    💰 배당 재투자 계산기 (5년 시뮬레이션)
-  </button>
+  <!-- 버튼 2개 가로 배치 -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+    <button onclick="openDripModal()" style="padding:14px;background:linear-gradient(135deg,#1e3a5f,#1e2d45);color:#60a5fa;border:1.5px solid #2563eb;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer">
+      💰 배당 재투자 계산기
+    </button>
+    <button onclick="openMonthlySim()" style="padding:14px;background:linear-gradient(135deg,#1a3a2a,#1e2d45);color:#34d399;border:1.5px solid #10b981;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer">
+      🎯 월배당 목표 시뮬레이터
+    </button>
+  </div>
 
 </div>
 </div><!-- /tab-etf -->
+
+<!-- 월배당 목표 시뮬레이터 모달 -->
+<div id="msim-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;overflow-y:auto;padding:20px" onclick="closeMonthlySim(event)">
+  <div style="background:#1e2d45;border-radius:16px;max-width:700px;margin:32px auto;padding:24px" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h3 style="margin:0;color:#f1f5f9;font-size:16px">🎯 월배당 목표 달성 시뮬레이터</h3>
+      <button onclick="closeMonthlySim()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <p style="margin:0 0 16px;font-size:12px;color:#64748b">매월 추가 투자 + 배당 재투자로 목표 월배당에 도달하는 시점을 계산합니다.</p>
+
+    <!-- 입력 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:11px;color:#94a3b8">현재 투자금 (만원)</label>
+        <input id="ms-invest" type="number" min="0" step="100" oninput="calcMonthlySim()"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">연 배당률 (%)</label>
+        <input id="ms-yield" type="number" min="0" max="30" step="0.1" oninput="calcMonthlySim()"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">월 추가 투자금 (만원)</label>
+        <input id="ms-monthly-add" type="number" min="0" step="10" value="50" oninput="calcMonthlySim()"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;color:#94a3b8">목표 월 배당금 (만원)</label>
+        <input id="ms-target" type="number" min="1" step="10" value="200" oninput="calcMonthlySim()"
+          style="width:100%;margin-top:4px;padding:10px;background:#111827;border:1px solid #1e2d45;border-radius:8px;color:#f1f5f9;font-size:14px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input id="ms-reinvest" type="checkbox" checked onchange="calcMonthlySim()" style="accent-color:#10b981">
+        배당 재투자
+      </label>
+      <label style="font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input id="ms-tax" type="checkbox" checked onchange="calcMonthlySim()" style="accent-color:#10b981">
+        세금 차감 (15.4%)
+      </label>
+      <div style="font-size:11px;color:#94a3b8">연 주가상승률 (%):
+        <input id="ms-price-grow" type="number" value="3" step="0.5" min="-10" max="30" oninput="calcMonthlySim()"
+          style="width:60px;padding:4px 6px;background:#111827;border:1px solid #1e2d45;border-radius:6px;color:#f1f5f9;font-size:12px;margin-left:4px">
+      </div>
+    </div>
+
+    <!-- 요약 배지 -->
+    <div id="ms-summary-wrap" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">현재 월 배당</div>
+        <div id="ms-cur-div" style="font-size:15px;font-weight:700;color:#f1f5f9">-</div>
+      </div>
+      <div style="background:#0d2318;border:1px solid #10b981;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">🎯 목표 달성 시기</div>
+        <div id="ms-reach-when" style="font-size:15px;font-weight:700;color:#34d399">-</div>
+        <div id="ms-reach-sub" style="font-size:10px;color:#6ee7b7;margin-top:2px">-</div>
+      </div>
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">달성 시 총 투자금</div>
+        <div id="ms-reach-total-inv" style="font-size:15px;font-weight:700;color:#60a5fa">-</div>
+      </div>
+      <div style="background:#111827;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px">달성 시 포트폴리오</div>
+        <div id="ms-reach-portfolio" style="font-size:15px;font-weight:700;color:#a78bfa">-</div>
+      </div>
+    </div>
+
+    <!-- 차트 -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:#94a3b8">📈 월 배당금 성장 추이</span>
+        <span style="font-size:10px;color:#64748b">월 단위</span>
+      </div>
+      <svg id="ms-chart" width="100%" height="200" style="overflow:visible;display:block"></svg>
+      <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:#94a3b8">
+        <span><span style="display:inline-block;width:12px;height:3px;background:#34d399;vertical-align:middle;margin-right:4px;border-radius:2px"></span>월 배당금</span>
+        <span><span style="display:inline-block;width:24px;height:2px;background:#f59e0b;vertical-align:middle;margin-right:4px;border-radius:2px;opacity:0.8" style="border-top:2px dashed #f59e0b"></span>목표선</span>
+      </div>
+    </div>
+
+    <!-- 연도별 테이블 -->
+    <div style="font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:8px">📋 연도별 진행 현황</div>
+    <div style="overflow-x:auto;border-radius:8px;border:1px solid #1e2d45;max-height:220px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0">
+          <tr style="background:#111827;color:#64748b">
+            <th style="padding:8px 10px;text-align:center;font-weight:600">시점</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">포트폴리오</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">누적 투자금</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">월 배당금</th>
+            <th style="padding:8px 10px;text-align:right;font-weight:600">목표대비</th>
+          </tr>
+        </thead>
+        <tbody id="ms-table-body"></tbody>
+      </table>
+    </div>
+    <p style="margin:12px 0 0;font-size:10px;color:#475569;text-align:center">⚠️ 참고용 시뮬레이션입니다. 배당률·주가는 변동될 수 있습니다.</p>
+  </div>
+</div>
 
 <!-- 배당 재투자 계산기 모달 -->
 <div id="drip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow-y:auto;padding:20px" onclick="closeDripModal(event)">
@@ -3761,6 +3867,170 @@ async function refreshAllEtfPrices(silent = false) {
 
 // 버튼 라벨 1분마다 갱신 (남은 시간 표시)
 setInterval(_updateRefreshBtnLabel, 60000);
+
+// ══════════════════════════════════════════════════════════════════
+// 월배당 목표 달성 시뮬레이터
+// ══════════════════════════════════════════════════════════════════
+function openMonthlySim() {
+  // 현재 포트폴리오 기본값 세팅
+  if (_etfRecords && _etfRecords.length > 0) {
+    const buyTotal = _etfRecords.reduce((s,r) => s + (r.qty||0)*(r.avg_price||0), 0);
+    const divPre   = _etfRecords.reduce((s,r) => {
+      if (!r.current_price || !r.annual_div_rate || r.div_cycle==='무배당') return s;
+      return s + r.current_price*(r.annual_div_rate/100)*(r.qty||0);
+    }, 0);
+    if (buyTotal > 0) {
+      document.getElementById('ms-invest').value = Math.round(buyTotal / 10000);
+      const yieldPct = divPre / buyTotal * 100;
+      if (yieldPct > 0) document.getElementById('ms-yield').value = yieldPct.toFixed(1);
+    }
+  }
+  document.getElementById('msim-modal').style.display = 'block';
+  calcMonthlySim();
+}
+
+function closeMonthlySim(e) {
+  if (e && e.target !== document.getElementById('msim-modal')) return;
+  document.getElementById('msim-modal').style.display = 'none';
+}
+
+function calcMonthlySim() {
+  const initInvest  = (parseFloat(document.getElementById('ms-invest').value)      || 0) * 10000;
+  const annYield    = (parseFloat(document.getElementById('ms-yield').value)        || 0) / 100;
+  const monthlyAdd  = (parseFloat(document.getElementById('ms-monthly-add').value) || 0) * 10000;
+  const targetDiv   = (parseFloat(document.getElementById('ms-target').value)      || 200) * 10000;
+  const priceGrow   = (parseFloat(document.getElementById('ms-price-grow').value)  || 0)  / 100;
+  const doReinvest  = document.getElementById('ms-reinvest').checked;
+  const doTax       = document.getElementById('ms-tax').checked;
+  const TAX         = 0.154;
+
+  if (initInvest <= 0 || annYield <= 0) return;
+
+  const mPriceGrow  = Math.pow(1 + priceGrow, 1/12) - 1;
+  const mYieldBase  = annYield / 12;
+  const taxRate     = doTax ? (1 - TAX) : 1;
+
+  let portfolio     = initInvest;   // 포트폴리오 평가액 (주가 상승 반영)
+  let costBasis     = initInvest;   // 누적 투자 원금
+  let reachMonth    = null;
+  let reachPortfolio= 0;
+  let reachCostBasis= 0;
+
+  const MAX_MONTHS  = 30 * 12;      // 최대 30년
+  const chartDiv    = [];           // 월별 세후 배당
+  const yearRows    = [];
+
+  // 현재 월 배당
+  const curMonthDiv = initInvest * mYieldBase * taxRate;
+  document.getElementById('ms-cur-div').textContent = fmtW(curMonthDiv) + '/월';
+
+  for (let m = 1; m <= MAX_MONTHS; m++) {
+    // 주가 상승
+    portfolio  = (portfolio + monthlyAdd) * (1 + mPriceGrow);
+    costBasis += monthlyAdd;
+
+    // 월 배당 (세후)
+    const mDiv = portfolio * mYieldBase * taxRate;
+
+    // 배당 재투자
+    if (doReinvest) portfolio += mDiv;
+
+    chartDiv.push(mDiv);
+
+    // 목표 최초 달성
+    if (!reachMonth && mDiv >= targetDiv) {
+      reachMonth     = m;
+      reachPortfolio = portfolio;
+      reachCostBasis = costBasis;
+    }
+
+    // 연도별 행 (12개월마다)
+    if (m % 12 === 0) {
+      yearRows.push({ yr: m/12, portfolio, costBasis, mDiv,
+        pct: mDiv / targetDiv * 100, reached: mDiv >= targetDiv });
+      if (reachMonth && m > reachMonth + 36) break; // 달성 후 3년까지만
+    }
+  }
+
+  // 요약 배지
+  if (reachMonth) {
+    const yrs = Math.floor(reachMonth / 12);
+    const mos = reachMonth % 12;
+    document.getElementById('ms-reach-when').textContent =
+      yrs > 0 ? `${yrs}년 ${mos > 0 ? mos+'개월' : ''}` : `${mos}개월`;
+    document.getElementById('ms-reach-sub').textContent = `약 ${reachMonth}개월 후`;
+    document.getElementById('ms-reach-total-inv').textContent = fmtW(reachCostBasis);
+    document.getElementById('ms-reach-portfolio').textContent = fmtW(reachPortfolio);
+  } else {
+    document.getElementById('ms-reach-when').textContent = '30년 내 미달성';
+    document.getElementById('ms-reach-sub').textContent = '투자금 또는 배당률 조정 필요';
+    document.getElementById('ms-reach-total-inv').textContent = '-';
+    document.getElementById('ms-reach-portfolio').textContent = '-';
+  }
+
+  // 테이블
+  const tbody = document.getElementById('ms-table-body');
+  tbody.innerHTML = yearRows.map(r => `
+    <tr style="border-top:1px solid #1e2d45;color:#f1f5f9;${r.reached?'background:#0d1f15':''}">
+      <td style="padding:7px 10px;text-align:center;color:${r.reached?'#34d399':'#94a3b8'}">${r.yr}년 후${r.reached?' 🎯':''}</td>
+      <td style="padding:7px 10px;text-align:right">${fmtW(r.portfolio)}</td>
+      <td style="padding:7px 10px;text-align:right;color:#64748b">${fmtW(r.costBasis)}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600;color:${r.mDiv>=targetDiv?'#34d399':'#f1f5f9'}">${fmtW(r.mDiv)}</td>
+      <td style="padding:7px 10px;text-align:right;color:${r.pct>=100?'#34d399':'#94a3b8'}">${r.pct.toFixed(0)}%</td>
+    </tr>`).join('');
+
+  // SVG 차트 (월 단위)
+  const svg = document.getElementById('ms-chart');
+  const W   = svg.parentElement.offsetWidth || 640;
+  const H   = 200;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const displayMonths = Math.min(chartDiv.length, (reachMonth ? reachMonth + 36 : MAX_MONTHS));
+  const displayData   = chartDiv.slice(0, displayMonths);
+  const maxDiv        = Math.max(...displayData, targetDiv) * 1.1;
+  const PAD = { left: 50, right: 12, top: 12, bottom: 28 };
+  const cw  = W - PAD.left - PAD.right;
+  const ch  = H - PAD.top  - PAD.bottom;
+
+  const xPos = (m) => PAD.left + (m / displayMonths) * cw;
+  const yPos = (v)  => PAD.top  + ch - (v / maxDiv) * ch;
+
+  // Y 그리드
+  let grid = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (ch/4)*i;
+    const v = maxDiv * (1 - i/4);
+    grid += `<line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${W-PAD.right}" y2="${y.toFixed(1)}" stroke="#1e2d45" stroke-width="1"/>`;
+    grid += `<text x="${(PAD.left-4).toFixed(1)}" y="${(y+3).toFixed(1)}" fill="#475569" font-size="9" text-anchor="end">${fmtW(v)}</text>`;
+  }
+
+  // X 연도 라벨
+  let xLabels = '';
+  const step = Math.max(1, Math.ceil(displayMonths / 12 / 6)) * 12;
+  for (let m = 0; m <= displayMonths; m += step) {
+    xLabels += `<text x="${xPos(m).toFixed(1)}" y="${H-4}" fill="#475569" font-size="9" text-anchor="middle">${m===0?'시작':Math.round(m/12)+'년'}</text>`;
+  }
+
+  // 목표선
+  const ty = yPos(targetDiv).toFixed(1);
+  const targetLine = `
+    <line x1="${PAD.left}" y1="${ty}" x2="${W-PAD.right}" y2="${ty}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.8"/>
+    <text x="${(W-PAD.right+2).toFixed(1)}" y="${(parseFloat(ty)+3).toFixed(1)}" fill="#f59e0b" font-size="9">목표</text>`;
+
+  // 달성 수직선
+  let reachLine = '';
+  if (reachMonth && reachMonth <= displayMonths) {
+    const rx = xPos(reachMonth).toFixed(1);
+    reachLine = `<line x1="${rx}" y1="${PAD.top}" x2="${rx}" y2="${(PAD.top+ch).toFixed(1)}" stroke="#34d399" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.7"/>
+    <text x="${rx}" y="${(PAD.top-2).toFixed(1)}" fill="#34d399" font-size="9" text-anchor="middle">달성!</text>`;
+  }
+
+  // 월별 배당선
+  const path = displayData.map((v,i) => `${i===0?'M':'L'}${xPos(i+1).toFixed(1)},${yPos(v).toFixed(1)}`).join(' ');
+
+  svg.innerHTML = `${grid}${xLabels}${targetLine}${reachLine}
+    <path d="M${xPos(0).toFixed(1)},${yPos(initInvest*mYieldBase*taxRate).toFixed(1)} ${path}" fill="none" stroke="#34d399" stroke-width="2"/>`;
+}
 
 // ══════════════════════════════════════════════════════════════════
 // 배당 재투자 계산기
