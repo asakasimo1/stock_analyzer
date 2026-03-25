@@ -28,9 +28,11 @@ export default async function handler(req, res) {
     return { price, chg, chgPct };
   };
 
-  /* ── Stooq CSV (미국 지수·환율·VIX 등) ── */
+  /* ── Stooq CSV (미국 지수·환율·금 등) — 최근 30일 범위 지정으로 안정적 데이터 확보 ── */
   const fetchStooq = async (symbol) => {
-    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&i=d`;
+    const d2 = new Date(); const d1 = new Date(d2); d1.setDate(d1.getDate() - 30);
+    const fmt = d => d.toISOString().slice(0,10).replace(/-/g,'');
+    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&d1=${fmt(d1)}&d2=${fmt(d2)}&i=d`;
     const r   = await fetch(url, { headers: ua });
     if (!r.ok) throw new Error(`Stooq ${symbol} HTTP ${r.status}`);
     const text  = await r.text();
@@ -39,9 +41,25 @@ export default async function handler(req, res) {
     const last  = lines[lines.length - 1].split(',');
     const price = parseFloat(last[4]);   // Close
     if (isNaN(price) || price === 0) throw new Error(`Stooq ${symbol}: parse fail`);
-    // 전일 데이터가 없으면 변동 0으로 처리
     const prevC = lines.length >= 2 ? parseFloat(lines[lines.length - 2].split(',')[4]) : price;
     return { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
+  };
+
+  /* ── FRED CSV — 미국 10년 국채금리 (DGS10) ── */
+  const fetchUS10Y = async () => {
+    const r = await fetch('https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10', { headers: ua });
+    if (!r.ok) throw new Error(`FRED HTTP ${r.status}`);
+    const text  = await r.text();
+    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('DATE'));
+    // FRED는 결측값을 "." 으로 표기 — 뒤에서부터 유효값 탐색
+    let last = null, prev = null;
+    for (let i = lines.length - 1; i >= 0 && (!last || !prev); i--) {
+      const val = parseFloat(lines[i].split(',')[1]);
+      if (!isNaN(val) && val > 0) { if (!last) last = val; else if (!prev) prev = val; }
+    }
+    if (!last) throw new Error('FRED DGS10: no valid data');
+    const prevC = prev ?? last;
+    return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
   };
 
   /* ── CNN 공포탐욕지수 ── */
@@ -62,9 +80,9 @@ export default async function handler(req, res) {
     fetchStooq('^spx'),     // S&P 500
     fetchStooq('^dji'),     // Dow Jones
     fetchStooq('usdkrw'),   // USD/KRW
-    fetchStooq('vix'),      // CBOE VIX (^vix → vix 으로 변경)
+    fetchStooq('^vix'),     // CBOE VIX (30일 범위로 안정적)
     fetchStooq('xauusd'),   // Gold spot (USD/oz)
-    fetchStooq('us10y.b'),  // 미국 10년 국채금리
+    fetchUS10Y(),           // 미국 10년 국채금리 (FRED)
     fetchFearGreed(),
   ]);
 
