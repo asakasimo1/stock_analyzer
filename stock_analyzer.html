@@ -896,25 +896,6 @@
 <div id="tab-etf" class="tab-page">
 <div class="etf-wrap">
 
-  <!-- 배당 요약 KPI -->
-  <div class="etf-div-kpi-row">
-    <div class="etf-kpi">
-      <div class="etf-div-kpi-label">📥 연간 배당 (세전)</div>
-      <div class="etf-div-kpi-val" id="etf-k-div-pre">-</div>
-      <div class="etf-div-kpi-sub" id="etf-k-div-pre-sub"></div>
-    </div>
-    <div class="etf-kpi">
-      <div class="etf-div-kpi-label">💰 연간 배당 (세후)</div>
-      <div class="etf-div-kpi-val" id="etf-k-div-post">-</div>
-      <div class="etf-div-kpi-sub" style="color:#16a34a;font-size:10px">배당소득세 15.4% 차감</div>
-    </div>
-    <div class="etf-kpi">
-      <div class="etf-div-kpi-label">📅 월 환산 배당 (세후)</div>
-      <div class="etf-div-kpi-val" id="etf-k-div-monthly">-</div>
-      <div class="etf-div-kpi-sub" id="etf-k-div-monthly-sub"></div>
-    </div>
-  </div>
-
   <!-- 목록 헤더 -->
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
     <div style="font-size:14px;font-weight:700;color:var(--text)">💹 ETF 보유 목록</div>
@@ -949,12 +930,29 @@
     <div id="div-hist-list"><div style="text-align:center;color:var(--muted);padding:32px">수령 내역이 없습니다.<br><small>ETF 카드의 💰 버튼으로 입력하세요.</small></div></div>
   </div>
 
-  <!-- KPI -->
+  <!-- 통합 요약 KPI -->
   <div class="etf-kpi-row" style="margin-top:8px">
     <div class="etf-kpi"><div class="etf-kpi-label">종목 수</div><div class="etf-kpi-val" id="etf-k-count">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">총 매입금</div><div class="etf-kpi-val" id="etf-k-buy">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">총 평가금</div><div class="etf-kpi-val" id="etf-k-eval">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">평가손익</div><div class="etf-kpi-val" id="etf-k-pnl">-</div></div>
+  </div>
+  <div class="etf-div-kpi-row" style="margin-top:6px">
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">📥 연간 배당 (세전)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-pre">-</div>
+      <div class="etf-div-kpi-sub" id="etf-k-div-pre-sub"></div>
+    </div>
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">💰 연간 배당 (세후)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-post">-</div>
+      <div class="etf-div-kpi-sub" style="color:#16a34a;font-size:10px">배당소득세 15.4% 차감</div>
+    </div>
+    <div class="etf-kpi">
+      <div class="etf-div-kpi-label">📅 월 환산 배당 (세후)</div>
+      <div class="etf-div-kpi-val" id="etf-k-div-monthly">-</div>
+      <div class="etf-div-kpi-sub" id="etf-k-div-monthly-sub"></div>
+    </div>
   </div>
 
   <!-- 배당 재투자 계산기 버튼 -->
