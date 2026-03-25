@@ -2269,7 +2269,7 @@ function onStkNameInput(val) {
 
 async function fetchStkAc(q) {
   try {
-    const r = await fetch(`/api/stock-search?q=${encodeURIComponent(q)}`);
+    const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
     const d = await r.json();
     showStkAc(d.items || []);
   } catch { hideStkAc(); }
@@ -2280,11 +2280,12 @@ function showStkAc(items) {
   if (!list || !items.length) { hideStkAc(); return; }
   list.innerHTML = items.map(it => {
     const safeN = it.name.replace(/'/g, "\\'");
+    const mkt = it.market ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${it.market}</span>` : '';
     return `<div onmousedown="selectStkAcItem('${safeN}','${it.ticker}')"
       style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
              align-items:center;border-bottom:1px solid var(--border)"
       onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
-      <span>${it.name}</span>
+      <span>${it.name}${mkt}</span>
       <span style="font-size:11px;color:var(--primary);font-weight:600">${it.ticker}</span>
     </div>`;
   }).join('');
@@ -2324,7 +2325,7 @@ async function fetchStkQuote(ticker) {
   tickerEl.style.borderColor = 'var(--primary)';
 
   try {
-    const r = await fetch(`/api/stock-quote?ticker=${ticker}`);
+    const r = await fetch(`/api/stock?ticker=${ticker}`);
     const d = await r.json();
     if (d.price) {
       curEl.value = d.price;
