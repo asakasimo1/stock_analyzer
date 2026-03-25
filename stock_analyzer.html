@@ -912,8 +912,8 @@
       <div class="port-card-title">🏢 공모주 수익현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th class="col-hide-sm">상장일</th><th class="col-hide-sm">공모가</th><th class="col-hide-sm">매도가</th><th class="col-hide-sm">수량</th><th>수익금</th><th>수익률</th></tr></thead>
-          <tbody id="port-ipo-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th class="col-hide-sm">상장일</th><th class="col-hide-sm">공모가</th><th class="col-hide-sm">매도가</th><th class="col-hide-sm">수량</th><th>수익금</th><th>수익률</th><th></th></tr></thead>
+          <tbody id="port-ipo-tbody"><tr><td colspan="8" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -2087,7 +2087,7 @@ function _renderPortEtf() {
 function _renderPortIpo() {
   const tbody = document.getElementById('port-ipo-tbody');
   const sold  = _portIpo.filter(r => r.price_open > 0 && r.price_ipo > 0);
-  if (!sold.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">매도 기록 없음</td></tr>'; return; }
+  if (!sold.length) { tbody.innerHTML = '<tr><td colspan="8" class="port-loading">매도 기록 없음</td></tr>'; return; }
   tbody.innerHTML = sold.map(r => {
     const qty    = r.sell_qty || r.shares_alloc || 0;
     const profit = (r.price_open - r.price_ipo) * qty - 2000;
@@ -2101,8 +2101,30 @@ function _renderPortIpo() {
       <td class="col-hide-sm">${qty}주</td>
       <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
       <td class="${pc}">${rate>=0?'+':''}${rate}%</td>
+      <td style="text-align:center">
+        <button onclick="clearIpoSale(${r.id})" title="매도기록 초기화"
+          style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
+      </td>
     </tr>`;
   }).join('');
+}
+
+async function clearIpoSale(id) {
+  if (!confirm('이 공모주의 매도 기록을 초기화하시겠습니까?\n(종목은 유지되고 매도가·매도수량만 삭제됩니다)')) return;
+  const rec = _portIpo.find(r => r.id == id);
+  if (!rec) return;
+  rec.price_open = 0;
+  rec.sell_qty   = null;
+  rec.sell_date  = null;
+  try {
+    const res = await fetch('/api/ipo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: _portIpo }),
+    });
+    if (!(await res.json()).ok) throw new Error('저장 실패');
+    await initPortfolio();
+  } catch(e) { alert('오류: ' + e.message); }
 }
 
 // ── 개별주 보유현황 ────────────────────────────────────────
@@ -2154,41 +2176,48 @@ function _renderPortAsset() {
 
 // ── 도넛 공통 렌더러 ──────────────────────────────────────
 function _drawDonut(el, slices, total, centerLabel, centerColor, signPrefix = false) {
-  const W = 180, CX = 90, CY = 90, R = 70, r = 42;
-  let startAngle = -Math.PI / 2;
-  let paths = '';
-  slices.forEach(s => {
-    const angle = (s.val / total) * 2 * Math.PI;
-    const endAngle = startAngle + angle;
-    const x1 = CX + R * Math.cos(startAngle), y1 = CY + R * Math.sin(startAngle);
-    const x2 = CX + R * Math.cos(endAngle),   y2 = CY + R * Math.sin(endAngle);
-    const ix1 = CX + r * Math.cos(startAngle), iy1 = CY + r * Math.sin(startAngle);
-    const ix2 = CX + r * Math.cos(endAngle),   iy2 = CY + r * Math.sin(endAngle);
-    const large = angle > Math.PI ? 1 : 0;
-    paths += `<path d="M${ix1},${iy1} L${x1},${y1} A${R},${R} 0 ${large} 1 ${x2},${y2} L${ix2},${iy2} A${r},${r} 0 ${large} 0 ${ix1},${iy1} Z" fill="${s.color}" opacity="0.9"/>`;
-    startAngle = endAngle;
-  });
+  const W = 160, CX = 80, CY = 80, R = 64, r = 38;
   const fmtN = v => v >= 1e8 ? (v/1e8).toFixed(1)+'억' : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : v.toLocaleString();
+
+  let paths = '';
+  if (slices.length === 1) {
+    // 단일 슬라이스: 원 두 개로 도넛 표현
+    paths = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${slices[0].color}" opacity="0.9"/>
+             <circle cx="${CX}" cy="${CY}" r="${r}" fill="var(--surface)"/>`;
+  } else {
+    let startAngle = -Math.PI / 2;
+    slices.forEach(s => {
+      const angle = (s.val / total) * 2 * Math.PI;
+      const endAngle = startAngle + angle;
+      const x1  = CX + R * Math.cos(startAngle), y1  = CY + R * Math.sin(startAngle);
+      const x2  = CX + R * Math.cos(endAngle),   y2  = CY + R * Math.sin(endAngle);
+      const ix1 = CX + r * Math.cos(startAngle), iy1 = CY + r * Math.sin(startAngle);
+      const ix2 = CX + r * Math.cos(endAngle),   iy2 = CY + r * Math.sin(endAngle);
+      const large = angle > Math.PI ? 1 : 0;
+      paths += `<path d="M${ix1},${iy1} L${x1},${y1} A${R},${R} 0 ${large} 1 ${x2},${y2} L${ix2},${iy2} A${r},${r} 0 ${large} 0 ${ix1},${iy1} Z" fill="${s.color}" opacity="0.9"/>`;
+      startAngle = endAngle;
+    });
+  }
+
   const totalFmt = (signPrefix ? '+' : '') + fmtN(total) + '원';
   const legend = slices.map(s => {
     const pct = (s.val / total * 100).toFixed(1);
-    return `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:7px">
       <span style="width:9px;height:9px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
       <span style="color:var(--muted);flex:1">${s.label}</span>
       <span style="font-weight:600">${signPrefix?'+':''}${fmtN(s.val)}원</span>
-      <span style="color:var(--muted);min-width:36px;text-align:right">${pct}%</span>
+      <span style="color:var(--muted);min-width:34px;text-align:right">${pct}%</span>
     </div>`;
   }).join('');
 
+  // 세로 레이아웃: SVG 위 / 범례 아래
   el.innerHTML = `
-    <div class="port-donut-inner" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-      <div style="flex-shrink:0">
-        <svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}
-          <text x="${CX}" y="${CY-7}" text-anchor="middle" font-size="10" fill="var(--muted)">${centerLabel}</text>
-          <text x="${CX}" y="${CY+9}" text-anchor="middle" font-size="13" font-weight="700" fill="${centerColor}">${totalFmt}</text>
-        </svg>
-      </div>
-      <div style="flex:1;min-width:120px">${legend}</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+      <svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}
+        <text x="${CX}" y="${CY-6}" text-anchor="middle" font-size="10" fill="var(--muted)">${centerLabel}</text>
+        <text x="${CX}" y="${CY+10}" text-anchor="middle" font-size="13" font-weight="700" fill="${centerColor}">${totalFmt}</text>
+      </svg>
+      <div style="width:100%">${legend}</div>
     </div>`;
 }
 
