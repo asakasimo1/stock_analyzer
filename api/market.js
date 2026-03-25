@@ -65,7 +65,8 @@ export default async function handler(req, res) {
     fetchFearGreed(),
   ]);
 
-  const ok = (r) => r.status === 'fulfilled' ? r.value : null;
+  const ok  = (r) => r.status === 'fulfilled' ? r.value : null;
+  const err = (r) => r.status === 'rejected'  ? r.reason?.message : null;
 
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
   return res.status(200).json({
@@ -77,5 +78,10 @@ export default async function handler(req, res) {
     vix:       ok(vix),
     feargreed: ok(fg),
     ts:        Date.now(),
+    _errors: {
+      kospi: err(kospi), kosdaq: err(kosdaq),
+      nasdaq: err(nasdaq), sp500: err(sp500),
+      usdkrw: err(usdkrw), vix: err(vix), feargreed: err(fg),
+    },
   });
 }
