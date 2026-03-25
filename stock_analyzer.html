@@ -3290,15 +3290,20 @@ function fillDivDefaults(etfId) {
     return;
   }
 
-  // 마지막 배당 내역에서 per_share, qty 가져오기
+  // 가장 최근 배당 내역 (ym 내림차순 → [0] = 최신)
   const lastRec = [..._divRecords]
     .filter(r => String(r.etf_id) === String(etfId))
-    .sort((a, b) => (b.ym || '') > (a.ym || '') ? 1 : -1)[0];
+    .sort((a, b) => {
+      const ay = (a.ym || '').replace('-', '');
+      const by = (b.ym || '').replace('-', '');
+      return by > ay ? 1 : by < ay ? -1 : 0;
+    })[0];
 
-  // 주당 배당금: 마지막 기록값 (없으면 ETF 레코드의 recent_div)
   const etfRec = _etfRecords.find(x => String(x.id) === String(etfId));
+
+  // 주당 배당금: 배당 내역이 있으면 그 값 최우선 (0이어도 유지), 없을 때만 recent_div 사용
   document.getElementById('dv-per-share').value =
-    lastRec?.per_share || etfRec?.recent_div || '';
+    lastRec != null ? (lastRec.per_share ?? '') : (etfRec?.recent_div ?? '');
 
   // 수량: 마지막 기록의 수량 (없으면 ETF 현재 보유 수량)
   document.getElementById('dv-qty').value =
