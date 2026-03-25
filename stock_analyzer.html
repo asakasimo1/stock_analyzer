@@ -3710,12 +3710,17 @@ async function refreshAllEtfPrices() {
 // ══════════════════════════════════════════════════════════════════
 
 function openDripModal() {
-  // 현재 ETF 평균 분배율을 기본값으로 세팅 (보유 ETF가 있으면)
   if (_etfRecords && _etfRecords.length > 0) {
-    const yields = _etfRecords.filter(r => r.annual_div_rate > 0).map(r => r.annual_div_rate);
-    if (yields.length > 0) {
-      const avg = (yields.reduce((a,b) => a+b, 0) / yields.length).toFixed(1);
-      document.getElementById('drip-yield').value = avg;
+    const buyTotal = _etfRecords.reduce((s,r) => s + (r.qty||0)*(r.avg_price||0), 0);
+    const divPreTotal = _etfRecords.reduce((s,r) => {
+      if (!r.current_price || !r.annual_div_rate || r.div_cycle === '무배당') return s;
+      return s + r.current_price * (r.annual_div_rate/100) * (r.qty||0);
+    }, 0);
+    if (buyTotal > 0) {
+      document.getElementById('drip-invest').value = Math.round(buyTotal / 10000);
+      const divYieldPct = divPreTotal / buyTotal * 100;
+      if (divYieldPct > 0)
+        document.getElementById('drip-yield').value = divYieldPct.toFixed(1);
     }
   }
   document.getElementById('drip-modal').style.display = 'block';
@@ -3743,31 +3748,50 @@ function calcDrip() {
 
   if (invest <= 0) return;
 
-  const basePrice = 10000; // 기준가 (주가 비율 계산용)
-  let shares = invest / basePrice;
-  let cumulDiv = 0;
-  const rows = [];
-  const evalVals = [invest];
-  const noReinvVals = [invest];
+  const totalMonths = years * 12;
+  const basePrice   = 10000;
+  // 월 단위 환산
+  const mPriceGrow  = Math.pow(1 + priceGrow, 1/12) - 1;
+  const mDivGrow    = Math.pow(1 + divGrow,   1/12) - 1;
+  const mDivYield   = divYield / 12;
 
-  for (let yr = 1; yr <= years; yr++) {
-    const priceEoy  = basePrice * Math.pow(1 + priceGrow, yr);
-    const yrYield   = divYield * Math.pow(1 + divGrow, yr - 1);
-    const dividend  = shares * priceEoy * yrYield;
+  let shares   = invest / basePrice;
+  let cumulDiv = 0;
+
+  // 월별 데이터 (차트용)
+  const chartDrip   = [invest];
+  const chartNoRein = [invest];
+
+  // 연도별 집계 (테이블용)
+  const yearRows = [];
+
+  let prevShares = shares;
+  let yrDiv = 0;
+
+  for (let m = 1; m <= totalMonths; m++) {
+    const price     = basePrice * Math.pow(1 + mPriceGrow, m);
+    const mYield    = mDivYield * Math.pow(1 + mDivGrow, m - 1);
+    const dividend  = shares * price * mYield;
     cumulDiv += dividend;
-    const extra = dividend / priceEoy;
-    shares += extra;
-    const evalAmt = shares * priceEoy;
-    const ret = (evalAmt / invest - 1) * 100;
-    evalVals.push(evalAmt);
-    noReinvVals.push((invest / basePrice) * priceEoy);
-    rows.push({ yr, shares, dividend, cumulDiv, evalAmt, ret });
+    yrDiv    += dividend;
+    shares   += dividend / price;          // 재투자
+    const evalAmt = shares * price;
+    chartDrip.push(evalAmt);
+    chartNoRein.push((invest / basePrice) * price);
+
+    // 매 12개월마다 연도 행 추가
+    if (m % 12 === 0) {
+      const yr  = m / 12;
+      const ret = (evalAmt / invest - 1) * 100;
+      yearRows.push({ yr, shares, yrDiv, cumulDiv, evalAmt, ret });
+      yrDiv = 0;
+    }
   }
 
-  const finalEval   = evalVals[years];
-  const noReinvFinal = noReinvVals[years];
-  const totalRet    = (finalEval / invest - 1) * 100;
-  const bonus       = finalEval - noReinvFinal;
+  const finalEval    = chartDrip[totalMonths];
+  const noReinvFinal = chartNoRein[totalMonths];
+  const totalRet     = (finalEval / invest - 1) * 100;
+  const bonus        = finalEval - noReinvFinal;
 
   // 요약 지표
   document.getElementById('drip-s-invest').textContent = fmtW(invest);
@@ -3776,60 +3800,69 @@ function calcDrip() {
   document.getElementById('drip-s-div').textContent    = fmtW(cumulDiv);
   document.getElementById('drip-s-bonus').textContent  = fmtW(bonus);
 
-  // 테이블
+  // 연도별 테이블
   const tbody = document.getElementById('drip-table-body');
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = yearRows.map(r => `
     <tr style="border-top:1px solid #1e2d45;color:#f1f5f9">
       <td style="padding:8px 10px;text-align:center;color:#94a3b8">${r.yr}년 후</td>
       <td style="padding:8px 10px;text-align:right">${r.shares.toFixed(2)}주</td>
-      <td style="padding:8px 10px;text-align:right">${fmtW(r.dividend)}</td>
+      <td style="padding:8px 10px;text-align:right">${fmtW(r.yrDiv)}</td>
       <td style="padding:8px 10px;text-align:right">${fmtW(r.cumulDiv)}</td>
       <td style="padding:8px 10px;text-align:right;font-weight:600">${fmtW(r.evalAmt)}</td>
       <td style="padding:8px 10px;text-align:right;color:${r.ret>=0?'#34d399':'#f87171'};font-weight:600">${r.ret>=0?'+':''}${r.ret.toFixed(1)}%</td>
     </tr>`).join('');
 
-  // SVG 차트
+  // SVG 차트 (월 단위)
   const svg = document.getElementById('drip-chart');
   const W = svg.parentElement.offsetWidth || 600;
   const H = 180;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-  const maxVal = Math.max(...evalVals, ...noReinvVals);
-  const PAD = { left: 10, right: 10, top: 12, bottom: 28 };
+  const maxVal = Math.max(...chartDrip, ...chartNoRein);
+  const PAD = { left: 46, right: 10, top: 12, bottom: 28 };
   const cw = W - PAD.left - PAD.right;
   const ch = H - PAD.top - PAD.bottom;
 
-  const xPos = (i) => PAD.left + (i / years) * cw;
-  const yPos = (v) => PAD.top + ch - (v / maxVal) * ch;
+  const xPos = (m) => PAD.left + (m / totalMonths) * cw;
+  const yPos = (v)  => PAD.top + ch - (v / maxVal) * ch;
 
   const toPath = (vals) =>
     vals.map((v, i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(v).toFixed(1)}`).join(' ');
 
-  const drip_path = toPath(evalVals);
-  const nori_path = toPath(noReinvVals);
-
-  // 그리드 라인
+  // 그리드 라인 (Y축)
   let gridLines = '';
   for (let i = 0; i <= 4; i++) {
-    const y = PAD.top + (ch / 4) * i;
+    const y   = PAD.top + (ch / 4) * i;
     const val = maxVal * (1 - i / 4);
     gridLines += `<line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${W-PAD.right}" y2="${y.toFixed(1)}" stroke="#1e2d45" stroke-width="1"/>`;
-    gridLines += `<text x="${PAD.left}" y="${(y-3).toFixed(1)}" fill="#475569" font-size="9" text-anchor="start">${fmtW(val)}</text>`;
+    gridLines += `<text x="${(PAD.left-4).toFixed(1)}" y="${(y+3).toFixed(1)}" fill="#475569" font-size="9" text-anchor="end">${fmtW(val)}</text>`;
   }
 
-  // X축 라벨
+  // X축 라벨 — 연 단위만 표시
   let xLabels = '';
-  for (let i = 0; i <= years; i++) {
-    xLabels += `<text x="${xPos(i).toFixed(1)}" y="${H-4}" fill="#475569" font-size="9" text-anchor="middle">${i}년</text>`;
+  for (let yr = 0; yr <= years; yr++) {
+    const mx = yr * 12;
+    xLabels += `<line x1="${xPos(mx).toFixed(1)}" y1="${(PAD.top+ch).toFixed(1)}" x2="${xPos(mx).toFixed(1)}" y2="${(PAD.top+ch+4).toFixed(1)}" stroke="#1e2d45" stroke-width="1"/>`;
+    xLabels += `<text x="${xPos(mx).toFixed(1)}" y="${H-4}" fill="#475569" font-size="9" text-anchor="middle">${yr === 0 ? '시작' : yr + '년'}</text>`;
+  }
+
+  // 연도 경계 수직 점선
+  let vLines = '';
+  for (let yr = 1; yr < years; yr++) {
+    const mx = yr * 12;
+    vLines += `<line x1="${xPos(mx).toFixed(1)}" y1="${PAD.top}" x2="${xPos(mx).toFixed(1)}" y2="${(PAD.top+ch).toFixed(1)}" stroke="#1e2d45" stroke-width="0.8" stroke-dasharray="3 3"/>`;
   }
 
   svg.innerHTML = `
     ${gridLines}
+    ${vLines}
     ${xLabels}
-    <path d="${nori_path}" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.6"/>
-    <path d="${drip_path}" fill="none" stroke="#34d399" stroke-width="2.5"/>
-    ${evalVals.map((v,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(v).toFixed(1)}" r="3.5" fill="#34d399"/>`).join('')}
-    ${noReinvVals.map((v,i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(v).toFixed(1)}" r="2.5" fill="#3b82f6" opacity="0.6"/>`).join('')}
+    <path d="${toPath(chartNoRein)}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+    <path d="${toPath(chartDrip)}"   fill="none" stroke="#34d399" stroke-width="2"/>
+    ${yearRows.map(r => {
+      const mx = r.yr * 12;
+      return `<circle cx="${xPos(mx).toFixed(1)}" cy="${yPos(r.evalAmt).toFixed(1)}" r="3.5" fill="#34d399"/>`;
+    }).join('')}
   `;
 }
 
