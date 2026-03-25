@@ -2911,7 +2911,11 @@ function openEtfModal(id) {
   document.getElementById('ef-div-months').value       = r?.div_months    || '';
   document.getElementById('ef-recent-div').value       = r?.recent_div    || '';
   document.getElementById('ef-recent-div-date').value  = r?.recent_div_date || '';
+  // recent_div_rate: 저장된 값 표시 (readonly — calcRecentDivRateFromInput으로만 갱신)
   document.getElementById('ef-recent-div-rate').value  = r?.recent_div_rate != null ? r.recent_div_rate : '';
+  // 수동 고정 배지
+  const badge = document.getElementById('ef-manual-badge');
+  if (badge) badge.style.display = r?.recent_div_manual ? 'inline' : 'none';
   document.getElementById('ef-annual-div-rate').value  = r?.annual_div_rate != null ? r.annual_div_rate : '';
   document.getElementById('ef-qty').value              = r?.qty           || '';
   document.getElementById('ef-avg-price').value        = r?.avg_price     || '';
@@ -2961,6 +2965,7 @@ async function saveEtfRecord() {
     recent_div:       parseFloat(document.getElementById('ef-recent-div').value)      || 0,
     recent_div_date:  document.getElementById('ef-recent-div-date').value.trim(),
     recent_div_rate:  parseFloat(document.getElementById('ef-recent-div-rate').value) || 0,
+    recent_div_manual: (parseFloat(document.getElementById('ef-recent-div').value) || 0) > 0,
     annual_div_rate:  parseFloat(document.getElementById('ef-annual-div-rate').value) || 0,
     qty,
     avg_price: avg,
@@ -3675,12 +3680,23 @@ async function fetchAndFillQuote(ticker) {
   setTimeout(() => { tickerEl.style.borderColor = ''; }, 2000);
 }
 
+function calcRecentDivRateFromInput() {
+  const recentDiv  = parseFloat(document.getElementById('ef-recent-div').value)  || 0;
+  const price      = parseFloat(document.getElementById('ef-price').value)        || 0;
+  const rateEl     = document.getElementById('ef-recent-div-rate');
+  if (rateEl) rateEl.value = (recentDiv && price) ? (recentDiv / price * 100).toFixed(3) : '';
+}
+
 function _fillDivFields(d) {
   const set = (id, val) => { const el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; };
   if (d.divCycle)      set('ef-div-cycle', d.divCycle);
   if (d.divMonths)     set('ef-div-months', d.divMonths);
-  if (d.recentDiv)     set('ef-recent-div', d.recentDiv);
-  if (d.recentDivRate) set('ef-recent-div-rate', d.recentDivRate);
+  // 수동 고정된 경우 recent_div / rate API 값으로 덮어쓰지 않음
+  const idVal = document.getElementById('ef-id')?.value;
+  const existRec = idVal ? _etfRecords.find(r => String(r.id) === String(idVal)) : null;
+  if (!existRec?.recent_div_manual) {
+    if (d.recentDiv) { set('ef-recent-div', d.recentDiv); calcRecentDivRateFromInput(); }
+  }
   if (d.annualDivRate) set('ef-annual-div-rate', d.annualDivRate);
 }
 
@@ -3715,8 +3731,12 @@ async function refreshAllEtfPrices(silent = false) {
         r.price_chg_pct  = d.chgPct ?? r.price_chg_pct;
         if (d.divCycle)      r.div_cycle        = d.divCycle;
         if (d.divMonths)     r.div_months       = d.divMonths;
-        if (d.recentDiv)     r.recent_div       = d.recentDiv;
-        if (d.recentDivRate) r.recent_div_rate  = d.recentDivRate;
+        // 수동 고정된 종목은 recent_div / rate API 값으로 덮어쓰지 않음
+        if (!r.recent_div_manual) {
+          if (d.recentDiv)     r.recent_div      = d.recentDiv;
+          if (d.recentDiv && r.current_price)
+            r.recent_div_rate = parseFloat((d.recentDiv / r.current_price * 100).toFixed(3));
+        }
         if (d.annualDivRate) r.annual_div_rate  = d.annualDivRate;
         updated++;
       }
@@ -3966,16 +3986,16 @@ function calcDrip() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:12px;color:var(--muted)">최근 배당금 (원)</label>
-          <input id="ef-recent-div" type="number" min="0" placeholder="78">
+          <label style="font-size:12px;color:var(--muted)">최근 배당금 (원) <span id="ef-manual-badge" style="display:none;font-size:10px;color:#f59e0b;margin-left:4px">🔒 수동고정</span></label>
+          <input id="ef-recent-div" type="number" min="0" placeholder="78" oninput="calcRecentDivRateFromInput()">
         </div>
         <div>
           <label style="font-size:12px;color:var(--muted)">최근 배당일</label>
           <input id="ef-recent-div-date" type="text" placeholder="01.05">
         </div>
         <div>
-          <label style="font-size:12px;color:var(--muted)">최근 배당률 (%)</label>
-          <input id="ef-recent-div-rate" type="number" step="0.01" min="0" placeholder="0.31">
+          <label style="font-size:12px;color:var(--muted)">최근 배당률 (%) <span style="font-size:10px;color:#64748b">자동계산</span></label>
+          <input id="ef-recent-div-rate" type="number" step="0.01" min="0" placeholder="0.31" readonly style="background:#0f1f35;color:#94a3b8;cursor:default">
         </div>
       </div>
       <div>
