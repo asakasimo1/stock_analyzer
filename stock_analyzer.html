@@ -400,12 +400,14 @@
   .result-badge.signal   { background: #fef3c7; color: #92400e; }
   .result-stocks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .stock-chip {
-    font-size: 11px; padding: 3px 8px; border-radius: 20px;
-    background: var(--secondary); color: var(--primary);
-    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; padding: 4px 10px; border-radius: 20px;
+    background: #1e3a5f; color: #e2e8f0;
+    display: flex; align-items: center; gap: 5px;
+    border: 1px solid #2563eb44;
+    font-weight: 600;
   }
-  .stock-chip .up { color: var(--green); }
-  .stock-chip .dn { color: var(--red); }
+  .stock-chip .up { color: #34d399; }
+  .stock-chip .dn { color: #f87171; }
   .empty-msg { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
 
   @media (max-width: 768px) {
@@ -916,8 +918,8 @@
       <div class="port-card-title">📊 ETF 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가금액</th><th>수익률</th><th class="col-hide-sm">세후배당</th></tr></thead>
-          <tbody id="port-etf-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>매입금</th><th>평가손익</th><th>평가금액</th><th>수익률</th></tr></thead>
+          <tbody id="port-etf-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -927,8 +929,8 @@
       <div class="port-card-title">🏢 공모주 수익현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th class="col-hide-sm">상장일</th><th class="col-hide-sm">공모가</th><th class="col-hide-sm">매도가</th><th class="col-hide-sm">수량</th><th>수익금</th><th>수익률</th><th></th></tr></thead>
-          <tbody id="port-ipo-tbody"><tr><td colspan="8" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>매입금</th><th>수익금</th><th>수익률</th><th></th></tr></thead>
+          <tbody id="port-ipo-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -941,7 +943,7 @@
       </div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가손익</th><th>수익률</th><th></th></tr></thead>
+          <thead><tr><th>종목명</th><th>매입금</th><th>평가손익</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
           <tbody id="port-stock-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
@@ -2137,16 +2139,13 @@ function _renderPortEtf() {
     const eval_ = cur * qty;
     const profit= eval_ - buy;
     const rate  = buy > 0 ? profit / buy * 100 : null;
-    const div   = divByEtf[r.id] || 0;
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
-      <td class="col-hide-sm">${qty.toLocaleString()}</td>
-      <td class="col-hide-sm">${avg ? avg.toLocaleString()+'원' : '-'}</td>
-      <td class="col-hide-sm">${cur ? cur.toLocaleString()+'원' : '-'}</td>
+      <td>${buy ? buy.toLocaleString()+'원' : '-'}</td>
+      <td class="${rc}">${cur ? (profit>=0?'+':'')+profit.toLocaleString()+'원' : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
-      <td class="col-hide-sm">${div ? div.toLocaleString()+'원' : '-'}</td>
     </tr>`;
   }).join('');
 }
@@ -2158,15 +2157,13 @@ function _renderPortIpo() {
   if (!sold.length) { tbody.innerHTML = '<tr><td colspan="8" class="port-loading">매도 기록 없음</td></tr>'; return; }
   tbody.innerHTML = sold.map(r => {
     const qty    = r.sell_qty || r.shares_alloc || 0;
+    const buy    = (r.price_ipo||0) * qty;
     const profit = (r.price_open - r.price_ipo) * qty - 2000;
     const rate   = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
     const pc     = profit >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}</td>
-      <td class="col-hide-sm">${r.date_list||'-'}</td>
-      <td class="col-hide-sm">${(r.price_ipo||0).toLocaleString()}원</td>
-      <td class="col-hide-sm">${(r.price_open||0).toLocaleString()}원</td>
-      <td class="col-hide-sm">${qty}주</td>
+      <td>${buy ? buy.toLocaleString()+'원' : '-'}</td>
       <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
       <td class="${pc}">${rate>=0?'+':''}${rate}%</td>
       <td style="text-align:center">
@@ -2198,7 +2195,7 @@ async function clearIpoSale(id) {
 // ── 개별주 보유현황 ────────────────────────────────────────
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
-  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="6" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
   tbody.innerHTML = _stockRecords.map(r => {
     const buy   = (r.qty||0) * (r.avg_price||0);
     const eval_ = (r.qty||0) * (r.current_price||0);
@@ -2207,10 +2204,9 @@ function _renderPortStock() {
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}${r.ticker ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${r.ticker}</span>` : ''}</td>
-      <td class="col-hide-sm">${(r.qty||0).toLocaleString()}</td>
-      <td class="col-hide-sm">${r.avg_price ? r.avg_price.toLocaleString()+'원' : '-'}</td>
-      <td class="col-hide-sm">${r.current_price ? r.current_price.toLocaleString()+'원' : '-'}</td>
+      <td>${buy ? buy.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${r.current_price ? (profit>=0?'+':'')+profit.toLocaleString()+'원' : '-'}</td>
+      <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
       <td style="text-align:center">
         <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
