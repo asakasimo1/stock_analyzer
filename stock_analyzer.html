@@ -412,9 +412,10 @@
 
   @media (max-width: 768px) {
     .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-    .cal-cell { min-height: 52px; padding: 3px; }
-    .cal-day  { font-size: 10px; }
-    .cal-event { font-size: 9px; padding: 2px 4px; }
+    .cal-cell { min-height: 48px; padding: 3px 2px; }
+    .cal-day  { font-size: 10px; margin-bottom: 3px; }
+    .cal-event { font-size: 0; height: 5px; padding: 0; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; }
+    .cal-events-dots { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
     header { padding: 0 20px; }
     main { grid-template-columns: 1fr; padding: 16px; }
     .trades-card  { grid-column: 1; grid-row: 2; }
@@ -1782,7 +1783,7 @@ function renderCalendar(data) {
 
     html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}" onclick="showDayDetail('${key}')">
       <div class="cal-day${dow===0?' sun':dow===6?' sat':''}">${d}</div>
-      ${cellEvs.slice(0,3).map(e => `<div class="cal-event ${e.type}">${e.text}</div>`).join('')}
+      ${cellEvs.slice(0,3).map(e => `<div class="cal-event ${e.type}" title="${e.text}">${e.text}</div>`).join('')}
       ${cellEvs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${cellEvs.length-3}개</div>` : ''}
     </div>`;
   }
@@ -2127,11 +2128,12 @@ function _renderPortKpi() {
 // ── ETF 보유현황 ───────────────────────────────────────────
 function _renderPortEtf() {
   const tbody = document.getElementById('port-etf-tbody');
-  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="7" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
+  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="5" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
   const divByEtf = {};
   _portDiv.forEach(r => { divByEtf[r.etf_id] = (divByEtf[r.etf_id]||0) + (r.net||0); });
 
-  tbody.innerHTML = _portEtf.map(r => {
+  let totalBuy = 0, totalEval = 0, totalProfit = 0;
+  const rows = _portEtf.map(r => {
     const avg   = r.avg_price || 0;
     const cur   = r.current_price || 0;
     const qty   = r.qty || 0;
@@ -2140,6 +2142,7 @@ function _renderPortEtf() {
     const profit= eval_ - buy;
     const rate  = buy > 0 ? profit / buy * 100 : null;
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    totalBuy += buy; totalEval += eval_; totalProfit += profit;
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
       <td>${buy ? buy.toLocaleString()+'원' : '-'}</td>
@@ -2148,6 +2151,15 @@ function _renderPortEtf() {
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
     </tr>`;
   }).join('');
+  const totalRate = totalBuy > 0 ? (totalProfit / totalBuy * 100) : null;
+  const trc = totalProfit >= 0 ? 'up' : 'dn';
+  tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
+    <td>합계</td>
+    <td>${totalBuy ? totalBuy.toLocaleString()+'원' : '-'}</td>
+    <td class="${trc}">${totalBuy ? (totalProfit>=0?'+':'')+totalProfit.toLocaleString()+'원' : '-'}</td>
+    <td>${totalEval ? totalEval.toLocaleString()+'원' : '-'}</td>
+    <td class="${trc}">${totalRate !== null ? (totalRate>=0?'+':'')+totalRate.toFixed(2)+'%' : '-'}</td>
+  </tr>`;
 }
 
 // ── 공모주 수익현황 ────────────────────────────────────────
@@ -2196,12 +2208,15 @@ async function clearIpoSale(id) {
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
   if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="6" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
-  tbody.innerHTML = _stockRecords.map(r => {
+  let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false;
+  const sRows = _stockRecords.map(r => {
     const buy   = (r.qty||0) * (r.avg_price||0);
     const eval_ = (r.qty||0) * (r.current_price||0);
     const profit= eval_ - buy;
     const rate  = buy > 0 && r.current_price ? profit / buy * 100 : null;
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    sTotalBuy += buy;
+    if (r.current_price) { sTotalEval += eval_; sTotalProfit += profit; sHasCur = true; }
     return `<tr>
       <td>${r.name||'-'}${r.ticker ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${r.ticker}</span>` : ''}</td>
       <td>${buy ? buy.toLocaleString()+'원' : '-'}</td>
@@ -2214,6 +2229,16 @@ function _renderPortStock() {
       </td>
     </tr>`;
   }).join('');
+  const sTotalRate = sTotalBuy > 0 && sHasCur ? (sTotalProfit / sTotalBuy * 100) : null;
+  const strc = sTotalProfit >= 0 ? 'up' : 'dn';
+  tbody.innerHTML = sRows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
+    <td>합계</td>
+    <td>${sTotalBuy ? sTotalBuy.toLocaleString()+'원' : '-'}</td>
+    <td class="${strc}">${sHasCur ? (sTotalProfit>=0?'+':'')+sTotalProfit.toLocaleString()+'원' : '-'}</td>
+    <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
+    <td class="${strc}">${sTotalRate !== null ? (sTotalRate>=0?'+':'')+sTotalRate.toFixed(2)+'%' : '-'}</td>
+    <td></td>
+  </tr>`;
 }
 
 // ── 자산 현황 도넛 차트 ────────────────────────────────────
