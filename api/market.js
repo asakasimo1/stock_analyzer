@@ -99,18 +99,19 @@ export default async function handler(req, res) {
     };
   };
 
-  /* ── Yahoo Finance — WTI 원유 선물 ── */
+  /* ── Yahoo Finance — WTI 원유 선물 (차트 데이터 기준) ── */
   const fetchOil = async () => {
-    const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=5d', {
+    const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=10d', {
       headers: { ...ua, Accept: 'application/json' },
     });
     if (!r.ok) throw new Error(`Yahoo Oil HTTP ${r.status}`);
-    const d    = await r.json();
-    const meta = d?.chart?.result?.[0]?.meta;
-    if (!meta) throw new Error('Yahoo Oil: no meta');
-    const price = meta.regularMarketPrice;
-    const prev  = meta.previousClose ?? meta.chartPreviousClose ?? price;
-    if (!price) throw new Error('Yahoo Oil: price=0');
+    const d      = await r.json();
+    const result = d?.chart?.result?.[0];
+    if (!result) throw new Error('Yahoo Oil: no result');
+    const closes = (result.indicators?.quote?.[0]?.close ?? []).filter(v => v != null);
+    if (closes.length < 2) throw new Error('Yahoo Oil: insufficient data');
+    const price = closes[closes.length - 1];
+    const prev  = closes[closes.length - 2];
     return { price, chg: price - prev, chgPct: prev ? (price - prev) / prev * 100 : 0 };
   };
 
