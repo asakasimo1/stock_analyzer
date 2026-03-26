@@ -9,4 +9,5 @@ __pycache__/
 *.pid
 *.log
 .DS_Store
-.vercel
+.vercel/cache
+.vercel/.env*
