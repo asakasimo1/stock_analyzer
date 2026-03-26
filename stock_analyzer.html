@@ -2080,8 +2080,33 @@ async function initPortfolio() {
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
-  renderPortfolio();
+  renderPortfolio(); // 저장된 데이터로 먼저 표시
+  _refreshPortfolioRealtime(); // 실시간 현재가 백그라운드 조회
   _startPortAutoRefresh();
+}
+
+// 포트폴리오 탭 — 실시간 현재가 일괄 조회 (Gist 저장 없이 화면만 갱신)
+async function _refreshPortfolioRealtime() {
+  const etfFetches = _portEtf
+    .filter(r => r.ticker)
+    .map(async r => {
+      try {
+        const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
+        if (d.price) r.current_price = d.price;
+      } catch {}
+    });
+
+  const stkFetches = _stockRecords
+    .filter(r => r.ticker)
+    .map(async r => {
+      try {
+        const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
+        if (d.price) r.current_price = d.price;
+      } catch {}
+    });
+
+  await Promise.all([...etfFetches, ...stkFetches]);
+  renderPortfolio();
 }
 
 function _startPortAutoRefresh() {
@@ -4648,11 +4673,35 @@ async function loadMarketData() {
       const p = data.price;
       const color = p >= highThreshold ? '#f87171' : p >= midThreshold ? '#fbbf24' : '#34d399';
       const tag = p >= highThreshold ? '⚠️ 고금리' : p >= midThreshold ? '중립' : '저금리';
+      // 스파크라인 (금리: 상승=위험 빨강, 하락=안정 초록)
+      let sparkHtml = '';
+      if (data.history && data.history.length >= 2) {
+        const vals = data.history;
+        const W = 240, H = 44, PAD = 2;
+        const min = Math.min(...vals), max = Math.max(...vals);
+        const range = max - min || 0.01;
+        const sx = i => (i / (vals.length - 1)) * (W - PAD * 2) + PAD;
+        const sy = v => H - PAD - ((v - min) / range) * (H - PAD * 2);
+        const pts = vals.map((v, i) => `${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join(' ');
+        const lx = sx(vals.length - 1), ly = sy(vals[vals.length - 1]);
+        const trend = vals[vals.length - 1] >= vals[0];
+        const col = trend ? '#f87171' : '#34d399';
+        sparkHtml = `<div style="margin-top:8px;border-top:1px solid #1e293b;padding-top:6px">
+          <div style="font-size:10px;color:#475569;margin-bottom:3px">최근 1개월 추이</div>
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible">
+            <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" opacity="0.9"/>
+            <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3" fill="${col}"/>
+            <text x="${PAD}" y="${H - PAD - 1}" fill="#475569" font-size="9">${min.toFixed(2)}%</text>
+            <text x="${PAD}" y="${PAD + 8}" fill="#475569" font-size="9">${max.toFixed(2)}%</text>
+          </svg>
+        </div>`;
+      }
       setCard(id, `
         <div class="mkt-name">🏦 ${label}</div>
         <div class="mkt-price" style="color:${color}">${p.toFixed(3)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">%</span></div>
         <div class="${data.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${data.chg >= 0 ? '+' : ''}${data.chg.toFixed(3)}%p</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">${tag} 구간</div>`);
+        <div style="font-size:11px;color:#64748b;margin-top:4px">${tag} 구간</div>
+        ${sparkHtml}`);
     };
     renderYield('mkt-us10y', '미국 10년 국채금리', d.us10y, 4.5, 3.5);
     renderYield('mkt-us20y', '미국 20년 국채금리', d.us20y, 4.8, 4.0);

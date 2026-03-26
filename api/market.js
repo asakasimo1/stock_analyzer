@@ -82,14 +82,18 @@ export default async function handler(req, res) {
 
     const parseCol = (colIdx) => {
       let last = NaN, prevC = NaN;
-      for (let i = lines.length - 1; i > hdrIdx && (isNaN(last) || isNaN(prevC)); i--) {
+      const history = [];
+      for (let i = hdrIdx + 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
         const val  = parseFloat(cols[colIdx]);
-        if (!isNaN(val) && val > 0) { isNaN(last) ? (last = val) : (prevC = val); }
+        if (!isNaN(val) && val > 0) history.push(val);
       }
-      if (isNaN(last)) return null;
-      if (isNaN(prevC)) prevC = last;
-      return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
+      // 최근 30개 영업일만 사용
+      const recent = history.slice(-30);
+      if (recent.length < 1) return null;
+      last  = recent[recent.length - 1];
+      prevC = recent.length >= 2 ? recent[recent.length - 2] : last;
+      return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0, history: recent };
     };
 
     return {
