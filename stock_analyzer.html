@@ -347,6 +347,8 @@
     font-size: 10px; padding: 2px 5px; border-radius: 4px;
     margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .cal-ev-short { display: none; }
+  .cal-ev-full  { display: inline; }
   .cal-event.briefing  { background: #dbeafe; color: #1e40af; }
   .cal-event.pick      { background: #d1fae5; color: #065f46; }
   .cal-event.signal    { background: #fef3c7; color: #92400e; }
@@ -412,10 +414,11 @@
 
   @media (max-width: 768px) {
     .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-    .cal-cell { min-height: 48px; padding: 3px 2px; }
-    .cal-day  { font-size: 10px; margin-bottom: 3px; }
-    .cal-event { font-size: 0; height: 5px; padding: 0; margin-bottom: 2px; border-radius: 3px; white-space: nowrap; overflow: hidden; }
-    .cal-events-dots { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
+    .cal-cell { min-height: 56px; padding: 3px 2px; }
+    .cal-day  { font-size: 10px; margin-bottom: 2px; }
+    .cal-event { font-size: 8px; padding: 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+    .cal-ev-full  { display: none; }
+    .cal-ev-short { display: inline; }
     header { padding: 0 20px; }
     main { grid-template-columns: 1fr; padding: 16px; }
     .trades-card  { grid-column: 1; grid-row: 2; }
@@ -1781,10 +1784,15 @@ function renderCalendar(data) {
     // 캘린더 셀에는 공모주 이벤트만 표시 (브리핑/추천/신호는 클릭 시 모달에서만 확인)
     const cellEvs = evs.filter(e => e.type.startsWith('ipo'));
 
+    const shortLabel = t => {
+      const m = t.match(/^([\p{Emoji}]\s?)(.+)/u);
+      if (!m) return t.slice(0, 5);
+      return m[1] + m[2].replace(/ .*/, '').slice(0, 4);
+    };
     html += `<div class="cal-cell${isToday ? ' today' : ''}${hasReal ? ' has-event' : ''}" onclick="showDayDetail('${key}')">
       <div class="cal-day${dow===0?' sun':dow===6?' sat':''}">${d}</div>
-      ${cellEvs.slice(0,3).map(e => `<div class="cal-event ${e.type}" title="${e.text}">${e.text}</div>`).join('')}
-      ${cellEvs.length > 3 ? `<div style="font-size:10px;color:var(--muted)">+${cellEvs.length-3}개</div>` : ''}
+      ${cellEvs.slice(0,3).map(e => `<div class="cal-event ${e.type}" title="${e.text}"><span class="cal-ev-full">${e.text}</span><span class="cal-ev-short">${shortLabel(e.text)}</span></div>`).join('')}
+      ${cellEvs.length > 3 ? `<div style="font-size:9px;color:var(--muted)">+${cellEvs.length-3}</div>` : ''}
     </div>`;
   }
 
