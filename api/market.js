@@ -66,31 +66,31 @@ export default async function handler(req, res) {
     return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
   };
 
-  /* ── 미국 재무부 — 10년 국채금리 ── */
-  const fetchUS10Y = async () => {
+  /* ── 미국 재무부 — 국채금리 (10년 / 30년) ── */
+  const fetchTreasury = async (colName) => {
     const year = new Date().getFullYear();
     const url  = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&download=true`;
     const r = await fetch(url, { headers: ua });
     if (!r.ok) throw new Error(`Treasury HTTP ${r.status}`);
     const text  = await r.text();
     const lines = text.trim().split('\n').filter(l => l.trim());
-    // 헤더 행 찾기: "Date," 로 시작
     const hdrIdx = lines.findIndex(l => l.startsWith('"Date') || l.startsWith('Date'));
     if (hdrIdx === -1) throw new Error('Treasury: header not found');
     const headers = lines[hdrIdx].split(',').map(h => h.replace(/"/g, '').trim());
-    const col10y  = headers.findIndex(h => h === '10 Yr');
-    if (col10y === -1) throw new Error('Treasury: 10Yr column not found');
-    // 뒤에서부터 유효값 탐색 (주말/공휴일은 N/A)
+    const col  = headers.findIndex(h => h === colName);
+    if (col === -1) throw new Error(`Treasury: ${colName} column not found`);
     let last = NaN, prevC = NaN;
     for (let i = lines.length - 1; i > hdrIdx && (isNaN(last) || isNaN(prevC)); i--) {
       const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
-      const val  = parseFloat(cols[col10y]);
+      const val  = parseFloat(cols[col]);
       if (!isNaN(val) && val > 0) { isNaN(last) ? (last = val) : (prevC = val); }
     }
-    if (isNaN(last)) throw new Error('Treasury: no valid 10Yr data');
+    if (isNaN(last)) throw new Error(`Treasury: no valid ${colName} data`);
     if (isNaN(prevC)) prevC = last;
     return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
   };
+  const fetchUS10Y = () => fetchTreasury('10 Yr');
+  const fetchUS30Y = () => fetchTreasury('30 Yr');
 
   /* ── CNN 공포탐욕지수 ── */
   const fetchFearGreed = async () => {
@@ -103,16 +103,18 @@ export default async function handler(req, res) {
     return { value: Math.round(fg.score), label: fg.rating };
   };
 
-  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, gold, us10y, fg] = await Promise.allSettled([
+  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, gold, us10y, us30y, oil, fg] = await Promise.allSettled([
     fetchNaver('KOSPI'),
     fetchNaver('KOSDAQ'),
-    fetchStooq('^ndq'),     // NASDAQ Composite
-    fetchStooq('^spx'),     // S&P 500
-    fetchStooq('^dji'),     // Dow Jones
-    fetchStooq('usdkrw', true),  // USD/KRW + 60일 히스토리
-    fetchVIX(),             // CBOE VIX (공식 CSV)
-    fetchStooq('xauusd'),   // Gold spot (USD/oz)
-    fetchUS10Y(),           // 미국 10년 국채금리 (FRED)
+    fetchStooq('^ndq'),       // NASDAQ Composite
+    fetchStooq('^spx'),       // S&P 500
+    fetchStooq('^dji'),       // Dow Jones
+    fetchStooq('usdkrw', true), // USD/KRW + 60일 히스토리
+    fetchVIX(),               // CBOE VIX (공식 CSV)
+    fetchStooq('xauusd'),     // Gold spot (USD/oz)
+    fetchUS10Y(),             // 미국 10년 국채금리
+    fetchUS30Y(),             // 미국 30년 국채금리
+    fetchStooq('cl.f'),       // WTI 원유 선물 (USD/배럴)
     fetchFearGreed(),
   ]);
 
@@ -130,13 +132,15 @@ export default async function handler(req, res) {
     vix:       ok(vix),
     gold:      ok(gold),
     us10y:     ok(us10y),
+    us30y:     ok(us30y),
+    oil:       ok(oil),
     feargreed: ok(fg),
     ts:        Date.now(),
     _errors: {
       kospi: err(kospi), kosdaq: err(kosdaq),
       nasdaq: err(nasdaq), sp500: err(sp500), dow: err(dow),
       usdkrw: err(usdkrw), vix: err(vix), gold: err(gold),
-      us10y: err(us10y), feargreed: err(fg),
+      us10y: err(us10y), us30y: err(us30y), oil: err(oil), feargreed: err(fg),
     },
   });
 }
