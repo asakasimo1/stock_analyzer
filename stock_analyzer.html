@@ -1038,12 +1038,16 @@
     <div id="mkt-vix" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-feargreed" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
     <div id="mkt-gold" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-oil" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
-    <div id="mkt-us10y" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr;gap:12px">
+
+  <!-- 미국 국채금리 -->
+  <div style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:0.5px;margin-bottom:8px">📈 미국 국채금리</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div id="mkt-us10y" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
+    <div id="mkt-us20y" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
     <div id="mkt-us30y" class="mkt-index-card"><div class="mkt-loading">로딩 중...</div></div>
   </div>
 </div>
@@ -4558,7 +4562,7 @@ function _fgLabel(v) {
 async function loadMarketData() {
   const btn = document.getElementById('mkt-refresh-btn');
   if (btn) { btn.textContent = '⟳ 로딩 중...'; btn.disabled = true; }
-  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-oil','mkt-us10y','mkt-us30y'].forEach(id => {
+  ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-oil','mkt-us10y','mkt-us20y','mkt-us30y'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="mkt-loading">로딩 중...</div>';
   });
@@ -4639,29 +4643,20 @@ async function loadMarketData() {
         <div style="font-size:11px;color:#64748b;margin-top:4px">${d.oil.price >= 90 ? '⚠️ 고유가 구간' : d.oil.price >= 70 ? '보통 구간' : '저유가 구간'}</div>`);
     } else noData('mkt-oil');
 
-    if (d.us10y) {
-      const r10 = d.us10y.price;
-      const rColor = r10 >= 4.5 ? '#f87171' : r10 >= 3.5 ? '#fbbf24' : '#34d399';
-      setCard('mkt-us10y', `
-        <div class="mkt-name">🏦 미국 10년 국채금리</div>
-        <div class="mkt-price" style="color:${rColor}">${r10.toFixed(3)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">%</span></div>
-        <div class="${d.us10y.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.us10y.chg >= 0 ? '+' : ''}${d.us10y.chg.toFixed(3)}%p</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">${r10 >= 4.5 ? '⚠️ 고금리 구간' : r10 >= 3.5 ? '중립 구간' : '저금리 구간'}</div>`);
-    } else noData('mkt-us10y');
-
-    if (d.us30y) {
-      const r30 = d.us30y.price;
-      const r30Color = r30 >= 5.0 ? '#f87171' : r30 >= 4.0 ? '#fbbf24' : '#34d399';
-      const spread = d.us10y ? (r30 - d.us10y.price).toFixed(3) : null;
-      setCard('mkt-us30y', `
-        <div class="mkt-name">🏦 미국 30년 국채금리</div>
-        <div class="mkt-price" style="color:${r30Color}">${r30.toFixed(3)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">%</span></div>
-        <div class="${d.us30y.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${d.us30y.chg >= 0 ? '+' : ''}${d.us30y.chg.toFixed(3)}%p</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">
-          ${r30 >= 5.0 ? '⚠️ 고금리 구간' : r30 >= 4.0 ? '중립 구간' : '저금리 구간'}
-          ${spread !== null ? `&nbsp;·&nbsp; 10-30년 스프레드 <span style="color:#94a3b8">${spread > 0 ? '+' : ''}${spread}%p</span>` : ''}
-        </div>`);
-    } else noData('mkt-us30y');
+    const renderYield = (id, label, data, highThreshold, midThreshold) => {
+      if (!data) { noData(id); return; }
+      const p = data.price;
+      const color = p >= highThreshold ? '#f87171' : p >= midThreshold ? '#fbbf24' : '#34d399';
+      const tag = p >= highThreshold ? '⚠️ 고금리' : p >= midThreshold ? '중립' : '저금리';
+      setCard(id, `
+        <div class="mkt-name">🏦 ${label}</div>
+        <div class="mkt-price" style="color:${color}">${p.toFixed(3)}<span style="font-size:14px;color:#94a3b8;margin-left:4px">%</span></div>
+        <div class="${data.chg >= 0 ? 'mkt-chg-up' : 'mkt-chg-dn'}">${data.chg >= 0 ? '+' : ''}${data.chg.toFixed(3)}%p</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">${tag} 구간</div>`);
+    };
+    renderYield('mkt-us10y', '미국 10년 국채금리', d.us10y, 4.5, 3.5);
+    renderYield('mkt-us20y', '미국 20년 국채금리', d.us20y, 4.8, 4.0);
+    renderYield('mkt-us30y', '미국 30년 국채금리', d.us30y, 5.0, 4.0);
 
     if (d.feargreed) {
       const v   = d.feargreed.value;
@@ -4692,7 +4687,7 @@ async function loadMarketData() {
     const updEl = document.getElementById('mkt-updated');
     if (updEl) updEl.textContent = `${now} 기준`;
   } catch (e) {
-    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-oil','mkt-us10y','mkt-us30y'].forEach(id => {
+    ['mkt-kospi','mkt-kosdaq','mkt-nasdaq','mkt-sp500','mkt-dow','mkt-usdkrw','mkt-vix','mkt-feargreed','mkt-gold','mkt-oil','mkt-us10y','mkt-us20y','mkt-us30y'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = `<div class="mkt-loading" style="color:#f87171">로드 실패<br><span style="font-size:10px;color:#94a3b8">${e.message}</span></div>`;
     });
