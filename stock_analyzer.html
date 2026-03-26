@@ -743,6 +743,8 @@
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
     #etf-card-list { grid-template-columns: 1fr; }
     .etf2-price { font-size: 18px; }
+    .etf-btn-full { display: none; }
+    .etf-btn-short { display: inline !important; }
   }
 
   /* ETF 티커 조회 상태 피드백 — border-color는 JS로 직접 제어 */
@@ -1039,8 +1041,8 @@
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
     <div style="font-size:14px;font-weight:700;color:var(--text)">💹 ETF 보유 목록</div>
     <div style="display:flex;gap:8px">
-      <button id="etf-refresh-btn" onclick="refreshAllEtfPrices()" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">⟳ 현재가 업데이트</button>
-      <button onclick="openEtfModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">+ ETF 추가</button>
+      <button id="etf-refresh-btn" onclick="refreshAllEtfPrices()" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap"><span class="etf-btn-full">⟳ 현재가 업데이트</span><span class="etf-btn-short" style="display:none">⟳ 업데이트</span></button>
+      <button onclick="openEtfModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">+ ETF 추가</button>
     </div>
   </div>
 
