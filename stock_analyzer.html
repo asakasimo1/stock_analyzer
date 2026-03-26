@@ -883,7 +883,7 @@
 
     <!-- KPI 요약 -->
     <div id="port-kpi-row" class="port-kpi-row-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      <div class="port-kpi-card"><div class="port-kpi-lbl">개별주 평가금액</div><div class="port-kpi-val" id="pk-stk-eval">-</div></div>
+      <div class="port-kpi-card"><div class="port-kpi-lbl">개별주 평가손익</div><div class="port-kpi-val" id="pk-stk-eval">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 평가손익</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val" id="pk-ipo-profit">-</div></div>
       <div class="port-kpi-card"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val" id="pk-div-total">-</div></div>
@@ -931,7 +931,7 @@
       </div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
+          <thead><tr><th>종목명</th><th class="col-hide-sm">수량</th><th class="col-hide-sm">평균단가</th><th class="col-hide-sm">현재가</th><th>평가손익</th><th>수익률</th><th></th></tr></thead>
           <tbody id="port-stock-tbody"><tr><td colspan="7" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
@@ -2049,9 +2049,14 @@ function _renderPortKpi() {
   const colorVal = (el, val) => { el.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--primary)'; };
   const signFmt  = v => (v > 0 ? '+' : '') + v.toLocaleString() + '원';
 
-  // 개별주 평가금액
-  const stkEval = _stockRecords.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
-  document.getElementById('pk-stk-eval').textContent = stkEval ? stkEval.toLocaleString() + '원' : '-';
+  // 개별주 평가손익
+  const stkProfit = _stockRecords.reduce((s, r) => {
+    const cur = r.current_price || r.avg_price || 0;
+    return s + (cur - (r.avg_price||0)) * (r.qty||0);
+  }, 0);
+  const stkEl = document.getElementById('pk-stk-eval');
+  stkEl.textContent = _stockRecords.some(r => r.current_price) ? signFmt(stkProfit) : '-';
+  colorVal(stkEl, stkProfit);
 
   // ETF 평가손익 (현재가 있는 것만)
   const etfProfit = _portEtf.reduce((s, r) => {
@@ -2169,7 +2174,7 @@ function _renderPortStock() {
       <td class="col-hide-sm">${(r.qty||0).toLocaleString()}</td>
       <td class="col-hide-sm">${r.avg_price ? r.avg_price.toLocaleString()+'원' : '-'}</td>
       <td class="col-hide-sm">${r.current_price ? r.current_price.toLocaleString()+'원' : '-'}</td>
-      <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
+      <td class="${rc}">${r.current_price ? (profit>=0?'+':'')+profit.toLocaleString()+'원' : '-'}</td>
       <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
       <td style="text-align:center">
         <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
