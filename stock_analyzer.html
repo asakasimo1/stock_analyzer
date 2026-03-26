@@ -575,7 +575,7 @@
   }
   .etf-div-kpi-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 12px;
   }
   .etf-div-kpi-label {
@@ -737,14 +737,20 @@
   .etf-expand-hint { font-size: 10px; color: var(--muted); padding: 4px 14px; text-align: right; }
   @media (max-width: 768px) {
     .etf-wrap { padding: 12px; }
-    .etf-kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .etf-div-kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .etf-kpi-row { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .etf-kpi { padding: 10px 8px; }
+    .etf-kpi-label { font-size: 9px; }
+    .etf-kpi-val { font-size: 13px; }
+    .etf-div-kpi-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .div-hist-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .etf-card-body { grid-template-columns: 1fr; }
     .etf-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
     #etf-card-list { grid-template-columns: 1fr; }
     .etf2-price { font-size: 18px; }
     .etf-btn-full { display: none; }
     .etf-btn-short { display: inline !important; }
+    .div-month-total { font-size: 10px; white-space: nowrap; }
+    .div-month-header { font-size: 12px; gap: 4px; }
   }
 
   /* ETF 티커 조회 상태 피드백 — border-color는 JS로 직접 제어 */
@@ -1080,7 +1086,7 @@
     <div class="etf-kpi"><div class="etf-kpi-label">총 평가금</div><div class="etf-kpi-val" id="etf-k-eval">-</div></div>
     <div class="etf-kpi"><div class="etf-kpi-label">평가손익</div><div class="etf-kpi-val" id="etf-k-pnl">-</div></div>
   </div>
-  <div class="etf-div-kpi-row" style="margin-top:6px;grid-template-columns:repeat(4,1fr)">
+  <div class="etf-div-kpi-row" style="margin-top:6px">
     <div class="etf-kpi">
       <div class="etf-div-kpi-label">📥 연간 배당 (세전)</div>
       <div class="etf-div-kpi-val" id="etf-k-div-pre">-</div>
