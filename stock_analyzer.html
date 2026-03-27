@@ -2059,6 +2059,7 @@ let _stockRecords  = [];
 let _portEtf       = [];
 let _portIpo       = [];
 let _portDiv       = [];
+let _portCash      = 0;
 let _stockMdDown   = null;
 const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 
@@ -2069,16 +2070,18 @@ const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 async function initPortfolio() {
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
-    const [etfRes, ipoRes, divRes, stkRes] = await Promise.all([
+    const [etfRes, ipoRes, divRes, stkRes, metaRes] = await Promise.all([
       fetch('/api/etf').then(r=>r.json()),
       fetch('/api/ipo').then(r=>r.json()),
       fetch('/api/dividend').then(r=>r.json()),
       fetch('/api/stocks').then(r=>r.json()),
+      fetch('/api/data').then(r=>r.json()),
     ]);
     _portEtf      = etfRes.records || [];
     _portIpo      = ipoRes.records || [];
     _portDiv      = divRes.records || [];
     _stockRecords = stkRes.records || [];
+    _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
@@ -2165,7 +2168,7 @@ function _renderPortKpi() {
 
   // 차트
   _renderPortAsset();
-  _renderPortDonut(etfProfit, ipoProfit, divTotal);
+  _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal);
 }
 
 // ── ETF 보유현황 ───────────────────────────────────────────
@@ -2291,7 +2294,8 @@ function _renderPortAsset() {
 
   const etfEval = _portEtf.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
   const stkEval = _stockRecords.reduce((s, r) => s + (r.qty||0) * (r.current_price || r.avg_price || 0), 0);
-  const total   = etfEval + stkEval;
+  const cash    = _portCash || 0;
+  const total   = etfEval + stkEval + cash;
 
   if (total <= 0) {
     el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">자산 데이터 없음</div>';
@@ -2301,6 +2305,7 @@ function _renderPortAsset() {
   const slices = [
     { label: 'ETF',   val: etfEval, color: '#3D5AFE' },
     { label: '개별주', val: stkEval, color: '#00C853' },
+    { label: '예수금', val: cash,    color: '#FF9100' },
   ].filter(s => s.val > 0);
 
   _drawDonut(el, slices, total, '총 자산', 'var(--primary)');
@@ -2354,14 +2359,15 @@ function _drawDonut(el, slices, total, centerLabel, centerColor, signPrefix = fa
 }
 
 // ── 수익 현황 도넛 차트 ────────────────────────────────────
-function _renderPortDonut(etfProfit, ipoProfit, divTotal) {
+function _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal) {
   const el = document.getElementById('port-donut-wrap');
   if (!el) return;
 
   const allItems = [
     { label: 'ETF 수익',   val: etfProfit,  color: '#3D5AFE' },
+    { label: '개별주 수익', val: stkProfit,  color: '#00C853' },
     { label: '공모주 수익', val: ipoProfit,  color: '#FF9100' },
-    { label: '배당 수익',  val: divTotal,   color: '#00C853' },
+    { label: '배당 수익',  val: divTotal,   color: '#AB47BC' },
   ];
   const total = allItems.reduce((s, i) => s + Math.max(0, i.val), 0);
 

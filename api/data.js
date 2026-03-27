@@ -27,19 +27,21 @@ export default async function handler(req, res) {
     const files = gist.files || {};
 
     const result = {
-      briefing: [],
-      picks:    [],
-      signals:  [],
-      ipo:      [],
+      briefing:       [],
+      picks:          [],
+      signals:        [],
+      ipo:            [],
+      portfolio_meta: {},
     };
 
     for (const [key, fileObj] of Object.entries(files)) {
       try {
-        const data = JSON.parse(fileObj.content || '[]');
-        if (key === 'briefing.json') result.briefing = data;
-        if (key === 'picks.json')    result.picks    = data;
-        if (key === 'signals.json')  result.signals  = data;
-        if (key === 'ipo.json')      result.ipo      = data;
+        const data = JSON.parse(fileObj.content || 'null');
+        if (key === 'briefing.json')        result.briefing       = data || [];
+        if (key === 'picks.json')           result.picks          = data || [];
+        if (key === 'signals.json')         result.signals        = data || [];
+        if (key === 'ipo.json')             result.ipo            = data || [];
+        if (key === 'portfolio_meta.json')  result.portfolio_meta = data || {};
       } catch (_) {}
     }
 
