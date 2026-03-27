@@ -905,6 +905,20 @@
 <div id="tab-portfolio" class="tab-page">
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
+    <!-- 예수금 입력 -->
+    <div class="port-card" style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap">💵 예수금</div>
+      <input id="cash-input" type="text" inputmode="numeric"
+        style="flex:1;min-width:120px;max-width:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:14px;font-weight:600;text-align:right"
+        placeholder="0" />
+      <span style="font-size:13px;color:var(--muted)">원</span>
+      <button onclick="saveCash()"
+        style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+        저장
+      </button>
+      <span id="cash-save-msg" style="font-size:12px;color:var(--green);display:none">✓ 저장됨</span>
+    </div>
+
     <!-- 차트 2개 나란히 -->
     <div class="port-chart-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="port-card">
@@ -2067,6 +2081,29 @@ let _portIpo       = [];
 let _portDiv       = [];
 let _portCash      = 0;
 let _stockMdDown   = null;
+
+async function saveCash() {
+  const raw = (document.getElementById('cash-input')?.value || '').replace(/,/g, '');
+  const cash = parseInt(raw, 10) || 0;
+  try {
+    const r = await fetch('/api/portfolio-meta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cash }),
+    });
+    if (!(await r.json()).ok && !r.ok) throw new Error('저장 실패');
+    _portCash = cash;
+    // 입력란 포맷 갱신
+    const ci = document.getElementById('cash-input');
+    if (ci) ci.value = cash ? cash.toLocaleString() : '';
+    // 저장 확인 메시지
+    const msg = document.getElementById('cash-save-msg');
+    if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2000); }
+    // 차트 즉시 갱신
+    _renderPortAsset();
+    _renderPortKpi();
+  } catch(e) { alert('예수금 저장 실패: ' + e.message); }
+}
 const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 
 // ══════════════════════════════════════════════════════════
@@ -2088,6 +2125,9 @@ async function initPortfolio() {
     _portDiv      = divRes.records || [];
     _stockRecords = stkRes.records || [];
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
+    // 예수금 입력란 초기값 세팅
+    const ci = document.getElementById('cash-input');
+    if (ci) ci.value = _portCash ? _portCash.toLocaleString() : '';
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
