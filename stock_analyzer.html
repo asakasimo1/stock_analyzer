@@ -530,7 +530,7 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  .port-table td:first-child { text-align: left; font-weight: 600; }
+  .port-table td:first-child { text-align: left; font-weight: 600; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .port-table tr:last-child td { border-bottom: none; }
   .port-table tr:hover td { background: var(--bg); }
   .port-table .up  { color: var(--green); font-weight: 700; }
@@ -560,6 +560,7 @@
     .port-table-wrap { overflow-x: visible; }
     .port-table { font-size: 11px; }
     .port-table th, .port-table td { padding: 7px 6px; }
+    .port-table td:first-child { max-width: 90px; }
     /* 카드 패딩 축소 */
     .port-card { padding: 16px; }
     .port-card-title { margin-bottom: 12px; }
