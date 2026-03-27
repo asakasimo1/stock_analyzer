@@ -135,3 +135,26 @@ def save_signal(ticker: str, name: str, price: float, chg_pct: float, alerts: li
 def save_ipo(records: list):
     """공모주 청약 전체 데이터 저장 (Vercel 캘린더 표시용)"""
     _write_gist({"ipo.json": records})
+
+
+# ── 신호 쿨다운 관리 ──────────────────────────────────────────────────────────
+
+def load_sent_cooldown() -> dict:
+    """Gist에서 신호 쿨다운 기록 읽기 → {key: last_sent_iso}"""
+    if not GIST_ID:
+        return {}
+    try:
+        r = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=_headers(), timeout=10)
+        files = r.json().get("files", {})
+        if "signals_cooldown.json" in files:
+            content = files["signals_cooldown.json"].get("content", "{}")
+            data = json.loads(content)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[Gist] 쿨다운 읽기 실패: {e}")
+    return {}
+
+
+def save_sent_cooldown(cooldown: dict):
+    """Gist에 신호 쿨다운 기록 저장"""
+    _write_gist({"signals_cooldown.json": cooldown})

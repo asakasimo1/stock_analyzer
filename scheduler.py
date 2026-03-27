@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import schedule
 
@@ -36,8 +36,25 @@ log = logging.getLogger(__name__)
 
 WATCHLIST_FILE = os.path.join(os.path.dirname(__file__), "watchlist.json")
 
-# 신호 알림 중복 방지 (당일 이미 보낸 신호 기록)
+# 신호 알림 중복 방지 (당일 이미 보낸 신호 기록, 단일 프로세스 내)
 _sent_alerts: set = set()
+
+# 신호 카테고리별 쿨다운 (시간 단위)
+# GitHub Actions 매 30분 재실행 → Gist에 쿨다운 저장으로 프로세스 재시작 후에도 중복 방지
+_SIGNAL_COOLDOWN_HOURS = {
+    "RSI":        6,   # RSI 과매수/과매도: 장중 지속될 수 있으므로 6시간 쿨다운
+    "MACD":       24,  # MACD 크로스: 하루 1회로 충분
+    "볼린저밴드":  6,   # BB 돌파: 6시간 쿨다운
+    "크로스":     24,  # MA 골든/데드크로스: 하루 1회로 충분
+}
+
+
+def _signal_category(alert_text: str) -> str:
+    """알림 텍스트에서 카테고리 추출"""
+    for cat in ("MACD", "볼린저밴드", "RSI", "크로스"):
+        if cat in alert_text:
+            return cat
+    return "기타"
 
 
 def load_watchlist() -> list:
@@ -165,6 +182,17 @@ def check_signals(force: bool = False):
     try:
         from modules import data, technical
         from modules.telegram_bot import format_signal_alert
+        from modules.gist_writer import load_sent_cooldown, save_sent_cooldown, save_signal
+
+        # Gist에서 쿨다운 기록 로드 (프로세스 재시작 후에도 중복 방지)
+        cooldown_map = load_sent_cooldown()
+        # 48시간 지난 항목 제거 (bloat 방지)
+        cutoff = now - timedelta(hours=48)
+        cooldown_map = {
+            k: v for k, v in cooldown_map.items()
+            if datetime.fromisoformat(v) > cutoff
+        }
+        cooldown_updated = False
 
         stocks = load_watchlist()
         for s in stocks:
@@ -182,42 +210,63 @@ def check_signals(force: bool = False):
                 prev    = df["Close"].iloc[-2] if len(df) > 1 else last
                 chg_p   = (last - prev) / prev * 100 if prev else 0
                 signals = tech.get("signals", {})
-                alerts  = []
+                raw_alerts = []
 
                 # RSI 과매수/과매도
                 rsi_sig = signals.get("RSI", "")
                 if "과매수" in str(rsi_sig):
-                    alerts.append(f"🔴 RSI 과매수 — {rsi_sig}")
+                    raw_alerts.append(f"🔴 RSI 과매수 — {rsi_sig}")
                 elif "과매도" in str(rsi_sig):
-                    alerts.append(f"🟢 RSI 과매도 — {rsi_sig}")
+                    raw_alerts.append(f"🟢 RSI 과매도 — {rsi_sig}")
 
                 # MACD 크로스
                 macd_sig = signals.get("MACD", "")
                 if "골든크로스" in str(macd_sig):
-                    alerts.append(f"🟢 MACD 골든크로스 발생!")
+                    raw_alerts.append(f"🟢 MACD 골든크로스 발생!")
                 elif "데드크로스" in str(macd_sig):
-                    alerts.append(f"🔴 MACD 데드크로스 발생!")
+                    raw_alerts.append(f"🔴 MACD 데드크로스 발생!")
 
                 # 볼린저밴드 돌파
                 bb_sig = signals.get("볼린저밴드", "")
                 if "상단 돌파" in str(bb_sig):
-                    alerts.append(f"⚠️ 볼린저밴드 상단 돌파 — {bb_sig}")
+                    raw_alerts.append(f"⚠️ 볼린저밴드 상단 돌파 — {bb_sig}")
                 elif "하단 이탈" in str(bb_sig):
-                    alerts.append(f"⚠️ 볼린저밴드 하단 이탈 — {bb_sig}")
+                    raw_alerts.append(f"⚠️ 볼린저밴드 하단 이탈 — {bb_sig}")
 
                 # 골든/데드크로스 (MA)
                 cross_sig = signals.get("크로스", "")
                 if cross_sig:
-                    alerts.append(f"🚨 {cross_sig}")
+                    raw_alerts.append(f"🚨 {cross_sig}")
+
+                if not raw_alerts:
+                    continue
+
+                # ── 쿨다운 필터 (Gist 기반, 프로세스 재시작 후에도 유효) ──────────
+                alerts = []
+                for alert in raw_alerts:
+                    cat   = _signal_category(alert)
+                    key   = f"{ticker}:{cat}"
+                    hours = _SIGNAL_COOLDOWN_HOURS.get(cat, 6)
+
+                    # 단일 프로세스 내 중복 방지
+                    if key in _sent_alerts:
+                        continue
+
+                    # Gist 쿨다운 체크
+                    last_sent = cooldown_map.get(key)
+                    if last_sent:
+                        elapsed_h = (now - datetime.fromisoformat(last_sent)).total_seconds() / 3600
+                        if elapsed_h < hours:
+                            log.info(f"  ⏳ 쿨다운 중 ({elapsed_h:.1f}h/{hours}h): {name} {cat}")
+                            continue
+
+                    alerts.append(alert)
+                    _sent_alerts.add(key)
+                    cooldown_map[key] = now.isoformat()
+                    cooldown_updated = True
 
                 if not alerts:
                     continue
-
-                # 중복 알림 방지 (같은 종목의 같은 알림은 하루에 1회)
-                alert_key = f"{ticker}:{':'.join(sorted(alerts))}:{now.date()}"
-                if alert_key in _sent_alerts:
-                    continue
-                _sent_alerts.add(alert_key)
 
                 msg = format_signal_alert(ticker, name, last, chg_p, alerts)
                 _send(msg)
@@ -225,7 +274,6 @@ def check_signals(force: bool = False):
 
                 # Gist에 신호 저장
                 try:
-                    from modules.gist_writer import save_signal
                     save_signal(ticker, name, float(last), round(chg_p, 2), alerts, msg)
                 except Exception as ge:
                     log.warning(f"Gist 신호 저장 실패: {ge}")
@@ -233,6 +281,14 @@ def check_signals(force: bool = False):
             except Exception as e:
                 log.warning(f"  {name} 신호 체크 실패: {e}")
                 continue
+
+        # 쿨다운 변경사항 Gist에 저장
+        if cooldown_updated:
+            try:
+                save_sent_cooldown(cooldown_map)
+                log.info("  💾 쿨다운 기록 저장 완료")
+            except Exception as e:
+                log.warning(f"쿨다운 저장 실패: {e}")
 
     except Exception as e:
         log.error(f"신호 체크 실패: {e}", exc_info=True)

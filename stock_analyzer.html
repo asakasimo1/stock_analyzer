@@ -435,8 +435,10 @@
      포트폴리오 탭
   ══════════════════════════════════════════════════ */
   .port-kpi-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+  .port-kpi-sm   { padding:10px 12px; }
   .port-kpi-lbl  { font-size:11px;color:var(--muted);margin-bottom:4px; }
   .port-kpi-val  { font-size:20px;font-weight:700;color:var(--primary); }
+  .port-kpi-val-sm { font-size:15px; }
   .port-wrap {
     max-width: 1400px; margin: 0 auto;
     padding: 28px 40px;
@@ -897,14 +899,6 @@
 <div id="tab-portfolio" class="tab-page">
   <div style="max-width:960px;margin:0 auto;padding:16px">
 
-    <!-- KPI 요약 -->
-    <div id="port-kpi-row" class="port-kpi-row-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      <div class="port-kpi-card"><div class="port-kpi-lbl">개별주 평가손익</div><div class="port-kpi-val" id="pk-stk-eval">-</div></div>
-      <div class="port-kpi-card"><div class="port-kpi-lbl">ETF 평가손익</div><div class="port-kpi-val" id="pk-etf-eval">-</div></div>
-      <div class="port-kpi-card"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val" id="pk-ipo-profit">-</div></div>
-      <div class="port-kpi-card"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val" id="pk-div-total">-</div></div>
-    </div>
-
     <!-- 차트 2개 나란히 -->
     <div class="port-chart-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="port-card">
@@ -915,6 +909,14 @@
         <div class="port-card-title">💰 수익 배분</div>
         <div id="port-donut-wrap"></div>
       </div>
+    </div>
+
+    <!-- KPI 요약 (차트 아래, 작게) -->
+    <div id="port-kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
+      <div class="port-kpi-card port-kpi-sm"><div class="port-kpi-lbl">개별주 평가손익</div><div class="port-kpi-val port-kpi-val-sm" id="pk-stk-eval">—</div></div>
+      <div class="port-kpi-card port-kpi-sm"><div class="port-kpi-lbl">ETF 평가손익</div><div class="port-kpi-val port-kpi-val-sm" id="pk-etf-eval">—</div></div>
+      <div class="port-kpi-card port-kpi-sm"><div class="port-kpi-lbl">공모주 누적 수익</div><div class="port-kpi-val port-kpi-val-sm" id="pk-ipo-profit">—</div></div>
+      <div class="port-kpi-card port-kpi-sm"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val port-kpi-val-sm" id="pk-div-total">—</div></div>
     </div>
 
     <!-- ETF 보유현황 -->
@@ -2355,16 +2357,32 @@ function _drawDonut(el, slices, total, centerLabel, centerColor, signPrefix = fa
 function _renderPortDonut(etfProfit, ipoProfit, divTotal) {
   const el = document.getElementById('port-donut-wrap');
   if (!el) return;
-  const total = Math.max(0, etfProfit) + Math.max(0, ipoProfit) + Math.max(0, divTotal);
+
+  const allItems = [
+    { label: 'ETF 수익',   val: etfProfit,  color: '#3D5AFE' },
+    { label: '공모주 수익', val: ipoProfit,  color: '#FF9100' },
+    { label: '배당 수익',  val: divTotal,   color: '#00C853' },
+  ];
+  const total = allItems.reduce((s, i) => s + Math.max(0, i.val), 0);
+
   if (total <= 0) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">수익 데이터 없음</div>';
+    // 수익 없어도 범례는 항상 표시
+    const fmtV = v => (v !== null && v !== undefined) ? (v > 0 ? '+' : '') + v.toLocaleString() + '원' : '—';
+    const legend = allItems.map(s => `
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:7px">
+        <span style="width:9px;height:9px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
+        <span style="color:var(--muted);flex:1">${s.label}</span>
+        <span style="font-weight:600;color:${s.val > 0 ? 'var(--green)' : s.val < 0 ? 'var(--red)' : 'var(--muted)'}">${fmtV(s.val)}</span>
+      </div>`).join('');
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:12px">
+        <div style="color:var(--muted);font-size:12px;margin-bottom:12px">수익 집계 대기 중</div>
+        <div style="width:100%">${legend}</div>
+      </div>`;
     return;
   }
-  const slices = [
-    { label: 'ETF 수익',   val: Math.max(0, etfProfit),  color: '#3D5AFE' },
-    { label: '공모주 수익', val: Math.max(0, ipoProfit),  color: '#FF9100' },
-    { label: '배당 수익',  val: Math.max(0, divTotal),   color: '#00C853' },
-  ].filter(s => s.val > 0);
+
+  const slices = allItems.filter(s => s.val > 0);
   _drawDonut(el, slices, total, '총 수익', 'var(--green)', true);
 }
 
