@@ -2082,7 +2082,7 @@ async function saveCash() {
   const raw = (document.getElementById('cash-input')?.value || '').replace(/,/g, '');
   const cash = parseInt(raw, 10) || 0;
   try {
-    const r = await fetch('/api/portfolio-meta', {
+    const r = await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cash }),
