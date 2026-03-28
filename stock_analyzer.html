@@ -1771,19 +1771,17 @@ function calMove(dir) {
   if (_dashData) renderCalendar(_dashData); else renderCalendar({ ipo: _ipoRecords });
 }
 
-function calcAllotDate(dateSubEnd) {
-  // 청약 마감 + 2 영업일 (로컬 시간 기준으로 파싱)
+// 영업일 계산 공통 함수 (calcAllotDate / calcAllotDateIpo / calcEstListDate 통합)
+function addBizDays(dateStr, n) {
+  if (!dateStr) return '';
   try {
-    let d = new Date(dateSubEnd + 'T00:00:00');
+    let d = new Date(dateStr + 'T00:00:00');
     let bdays = 0;
-    while (bdays < 2) {
+    while (bdays < n) {
       d.setDate(d.getDate() + 1);
-      if (d.getDay() !== 0 && d.getDay() !== 6) bdays++;
+      if (d.getDay() >= 1 && d.getDay() <= 5) bdays++;
     }
-    const y = d.getFullYear();
-    const mo = String(d.getMonth()+1).padStart(2,'0');
-    const dy = String(d.getDate()).padStart(2,'0');
-    return `${y}-${mo}-${dy}`;
+    return d.toISOString().slice(0, 10);
   } catch(_) { return ''; }
 }
 
@@ -1837,7 +1835,7 @@ function renderCalendar(data) {
     // 배정일 — 청약완료 시에만 표시 (step2)
     // 배정주수 미입력 OR 배정은 됐지만 상장일이 아직 없는 경우에도 표시
     if (ipo.subscribed && ipo.date_sub_end && !['상장완료','청약포기','배정실패'].includes(status)) {
-      const allotDate = ipo.date_allot || calcAllotDate(ipo.date_sub_end);
+      const allotDate = ipo.date_allot || addBizDays(ipo.date_sub_end, 2);
       const hasAlloc  = ipo.shares_alloc && ipo.shares_alloc > 0;
       const needsListDate = hasAlloc && !ipo.date_list;
       if (!hasAlloc || needsListDate) {
@@ -2047,7 +2045,7 @@ function showDayDetail(key) {
             </div>
             <div>
               <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">상장일 <span style="color:#64748b">(모르면 추정값)</span></label>
-              <input type="date" id="allot-listdate-${ipo.id}" value="${ipo.date_list || calcEstListDate(ipo.date_sub_end)}"
+              <input type="date" id="allot-listdate-${ipo.id}" value="${ipo.date_list || addBizDays(ipo.date_sub_end, 5)}"
                 style="width:100%;padding:8px;background:#111827;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:13px;box-sizing:border-box">
             </div>
           </div>
@@ -2216,27 +2214,34 @@ async function initPortfolio() {
 }
 
 // 포트폴리오 탭 — 실시간 현재가 일괄 조회 (Gist 저장 없이 화면만 갱신)
+let _portRefreshing = false;
 async function _refreshPortfolioRealtime() {
-  const etfFetches = _portEtf
-    .filter(r => r.ticker)
-    .map(async r => {
-      try {
-        const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
-        if (d.price) r.current_price = d.price;
-      } catch {}
-    });
+  if (_portRefreshing) return;   // 중복 실행 차단
+  _portRefreshing = true;
+  try {
+    const etfFetches = _portEtf
+      .filter(r => r.ticker)
+      .map(async r => {
+        try {
+          const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
+          if (d.price) r.current_price = d.price;
+        } catch {}
+      });
 
-  const stkFetches = _stockRecords
-    .filter(r => r.ticker)
-    .map(async r => {
-      try {
-        const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
-        if (d.price) r.current_price = d.price;
-      } catch {}
-    });
+    const stkFetches = _stockRecords
+      .filter(r => r.ticker)
+      .map(async r => {
+        try {
+          const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
+          if (d.price) r.current_price = d.price;
+        } catch {}
+      });
 
-  await Promise.all([...etfFetches, ...stkFetches]);
-  renderPortfolio();
+    await Promise.all([...etfFetches, ...stkFetches]);
+    renderPortfolio();
+  } finally {
+    _portRefreshing = false;
+  }
 }
 
 function _startPortAutoRefresh() {
@@ -2668,22 +2673,29 @@ async function saveStockRecord() {
   const qty  = parseFloat(document.getElementById('sm-qty').value) || 0;
   const avg  = parseFloat(document.getElementById('sm-avg').value) || 0;
   if (!name) { alert('종목명을 입력하세요'); return; }
-  const record = {
-    id:            parseInt(document.getElementById('sm-id').value) || undefined,
-    name,
-    ticker:        document.getElementById('sm-ticker').value.trim(),
-    qty,
-    avg_price:     avg,
-    current_price: parseFloat(document.getElementById('sm-cur').value) || 0,
-    note:          document.getElementById('sm-note').value.trim(),
-  };
-  const res = await fetch('/api/stocks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({record}) });
-  const d   = await res.json();
-  if (!d.ok) { alert('저장 실패: ' + (d.error||'')); return; }
-  const idx = _stockRecords.findIndex(s => s.id == d.record.id);
-  if (idx !== -1) _stockRecords[idx] = d.record; else _stockRecords.push(d.record);
-  closeStockModal();
-  renderPortfolio();
+  const btn = document.querySelector('[onclick="saveStockRecord()"]');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  try {
+    const record = {
+      id:            parseInt(document.getElementById('sm-id').value) || undefined,
+      name,
+      ticker:        document.getElementById('sm-ticker').value.trim(),
+      qty,
+      avg_price:     avg,
+      current_price: parseFloat(document.getElementById('sm-cur').value) || 0,
+      note:          document.getElementById('sm-note').value.trim(),
+    };
+    const res = await fetch('/api/stocks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({record}) });
+    const d   = await res.json();
+    if (!d.ok) { alert('저장 실패: ' + (d.error||'')); return; }
+    const idx = _stockRecords.findIndex(s => s.id == d.record.id);
+    if (idx !== -1) _stockRecords[idx] = d.record; else _stockRecords.push(d.record);
+    closeStockModal();
+    renderPortfolio();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 저장'; }
+  }
 }
 
 async function deleteStockRecord(id) {
@@ -2718,22 +2730,6 @@ const IPO_STATUS = {
   '청약예정': '🔵', '청약중': '🟡', '상장예정': '🟠', '상장완료': '🟢', '청약포기': '⚫', '배정실패': '❌',
 };
 
-function calcAllotDateIpo(subEnd) {
-  if (!subEnd) return '';
-  let d = new Date(subEnd + 'T00:00:00');
-  let bdays = 0;
-  while (bdays < 2) { d.setDate(d.getDate() + 1); if (d.getDay() >= 1 && d.getDay() <= 5) bdays++; }
-  return d.toISOString().slice(0, 10);
-}
-
-// 청약마감일 기준 약 5영업일 후 = 추정 상장일
-function calcEstListDate(subEnd) {
-  if (!subEnd) return '';
-  let d = new Date(subEnd + 'T00:00:00');
-  let bdays = 0;
-  while (bdays < 5) { d.setDate(d.getDate() + 1); if (d.getDay() >= 1 && d.getDay() <= 5) bdays++; }
-  return d.toISOString().slice(0, 10);
-}
 
 function autoStatus(r) {
   const today = new Date().toISOString().slice(0, 10);
@@ -2815,7 +2811,7 @@ function renderIpoManage() {
   let alerts = '';
   _ipoRecords.forEach(r => {
     if (r.shares_alloc > 0 || ['청약포기','상장완료','배정실패'].includes(r.status)) return;
-    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
+    const allotDate = r.date_allot || addBizDays(r.date_sub_end, 2);
     if (allotDate && allotDate <= today) {
       alerts += `
         <div style="background:#78350f;border:1px solid #fbbf24;border-radius:10px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
@@ -2846,7 +2842,7 @@ function renderIpoManage() {
     </div>`;
 
   document.getElementById('ipo-list-manage').innerHTML = sorted.map(r => {
-    const allotDate = r.date_allot || calcAllotDateIpo(r.date_sub_end);
+    const allotDate = r.date_allot || addBizDays(r.date_sub_end, 2);
     const alloc     = r.shares_alloc || 0;
     const minAmt    = (r.shares_apply && r.price_ipo) ? r.shares_apply * r.price_ipo * 0.5 : null;
     const sellQty   = r.sell_qty || alloc;
@@ -3043,10 +3039,14 @@ function closeIpoModal() {
 async function saveIpoRecord() {
   const name = document.getElementById('if-name').value.trim();
   if (!name) { alert('종목명을 입력하세요'); return; }
+  const btn = document.querySelector('[onclick="saveIpoRecord()"]');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  try {
 
   const id = parseInt(document.getElementById('if-id').value) || null;
   const rec = {
-    id: id || (Math.max(0, ..._ipoRecords.map(r => r.id || 0)) + 1),
+    id: id || (Date.now()),  // 고유 ID (동시 저장 시 충돌 방지)
     name,
     date_sub_start:   document.getElementById('if-sub-start').value,
     date_sub_end:     document.getElementById('if-sub-end').value,
@@ -3072,6 +3072,9 @@ async function saveIpoRecord() {
   await saveIpoRecords();
   closeIpoModal();
   renderIpoManage();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 저장'; }
+  }
 }
 
 function editIpo(id) {
@@ -3202,7 +3205,7 @@ async function markSubscribed(id) {
   else renderCalendar({ ipo: _ipoRecords });
   document.getElementById('day-modal-overlay').classList.remove('open');
   const r = _ipoRecords[idx];
-  const allotDate = r.date_allot || calcAllotDate(r.date_sub_end);
+  const allotDate = r.date_allot || addBizDays(r.date_sub_end, 2);
   alert(`✅ ${r.name} 청약완료!\n배정확인일(${allotDate})이 캘린더에 추가됐습니다.`);
 }
 
@@ -3590,6 +3593,10 @@ async function saveEtfRecord() {
   const avg  = parseInt(document.getElementById('ef-avg-price').value) || 0;
   if (!name)       { alert('ETF명을 입력하세요'); return; }
   if (!qty || !avg){ alert('보유수량과 평균매수가를 입력하세요'); return; }
+  const btn = document.querySelector('[onclick="saveEtfRecord()"]');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+  try {
 
   const idVal = document.getElementById('ef-id').value;
   const rec = {
@@ -3622,6 +3629,9 @@ async function saveEtfRecord() {
   await saveEtfRecords();
   closeEtfModal();
   renderEtfCards();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+  }
 }
 
 async function deleteEtf(id) {
@@ -4354,8 +4364,11 @@ function _updateRefreshBtnLabel() {
     btn.textContent = '⟳ 현재가 업데이트';
 }
 
+let _etfRefreshing = false;
 async function refreshAllEtfPrices(silent = false) {
   if (!_etfRecords.length) return;
+  if (_etfRefreshing) return;   // 자동/수동 중복 실행 차단
+  _etfRefreshing = true;
   const btn = document.getElementById('etf-refresh-btn');
   if (!silent && btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
 
@@ -4396,6 +4409,7 @@ async function refreshAllEtfPrices(silent = false) {
   } else if (updated) {
     setTimeout(_updateRefreshBtnLabel, 0);
   }
+  _etfRefreshing = false;
 }
 
 // 버튼 라벨 1분마다 갱신 (남은 시간 표시)
@@ -4434,13 +4448,12 @@ function calcMonthlySim() {
   const priceGrow   = (parseFloat(document.getElementById('ms-price-grow').value)  || 0)  / 100;
   const doReinvest  = document.getElementById('ms-reinvest').checked;
   const doTax       = document.getElementById('ms-tax').checked;
-  const TAX         = 0.154;
 
   if (initInvest <= 0 || annYield <= 0) return;
 
   const mPriceGrow  = Math.pow(1 + priceGrow, 1/12) - 1;
   const mYieldBase  = annYield / 12;
-  const taxRate     = doTax ? (1 - TAX) : 1;
+  const taxRate     = doTax ? (1 - TAX_RATE) : 1;  // 전역 TAX_RATE = 0.154 사용
 
   let portfolio     = initInvest;   // 포트폴리오 평가액 (주가 상승 반영)
   let costBasis     = initInvest;   // 누적 투자 원금
@@ -4457,15 +4470,18 @@ function calcMonthlySim() {
   document.getElementById('ms-cur-div').textContent = fmtW(curMonthDiv) + '/월';
 
   for (let m = 1; m <= MAX_MONTHS; m++) {
-    // 주가 상승
-    portfolio  = (portfolio + monthlyAdd) * (1 + mPriceGrow);
-    costBasis += monthlyAdd;
+    // 1. 월 추가 투자
+    portfolio  += monthlyAdd;
+    costBasis  += monthlyAdd;
 
-    // 월 배당 (세후)
+    // 2. 배당 계산 (추가투자 반영 후, 주가상승 전)
     const mDiv = portfolio * mYieldBase * taxRate;
 
-    // 배당 재투자
+    // 3. 배당 재투자
     if (doReinvest) portfolio += mDiv;
+
+    // 4. 주가 상승
+    portfolio  *= (1 + mPriceGrow);
 
     chartDiv.push(mDiv);
 
