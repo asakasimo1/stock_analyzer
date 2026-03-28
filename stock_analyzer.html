@@ -910,6 +910,16 @@
       <div class="port-card">
         <div class="port-card-title">📦 자산 현황</div>
         <div id="port-asset-wrap"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap">💵 예수금</span>
+          <input id="cash-input" type="text" inputmode="numeric"
+            style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:14px;font-weight:600;text-align:right"
+            placeholder="0" />
+          <span style="font-size:12px;color:var(--muted)">원</span>
+          <button onclick="saveCash()"
+            style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">저장</button>
+          <span id="cash-save-msg" style="font-size:11px;color:var(--green);display:none">✓</span>
+        </div>
       </div>
       <div class="port-card">
         <div class="port-card-title">💰 수익 배분</div>
@@ -958,22 +968,6 @@
           <thead><tr><th>종목명</th><th>평가손익</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
           <tbody id="port-stock-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- 예수금 입력 -->
-    <div class="port-card" style="margin-top:16px">
-      <div class="port-card-title">💵 예수금</div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <input id="cash-input" type="text" inputmode="numeric"
-          style="flex:1;min-width:140px;max-width:220px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:16px;font-weight:600;text-align:right"
-          placeholder="0" />
-        <span style="font-size:14px;color:var(--muted)">원</span>
-        <button onclick="saveCash()"
-          style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:14px;font-weight:600;cursor:pointer">
-          저장
-        </button>
-        <span id="cash-save-msg" style="font-size:12px;color:var(--green);display:none">✓ 저장됨</span>
       </div>
     </div>
 
