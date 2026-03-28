@@ -1581,10 +1581,36 @@ function renderDashboard(data) {
 }
 
 // ── 브리핑 목록 ─────────────────────────────────────────
-function renderBriefingList(items) {
+let _briefingItems = [], _briefingExpanded = false;
+
+function renderBriefingList(items) { _briefingItems = items; _renderBriefing(); }
+
+function _renderBriefing() {
   const el = document.getElementById('list-briefing');
+  const items = _briefingItems;
   if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 브리핑 데이터가 없습니다</div>'; return; }
-  el.innerHTML = items.slice(0, 20).map(item => `
+
+  const today     = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  // 오늘+어제 필터. 없으면 최근 2개 날짜로 폴백
+  let visible = items.filter(i => i.date === today || i.date === yesterday);
+  if (!visible.length) {
+    const dates = [...new Set(items.map(i => i.date))].sort().reverse().slice(0, 2);
+    visible = items.filter(i => dates.includes(i.date));
+  }
+  const toShow = _briefingExpanded ? items.slice(0, 20) : visible;
+  const hasMore = items.length > visible.length;
+
+  const moreBtn = hasMore ? `
+    <div style="text-align:center;padding:6px 0">
+      <button onclick="_briefingExpanded=!_briefingExpanded;_renderBriefing()"
+        style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 18px;font-size:12px;color:var(--muted);cursor:pointer">
+        ${_briefingExpanded ? '▲ 접기' : '▼ 더보기'}
+      </button>
+    </div>` : '';
+
+  el.innerHTML = toShow.map(item => `
     <div class="result-item">
       <div class="result-item-header">
         <span class="result-badge briefing">📊 일일 브리핑</span>
@@ -1598,7 +1624,7 @@ function renderBriefingList(items) {
             <span style="color:var(--muted);font-size:10px">${s.signal?.replace(/[🟢🔴🟡]/g,'').trim()}</span>
           </span>`).join('')}
       </div>
-    </div>`).join('');
+    </div>`).join('') + moreBtn;
 }
 
 // ── 매수 추천 목록 ───────────────────────────────────────
@@ -1622,17 +1648,48 @@ function renderPicksList(items) {
 }
 
 // ── 공모주 청약 현황 ─────────────────────────────────────
-function renderIpoList(items) {
+let _ipoListItems = [], _ipoExpanded = false;
+
+function renderIpoList(items) { _ipoListItems = items; _renderIpoList(); }
+
+function _renderIpoList() {
   const el = document.getElementById('list-ipo');
+  const items = _ipoListItems;
   const STATUS_EMOJI = { '청약예정':'🔵', '청약중':'🟡', '상장예정':'🟠', '상장완료':'🟢', '청약포기':'⚫', '배정실패':'❌' };
 
-  // 진행중 → 상장완료 순 정렬
+  if (!items.length) { el.innerHTML = '<div class="empty-msg">등록된 공모주가 없습니다</div>'; return; }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 일정 기준일 추출 (정렬용)
+  function _ipoDate(ipo) {
+    if (ipo.status === '청약중')   return ipo.date_sub_end   || '9999';
+    if (ipo.status === '청약예정') return ipo.date_sub_start || '9999';
+    if (ipo.status === '상장예정') return ipo.date_list      || '9999';
+    return null;
+  }
+
+  // 금일 이후 가장 가까운 일정 (청약중·청약예정·상장예정)
+  const upcoming = items
+    .filter(ipo => { const d = _ipoDate(ipo); return d && d >= today; })
+    .sort((a, b) => (_ipoDate(a) || '').localeCompare(_ipoDate(b) || ''));
+
+  // 전체 보기용: 진행중 → 상장완료 순
   const order = ['청약중','청약예정','상장예정','상장완료','청약포기','배정실패'];
-  const sorted = [...items].sort((a,b) => order.indexOf(a.status||'') - order.indexOf(b.status||''));
+  const allSorted = [...items].sort((a,b) => order.indexOf(a.status||'') - order.indexOf(b.status||''));
 
-  if (!sorted.length) { el.innerHTML = '<div class="empty-msg">등록된 공모주가 없습니다</div>'; return; }
+  const toShow = _ipoExpanded ? allSorted : upcoming.slice(0, 3);
+  const hasMore = upcoming.length > 3 || items.some(ipo => !_ipoDate(ipo) || _ipoDate(ipo) < today);
 
-  el.innerHTML = sorted.map(ipo => {
+  const moreBtn = hasMore ? `
+    <div style="text-align:center;padding:6px 0">
+      <button onclick="_ipoExpanded=!_ipoExpanded;_renderIpoList()"
+        style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 18px;font-size:12px;color:var(--muted);cursor:pointer">
+        ${_ipoExpanded ? '▲ 접기' : '▼ 전체보기'}
+      </button>
+    </div>` : '';
+
+  el.innerHTML = (toShow.length ? toShow : allSorted.slice(0, 3)).map(ipo => {
     const sub = ipo.subscribed;
     const status = ipo.status || '';
     const emoji = STATUS_EMOJI[status] || '⚪';
@@ -1657,14 +1714,31 @@ function renderIpoList(items) {
       </div>
       ${ipo.price_ipo ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">공모가 ${ipo.price_ipo.toLocaleString()}원${ipo.competition_inst ? ` | 기관경쟁률 ${ipo.competition_inst.toLocaleString()}:1` : ''}</div>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + moreBtn;
 }
 
 // ── 신호 알림 목록 ───────────────────────────────────────
-function renderSignalsList(items) {
+let _signalItems = [], _signalExpanded = false;
+
+function renderSignalsList(items) { _signalItems = items; _renderSignals(); }
+
+function _renderSignals() {
   const el = document.getElementById('list-signals');
+  const items = _signalItems;
   if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 신호 데이터가 없습니다</div>'; return; }
-  el.innerHTML = items.slice(0, 30).map(item => `
+
+  const toShow = _signalExpanded ? items.slice(0, 10) : items.slice(0, 3);
+  const hasMore = items.length > 3;
+
+  const moreBtn = hasMore ? `
+    <div style="text-align:center;padding:6px 0">
+      <button onclick="_signalExpanded=!_signalExpanded;_renderSignals()"
+        style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 18px;font-size:12px;color:var(--muted);cursor:pointer">
+        ${_signalExpanded ? '▲ 접기' : `▼ 더보기 (최대 10개)`}
+      </button>
+    </div>` : '';
+
+  el.innerHTML = toShow.map(item => `
     <div class="result-item">
       <div class="result-item-header">
         <span class="result-badge signal">📡 ${item.name} (${item.ticker})</span>
@@ -1679,7 +1753,7 @@ function renderSignalsList(items) {
           ${item.chg_pct >= 0 ? '▲' : '▼'}${Math.abs(item.chg_pct).toFixed(2)}%
         </span>
       </div>
-    </div>`).join('');
+    </div>`).join('') + moreBtn;
 }
 
 // ══════════════════════════════════════════════════════════
