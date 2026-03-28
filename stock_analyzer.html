@@ -925,24 +925,30 @@
       <div class="port-kpi-card port-kpi-sm"><div class="port-kpi-lbl">세후 배당 누적</div><div class="port-kpi-val port-kpi-val-sm" id="pk-div-total">—</div></div>
     </div>
 
+    <!-- ETF별 배당 현황 차트 -->
+    <div class="port-card" style="margin-bottom:16px">
+      <div class="port-card-title">💸 ETF별 배당 현황</div>
+      <div id="port-etf-div-chart"><div class="port-loading" style="padding:20px">로딩 중...</div></div>
+    </div>
+
     <!-- ETF 보유현황 -->
     <div class="port-card" style="margin-bottom:16px">
       <div class="port-card-title">📊 ETF 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>평가손익</th><th>평가금액</th><th>수익률</th></tr></thead>
-          <tbody id="port-etf-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>수익률</th><th>평가금액</th></tr></thead>
+          <tbody id="port-etf-tbody"><tr><td colspan="3" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- 공모주 수익현황 -->
-    <div class="port-card" style="margin-bottom:16px">
+    <!-- 공모주 수익현황 (데이터 있을 때만 표시) -->
+    <div id="port-ipo-card" class="port-card" style="margin-bottom:16px;display:none">
       <div class="port-card-title">🏢 공모주 수익현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>수익금</th><th>수익률</th><th></th></tr></thead>
-          <tbody id="port-ipo-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>수익률</th><th>수익금</th></tr></thead>
+          <tbody id="port-ipo-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -955,8 +961,8 @@
       </div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>평가손익</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
-          <tbody id="port-stock-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>수익률</th><th>평가금액</th><th></th></tr></thead>
+          <tbody id="port-stock-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
       <!-- 예수금 관리 -->
@@ -2254,6 +2260,7 @@ function _startPortAutoRefresh() {
 
 function renderPortfolio() {
   _renderPortKpi();
+  _renderEtfDivChart();
   _renderPortEtf();
   _renderPortIpo();
   _renderPortStock();
@@ -2304,9 +2311,7 @@ function _renderPortKpi() {
 // ── ETF 보유현황 ───────────────────────────────────────────
 function _renderPortEtf() {
   const tbody = document.getElementById('port-etf-tbody');
-  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
-  const divByEtf = {};
-  _portDiv.forEach(r => { divByEtf[r.etf_id] = (divByEtf[r.etf_id]||0) + (r.net||0); });
+  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="3" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
 
   let totalBuy = 0, totalEval = 0, totalProfit = 0;
   const rows = _portEtf.map(r => {
@@ -2321,40 +2326,44 @@ function _renderPortEtf() {
     totalBuy += buy; totalEval += eval_; totalProfit += profit;
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
-      <td class="${rc}">${cur ? (profit>=0?'+':'')+profit.toLocaleString()+'원' : '-'}</td>
+      <td class="${rc}" style="line-height:1.4">
+        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
+        ${cur ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
+      </td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
-      <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
     </tr>`;
   }).join('');
   const totalRate = totalBuy > 0 ? (totalProfit / totalBuy * 100) : null;
   const trc = totalProfit >= 0 ? 'up' : 'dn';
   tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${trc}">${totalBuy ? (totalProfit>=0?'+':'')+totalProfit.toLocaleString()+'원' : '-'}</td>
+    <td class="${trc}" style="line-height:1.4">
+      ${totalRate !== null ? `<div>${totalRate>=0?'+':''}${totalRate.toFixed(2)}%</div>` : '-'}
+      ${totalBuy ? `<div style="font-size:10px;opacity:.75">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</div>` : ''}
+    </td>
     <td>${totalEval ? totalEval.toLocaleString()+'원' : '-'}</td>
-    <td class="${trc}">${totalRate !== null ? (totalRate>=0?'+':'')+totalRate.toFixed(2)+'%' : '-'}</td>
   </tr>`;
 }
 
-// ── 공모주 수익현황 ────────────────────────────────────────
+// ── 공모주 수익현황 (데이터 있을 때만 카드 표시) ────────────
 function _renderPortIpo() {
+  const card  = document.getElementById('port-ipo-card');
   const tbody = document.getElementById('port-ipo-tbody');
   const sold  = _portIpo.filter(r => r.price_open > 0 && r.price_ipo > 0);
-  if (!sold.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">매도 기록 없음</td></tr>'; return; }
+  if (!sold.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
   tbody.innerHTML = sold.map(r => {
     const qty    = r.sell_qty || r.shares_alloc || 0;
-    const buy    = (r.price_ipo||0) * qty;
     const profit = (r.price_open - r.price_ipo) * qty - 2000;
     const rate   = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
     const pc     = profit >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}</td>
-      <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
-      <td class="${pc}">${rate>=0?'+':''}${rate}%</td>
-      <td style="text-align:center">
-        <button onclick="clearIpoSale(${r.id})" title="매도기록 초기화"
-          style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
+      <td class="${pc}" style="line-height:1.4">
+        <div>${rate>=0?'+':''}${rate}%</div>
+        <div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>
       </td>
+      <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
     </tr>`;
   }).join('');
 }
@@ -2380,7 +2389,7 @@ async function clearIpoSale(id) {
 // ── 개별주 보유현황 ────────────────────────────────────────
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
-  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="5" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
   let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false;
   const sRows = _stockRecords.map(r => {
     const buy   = (r.qty||0) * (r.avg_price||0);
@@ -2391,11 +2400,13 @@ function _renderPortStock() {
     sTotalBuy += buy;
     if (r.current_price) { sTotalEval += eval_; sTotalProfit += profit; sHasCur = true; }
     return `<tr>
-      <td>${r.name||'-'}${r.ticker ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${r.ticker}</span>` : ''}</td>
-      <td class="${rc}">${r.current_price ? (profit>=0?'+':'')+profit.toLocaleString()+'원' : '-'}</td>
+      <td>${r.name||'-'}${r.ticker ? `<div style="font-size:10px;color:var(--muted)">${r.ticker}</div>` : ''}</td>
+      <td class="${rc}" style="line-height:1.4">
+        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
+        ${r.current_price ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
+      </td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
-      <td class="${rc}">${rate !== null ? (rate>=0?'+':'')+rate.toFixed(2)+'%' : '-'}</td>
-      <td style="text-align:center">
+      <td style="text-align:center;white-space:nowrap">
         <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
         <button onclick="deleteStockRecord(${r.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
       </td>
@@ -2405,11 +2416,60 @@ function _renderPortStock() {
   const strc = sTotalProfit >= 0 ? 'up' : 'dn';
   tbody.innerHTML = sRows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${strc}">${sHasCur ? (sTotalProfit>=0?'+':'')+sTotalProfit.toLocaleString()+'원' : '-'}</td>
+    <td class="${strc}" style="line-height:1.4">
+      ${sTotalRate !== null ? `<div>${sTotalRate>=0?'+':''}${sTotalRate.toFixed(2)}%</div>` : '-'}
+      ${sHasCur ? `<div style="font-size:10px;opacity:.75">${sTotalProfit>=0?'+':''}${sTotalProfit.toLocaleString()}원</div>` : ''}
+    </td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
-    <td class="${strc}">${sTotalRate !== null ? (sTotalRate>=0?'+':'')+sTotalRate.toFixed(2)+'%' : '-'}</td>
     <td></td>
   </tr>`;
+}
+
+// ── ETF별 배당 현황 차트 ──────────────────────────────────
+function _renderEtfDivChart() {
+  const el = document.getElementById('port-etf-div-chart');
+  if (!el) return;
+
+  // ETF별 실수령 배당 합계
+  const divByEtf = {};
+  _portDiv.forEach(r => { divByEtf[r.etf_id] = (divByEtf[r.etf_id]||0) + (r.net||0); });
+
+  const data = _portEtf.map(r => {
+    const evalAmt  = r.qty * (r.current_price || r.avg_price || 0);
+    const annRate  = r.annual_div_rate || 0;           // 연배당수익률 %
+    const annDivNet= evalAmt * annRate / 100 * (1 - TAX_RATE);  // 연간 추정 세후
+    const actual   = divByEtf[r.id] || 0;
+    return { name: r.name || r.ticker || '-', annRate, annDivNet, actual };
+  }).filter(e => e.annRate > 0 || e.actual > 0)
+    .sort((a, b) => b.annRate - a.annRate);
+
+  if (!data.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">배당 정보가 있는 ETF가 없습니다<br><span style="font-size:11px">ETF 탭에서 연배당수익률을 입력하세요</span></div>';
+    return;
+  }
+
+  const maxRate = Math.max(...data.map(e => e.annRate));
+  const fmtN = v => v >= 1e8 ? (v/1e8).toFixed(1)+'억' : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString();
+  const rateColor = r => r >= 9 ? '#00C853' : r >= 6 ? '#3D5AFE' : r >= 3 ? '#FF9100' : '#9EA3B0';
+
+  el.innerHTML = data.map(e => {
+    const barW  = maxRate > 0 ? (e.annRate / maxRate * 100).toFixed(1) : 0;
+    const color = rateColor(e.annRate);
+    return `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+          <span style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">${e.name}</span>
+          <span style="font-size:13px;font-weight:700;color:${color};flex-shrink:0;margin-left:6px">연 ${e.annRate.toFixed(1)}%</span>
+        </div>
+        <div style="background:var(--bg);border-radius:4px;height:8px;overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,${color}88,${color});border-radius:4px;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:10px;color:var(--muted)">추정 연 세후 <strong style="color:var(--text)">${fmtN(e.annDivNet)}원</strong></span>
+          ${e.actual ? `<span style="font-size:10px;color:var(--muted)">누적 실수령 ${fmtN(e.actual)}원</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ── 자산 현황 도넛 차트 ────────────────────────────────────
