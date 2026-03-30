@@ -1,10 +1,13 @@
 /**
  * Vercel API — 시장현황
- * KOSPI/KOSDAQ: Naver Mobile API
- * NASDAQ/S&P500/USD-KRW/VIX: Stooq CSV (무인증, 안정적)
- * WTI 원유: Yahoo Finance
- * 국채금리 (10/20/30년): 미국 재무부 CSV
- * 공포탐욕지수: CNN dataviz
+ *
+ * 데이터 소스 (안정성 우선순위 순):
+ * - 한국 지수(KOSPI/KOSDAQ): Naver Mobile API
+ * - 미국 지수(나스닥/S&P500/다우)/VIX/금/USD-KRW: Yahoo Finance v8 (Stooq 대체 — IP 차단 이슈)
+ * - WTI 원유: Yahoo Finance v8
+ * - 국채금리(10/20/30년): 미국 재무부 CSV
+ * - 공포탐욕지수: CNN dataviz (실패 시 null 반환)
+ *
  * GET /api/market
  */
 export default async function handler(req, res) {
@@ -14,64 +17,73 @@ export default async function handler(req, res) {
 
   const ua = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
   };
 
   /* ── 네이버 (한국 지수) ── */
   const fetchNaver = async (index) => {
     const r = await fetch(`https://m.stock.naver.com/api/index/${index}/basic`, {
-      headers: { ...ua, Referer: 'https://m.stock.naver.com/', Accept: 'application/json' },
+      headers: { ...ua, Referer: 'https://m.stock.naver.com/' },
+      signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) throw new Error(`Naver ${index} HTTP ${r.status}`);
     const d = await r.json();
-    const price  = Number(String(d.closePrice                    ?? '0').replace(/,/g, ''));
-    const chg    = Number(String(d.compareToPreviousClosePrice   ?? '0').replace(/,/g, ''));
-    const chgPct = Number(String(d.fluctuationsRatio             ?? '0').replace(/,/g, ''));
+    const price  = Number(String(d.closePrice                  ?? '0').replace(/,/g, ''));
+    const chg    = Number(String(d.compareToPreviousClosePrice ?? '0').replace(/,/g, ''));
+    const chgPct = Number(String(d.fluctuationsRatio           ?? '0').replace(/,/g, ''));
     if (!price) throw new Error(`Naver ${index} price=0`);
     return { price, chg, chgPct };
   };
 
-  /* ── Stooq CSV (미국 지수·환율·금 등) — 최근 60일 범위 ── */
-  const fetchStooq = async (symbol, withHistory = false) => {
-    const d2 = new Date(); const d1 = new Date(d2); d1.setDate(d1.getDate() - 60);
-    const fmt = d => d.toISOString().slice(0,10).replace(/-/g,'');
-    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&d1=${fmt(d1)}&d2=${fmt(d2)}&i=d`;
-    const r   = await fetch(url, { headers: ua });
-    if (!r.ok) throw new Error(`Stooq ${symbol} HTTP ${r.status}`);
-    const text  = await r.text();
-    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-    if (lines.length < 1) throw new Error(`Stooq ${symbol}: no data`);
-    const last  = lines[lines.length - 1].split(',');
-    const price = parseFloat(last[4]);   // Close
-    if (isNaN(price) || price === 0) throw new Error(`Stooq ${symbol}: parse fail`);
-    const prevC = lines.length >= 2 ? parseFloat(lines[lines.length - 2].split(',')[4]) : price;
-    const result = { price, chg: price - prevC, chgPct: prevC ? (price - prevC) / prevC * 100 : 0 };
-    if (withHistory) {
-      result.history = lines
-        .map(l => { const c = l.split(','); return { date: c[0], close: parseFloat(c[4]) }; })
-        .filter(p => !isNaN(p.close) && p.close > 0);
+  /* ── Yahoo Finance v8 (미국 지수·VIX·금·환율·원유) ── */
+  const fetchYahoo = async (symbol, withHistory = false) => {
+    const range    = withHistory ? '60d' : '10d';
+    const encoded  = encodeURIComponent(symbol);
+    // query2 → query1 폴백
+    let text;
+    for (const host of ['query2', 'query1']) {
+      try {
+        const r = await fetch(
+          `https://${host}.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=${range}`,
+          { headers: ua, signal: AbortSignal.timeout(8000) }
+        );
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        text = await r.json();
+        break;
+      } catch (_) {}
     }
-    return result;
+    if (!text) throw new Error(`Yahoo ${symbol}: fetch failed`);
+
+    const result = text?.chart?.result?.[0];
+    if (!result) throw new Error(`Yahoo ${symbol}: no result`);
+    const closes    = (result.indicators?.quote?.[0]?.close ?? []);
+    const validClose = closes.map((v, i) => ({ v, i })).filter(x => x.v != null);
+    if (validClose.length < 2) throw new Error(`Yahoo ${symbol}: insufficient data`);
+
+    const last = validClose[validClose.length - 1].v;
+    const prev = validClose[validClose.length - 2].v;
+    const out  = {
+      price:  last,
+      chg:    last - prev,
+      chgPct: prev ? (last - prev) / prev * 100 : 0,
+    };
+
+    if (withHistory) {
+      const timestamps = result.timestamp ?? [];
+      out.history = validClose.map(({ v, i }) => {
+        const ts   = timestamps[i];
+        const date = ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
+        return { date, close: v };
+      });
+    }
+    return out;
   };
 
-  /* ── CBOE — VIX 공식 CSV ── */
-  const fetchVIX = async () => {
-    const r = await fetch('https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv', { headers: ua });
-    if (!r.ok) throw new Error(`CBOE VIX HTTP ${r.status}`);
-    const text  = await r.text();
-    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('DATE') && !l.startsWith('"DATE'));
-    if (lines.length < 1) throw new Error('CBOE VIX: no data');
-    const parse = l => parseFloat(l.split(',')[4]);
-    const last  = parse(lines[lines.length - 1]);
-    const prevC = lines.length >= 2 ? parse(lines[lines.length - 2]) : last;
-    if (isNaN(last) || last === 0) throw new Error('CBOE VIX: parse fail');
-    return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0 };
-  };
-
-  /* ── 미국 재무부 — 국채금리 한 번 요청 후 10/20/30년 파싱 ── */
+  /* ── 미국 재무부 — 국채금리 (10/20/30년) ── */
   const fetchAllTreasury = async () => {
     const year = new Date().getFullYear();
     const url  = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&download=true`;
-    const r = await fetch(url, { headers: ua });
+    const r = await fetch(url, { headers: ua, signal: AbortSignal.timeout(12000) });
     if (!r.ok) throw new Error(`Treasury HTTP ${r.status}`);
     const text    = await r.text();
     const lines   = text.trim().split('\n').filter(l => l.trim());
@@ -81,18 +93,16 @@ export default async function handler(req, res) {
     const getCol  = name => headers.findIndex(h => h === name);
 
     const parseCol = (colIdx) => {
-      let last = NaN, prevC = NaN;
       const history = [];
       for (let i = hdrIdx + 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
         const val  = parseFloat(cols[colIdx]);
         if (!isNaN(val) && val > 0) history.push(val);
       }
-      // 최근 30개 영업일만 사용
       const recent = history.slice(-30);
       if (recent.length < 1) return null;
-      last  = recent[recent.length - 1];
-      prevC = recent.length >= 2 ? recent[recent.length - 2] : last;
+      const last  = recent[recent.length - 1];
+      const prevC = recent.length >= 2 ? recent[recent.length - 2] : last;
       return { price: last, chg: last - prevC, chgPct: prevC ? (last - prevC) / prevC * 100 : 0, history: recent };
     };
 
@@ -103,44 +113,43 @@ export default async function handler(req, res) {
     };
   };
 
-  /* ── Yahoo Finance — WTI 원유 선물 (차트 데이터 기준) ── */
-  const fetchOil = async () => {
-    const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/CL%3DF?interval=1d&range=10d', {
-      headers: { ...ua, Accept: 'application/json' },
-    });
-    if (!r.ok) throw new Error(`Yahoo Oil HTTP ${r.status}`);
-    const d      = await r.json();
-    const result = d?.chart?.result?.[0];
-    if (!result) throw new Error('Yahoo Oil: no result');
-    const closes = (result.indicators?.quote?.[0]?.close ?? []).filter(v => v != null);
-    if (closes.length < 2) throw new Error('Yahoo Oil: insufficient data');
-    const price = closes[closes.length - 1];
-    const prev  = closes[closes.length - 2];
-    return { price, chg: price - prev, chgPct: prev ? (price - prev) / prev * 100 : 0 };
-  };
-
-  /* ── CNN 공포탐욕지수 ── */
+  /* ── CNN 공포탐욕지수 (실패 허용) ── */
   const fetchFearGreed = async () => {
-    const r = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
-      headers: { ...ua, Referer: 'https://edition.cnn.com/', Accept: 'application/json' },
-    });
-    if (!r.ok) throw new Error(`FearGreed HTTP ${r.status}`);
-    const d  = await r.json();
-    const fg = d.fear_and_greed;
-    return { value: Math.round(fg.score), label: fg.rating };
+    // 엔드포인트 2개 시도
+    const endpoints = [
+      'https://production.dataviz.cnn.io/index/fearandgreed/graphdata',
+      'https://production.dataviz.cnn.io/index/fearandgreed/graphdata/30',
+    ];
+    for (const url of endpoints) {
+      try {
+        const r = await fetch(url, {
+          headers: { ...ua, Referer: 'https://edition.cnn.com/', Origin: 'https://edition.cnn.com' },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!r.ok) continue;
+        const d  = await r.json();
+        const fg = d.fear_and_greed ?? d.fear_and_greed_historical?.data?.[0];
+        if (!fg) continue;
+        const score = parseFloat(fg.score ?? fg.x);
+        if (isNaN(score)) continue;
+        return { value: Math.round(score), label: fg.rating ?? '' };
+      } catch (_) {}
+    }
+    throw new Error('FearGreed: all endpoints failed');
   };
 
-  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, gold, treasury, oil, fg] = await Promise.allSettled([
+  /* ── 병렬 실행 ── */
+  const [kospi, kosdaq, nasdaq, sp500, dow, usdkrw, vix, gold, oil, treasury, fg] = await Promise.allSettled([
     fetchNaver('KOSPI'),
     fetchNaver('KOSDAQ'),
-    fetchStooq('^ndq'),
-    fetchStooq('^spx'),
-    fetchStooq('^dji'),
-    fetchStooq('usdkrw', true),
-    fetchVIX(),
-    fetchStooq('xauusd'),
+    fetchYahoo('^IXIC'),          // NASDAQ Composite
+    fetchYahoo('^GSPC'),          // S&P 500
+    fetchYahoo('^DJI'),           // Dow Jones
+    fetchYahoo('USDKRW=X', true), // USD/KRW (히스토리 포함)
+    fetchYahoo('^VIX'),           // VIX
+    fetchYahoo('GC=F'),           // Gold Futures
+    fetchYahoo('CL=F'),           // WTI Crude Oil
     fetchAllTreasury(),
-    fetchOil(),
     fetchFearGreed(),
   ]);
 
@@ -165,10 +174,10 @@ export default async function handler(req, res) {
     feargreed: ok(fg),
     ts:        Date.now(),
     _errors: {
-      kospi: err(kospi), kosdaq: err(kosdaq),
-      nasdaq: err(nasdaq), sp500: err(sp500), dow: err(dow),
-      usdkrw: err(usdkrw), vix: err(vix), gold: err(gold),
-      treasury: err(treasury), oil: err(oil), feargreed: err(fg),
+      kospi:    err(kospi),    kosdaq:  err(kosdaq),
+      nasdaq:   err(nasdaq),   sp500:   err(sp500),   dow:      err(dow),
+      usdkrw:   err(usdkrw),  vix:     err(vix),     gold:     err(gold),
+      oil:      err(oil),      treasury:err(treasury),feargreed:err(fg),
     },
   });
 }
