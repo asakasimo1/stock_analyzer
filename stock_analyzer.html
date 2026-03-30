@@ -4345,7 +4345,7 @@ function onEtfNameInput(val) {
 
 async function fetchEtfAc(q) {
   try {
-    const r = await fetch(`/api/etf-search?q=${encodeURIComponent(q)}`);
+    const r = await fetch(`/api/etf?search=${encodeURIComponent(q)}`);
     const data = await r.json();
     showEtfAc(data.items || []);
   } catch { hideEtfAc(); }
