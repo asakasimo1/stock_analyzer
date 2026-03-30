@@ -12,7 +12,8 @@
     { "src": "api/dividend-schedule.js", "use": "@vercel/node" },
     { "src": "api/market.js", "use": "@vercel/node" },
     { "src": "api/stocks.js", "use": "@vercel/node" },
-    { "src": "api/stock.js", "use": "@vercel/node" }
+    { "src": "api/stock.js", "use": "@vercel/node" },
+    { "src": "api/investor.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -27,6 +28,7 @@
     { "src": "/api/dividend-schedule", "dest": "/api/dividend-schedule.js" },
     { "src": "/api/market", "dest": "/api/market.js" },
     { "src": "/api/stocks", "dest": "/api/stocks.js" },
-    { "src": "/api/stock", "dest": "/api/stock.js" }
+    { "src": "/api/stock", "dest": "/api/stock.js" },
+    { "src": "/api/investor", "dest": "/api/investor.js" }
   ]
 }
