@@ -890,8 +890,9 @@
   }
   #stock-detail-overlay.open { display:flex; }
   #stock-detail-modal {
-    background:var(--card); width:100%; border-radius:16px 16px 0 0;
+    background:var(--surface); width:100%; border-radius:16px 16px 0 0;
     max-height:92dvh; overflow-y:auto; padding-bottom:env(safe-area-inset-bottom,12px);
+    box-shadow:0 -4px 24px rgba(0,0,0,.18);
   }
   @media(min-width:600px){
     #stock-detail-overlay { align-items:center; }
@@ -904,7 +905,7 @@
   .dtab { flex:1; padding:8px 0; background:none; border:none;
     border-bottom:2px solid transparent; font-size:13px; font-weight:600;
     color:var(--muted); cursor:pointer; transition:color .15s,border-color .15s; }
-  .dtab.active { color:var(--text); border-bottom-color:var(--accent); }
+  .dtab.active { color:var(--text); border-bottom-color:var(--primary); }
   .detail-body { padding:12px 16px 16px; }
   .detail-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
   @media(max-width:400px){ .detail-metrics { grid-template-columns:repeat(2,1fr); } }
@@ -1555,7 +1556,7 @@
 <!-- ── 종목 상세 모달 ─────────────────────────────── -->
 <div id="stock-detail-overlay" onclick="if(event.target===this)closeStockDetail()">
   <div id="stock-detail-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1">
       <div>
         <div style="font-weight:700;font-size:16px" id="detail-name">—</div>
         <div style="font-size:12px;color:var(--muted)" id="detail-ticker-label">—</div>
@@ -1848,7 +1849,7 @@ function renderInvestorTable(data) {
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:5px">
           <div style="width:44px;background:var(--border);border-radius:3px;height:5px;overflow:hidden;flex-shrink:0">
-            <div style="width:${Math.min(it.foreign_rate||0,100)}%;height:100%;background:var(--accent);border-radius:3px"></div>
+            <div style="width:${Math.min(it.foreign_rate||0,100)}%;height:100%;background:var(--primary);border-radius:3px"></div>
           </div>
           <span>${(it.foreign_rate||0).toFixed(1)}%</span>
         </div>
