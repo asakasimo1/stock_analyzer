@@ -2,6 +2,7 @@
 Stock Analyzer - Streamlit 웹 대시보드
 실행: streamlit run streamlit_app.py
 """
+import json
 import os
 import sys
 from datetime import datetime
@@ -177,6 +178,12 @@ def fetch_stock_data(ticker: str) -> dict:
         "disclosures": disclosures,
         "news":        news_list,
     }
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_investor_trading(ticker: str) -> dict:
+    """투자자별 거래 현황 (5분 캐시)"""
+    return _data.get_investor_trading(ticker)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -687,43 +694,86 @@ with tab_chart:
     fig = build_chart(df, tech, name, ticker)
     st.plotly_chart(fig, use_container_width=True)
 
-    if tech:
-        ma_dict  = tech.get("ma", {})
-        bb_dict  = tech.get("bb", {})
-        rsi_val  = tech.get("rsi", pd.Series())
-        last_rsi = float(rsi_val.dropna().iloc[-1]) if not rsi_val.dropna().empty else None
+    # ── 보유 종목 현황 ─────────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("#### 📋 보유 종목 현황  ·  외국인 · 기관 · 개인 동향")
 
-        rows = []
-        for p in [20, 60, 120]:
-            if p in ma_dict and not ma_dict[p].dropna().empty:
-                ma_v = float(ma_dict[p].iloc[-1])
-                diff = last - ma_v
-                rows.append({
-                    "지표": f"MA{p}",
-                    "현재값": f"{ma_v:,.0f}",
-                    "현재가 대비": f"{diff:+,.0f} ({diff/ma_v*100:+.1f}%)",
-                    "상태": "↑ 위" if diff > 0 else "↓ 아래",
+    _wl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "watchlist.json")
+    try:
+        with open(_wl_path, "r", encoding="utf-8") as _f:
+            _portfolio = json.load(_f)["stocks"]
+    except Exception:
+        _portfolio = []
+
+    if not _portfolio:
+        st.info("watchlist.json에 보유 종목을 추가하세요.")
+    else:
+        _port_rows = []
+        with st.spinner("보유 종목 데이터 로드 중..."):
+            for _item in _portfolio:
+                _tk = _item["ticker"]
+                _nm = _item["name"]
+
+                # 현재가 / 등락
+                _df_p = _data.get_ohlcv(_tk, days=5)
+                if _df_p.empty:
+                    _last_p, _chg_p = 0, 0.0
+                else:
+                    _last_p = int(_df_p["Close"].iloc[-1])
+                    _prev_p = int(_df_p["Close"].iloc[-2]) if len(_df_p) > 1 else _last_p
+                    _chg_p  = (_last_p - _prev_p) / _prev_p * 100 if _prev_p else 0
+
+                # 투자자별 데이터
+                _inv = fetch_investor_trading(_tk)
+
+                def _net(_label: str, _key: str) -> int:
+                    return _inv.get(_label, {}).get(_key, 0)
+
+                _fr      = _inv.get("foreign_rate", 0.0)
+                _f_buy   = _net("외국인", "매수")
+                _f_sell  = _net("외국인", "매도")
+                _f_net   = _net("외국인", "순매수")
+                _i_net   = _net("기관",   "순매수")
+                _p_net   = _net("개인",   "순매수")
+
+                _chg_str = f"{_chg_p:+.2f}%"
+                _port_rows.append({
+                    "종목":        _nm,
+                    "현재가(원)":  _last_p,
+                    "등락(%)":     _chg_str,
+                    "외국인지분율(%)": _fr,
+                    "외국인매수(주)": _f_buy,
+                    "외국인매도(주)": _f_sell,
+                    "외국인순매수(주)": _f_net,
+                    "기관순매수(주)":   _i_net,
+                    "개인순매수(주)":   _p_net,
                 })
-        if bb_dict:
-            bb_u = float(bb_dict["upper"].iloc[-1])
-            bb_l = float(bb_dict["lower"].iloc[-1])
-            bb_m = float(bb_dict["mid"].iloc[-1])
-            bb_p = (last - bb_l) / (bb_u - bb_l) * 100 if (bb_u - bb_l) > 0 else 50
-            rows.append({
-                "지표": "볼린저밴드",
-                "현재값": f"상단 {bb_u:,.0f} / 중 {bb_m:,.0f} / 하단 {bb_l:,.0f}",
-                "현재가 대비": f"밴드 내 {bb_p:.0f}%",
-                "상태": "🔴 과열" if last >= bb_u else ("🟢 과매도" if last <= bb_l else "중립"),
-            })
-        if last_rsi is not None:
-            rows.append({
-                "지표": "RSI (14)",
-                "현재값": f"{last_rsi:.1f}",
-                "현재가 대비": "",
-                "상태": "🔴 과매수" if last_rsi >= 70 else ("🟢 과매도" if last_rsi <= 30 else "중립"),
-            })
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+        if _port_rows:
+            _df_port = pd.DataFrame(_port_rows)
+            st.dataframe(
+                _df_port,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "종목":            st.column_config.TextColumn("종목", width="medium"),
+                    "현재가(원)":      st.column_config.NumberColumn("현재가(원)", format="%,d"),
+                    "등락(%)":         st.column_config.TextColumn("등락", width="small"),
+                    "외국인지분율(%)": st.column_config.ProgressColumn(
+                        "외국인 지분율(%)", min_value=0, max_value=100, format="%.1f%%"
+                    ),
+                    "외국인매수(주)":   st.column_config.NumberColumn("외국인 매수(주)", format="%,d"),
+                    "외국인매도(주)":   st.column_config.NumberColumn("외국인 매도(주)", format="%,d"),
+                    "외국인순매수(주)": st.column_config.NumberColumn("외국인 순매수(주)", format="%+,d"),
+                    "기관순매수(주)":   st.column_config.NumberColumn("기관 순매수(주)",   format="%+,d"),
+                    "개인순매수(주)":   st.column_config.NumberColumn("개인 순매수(주)",   format="%+,d"),
+                },
+            )
+
+            # 날짜 표시
+            _inv_date = _inv.get("date", "")
+            if _inv_date:
+                st.caption(f"기준일: {_inv_date[:4]}-{_inv_date[4:6]}-{_inv_date[6:8]}  |  5분마다 자동 갱신")
 
 
 # ┌─────────────────────────────────────────────────────────────────────────────

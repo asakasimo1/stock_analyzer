@@ -161,6 +161,83 @@ def get_52week(ticker: str) -> dict:
         return {}
 
 
+def get_investor_trading(ticker: str) -> dict:
+    """네이버 금융 외국인·기관·개인 순매매 현황 및 외국인 보유율 반환
+
+    Returns:
+        {
+          "date":         "YYYYMMDD",
+          "foreign_rate": float,          # 외국인 지분율 (%)
+          "외국인":  {"순매수": int},
+          "기관":    {"순매수": int},
+          "개인":    {"순매수": int},      # -(외국인+기관) 근사값
+        }
+    """
+    try:
+        url = f"https://finance.naver.com/item/frgn.naver?code={ticker}"
+        resp = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        tables = soup.find_all("table")
+
+        # 외국인·기관 순매매 테이블 동적 탐색 (헤더 포함 + 9컬럼 데이터)
+        t = None
+        for _tbl in tables:
+            _rows_check = [
+                r for r in _tbl.find_all("tr")
+                if r.find_all("td") and len(r.find_all("td")) >= 9
+            ]
+            if _rows_check:
+                t = _tbl
+                break
+
+        if t is None:
+            return {}
+
+        data_rows = [
+            r for r in t.find_all("tr")
+            if r.find_all("td") and len(r.find_all("td")) >= 9
+        ]
+        if not data_rows:
+            return {}
+
+        # 가장 최근 행 파싱
+        row = data_rows[0]
+        cols = [td.get_text(strip=True) for td in row.find_all("td")]
+        # cols: [날짜, 종가, 전일비, 등락률, 거래량, 기관순매매, 외국인순매매, 외국인보유주수, 외국인보유율]
+
+        def _to_int(s: str) -> int:
+            s = s.replace(",", "").replace("+", "")
+            try:
+                return int(s)
+            except Exception:
+                return 0
+
+        def _to_float(s: str) -> float:
+            s = s.replace(",", "").replace("%", "")
+            try:
+                return float(s)
+            except Exception:
+                return 0.0
+
+        date_raw      = cols[0].replace(".", "")          # "20260327"
+        inst_net      = _to_int(cols[5])                  # 기관 순매매
+        foreign_net   = _to_int(cols[6])                  # 외국인 순매매
+        foreign_rate  = _to_float(cols[8])                # 외국인 보유율 %
+        indiv_net     = -(inst_net + foreign_net)         # 개인 순매매 (근사)
+
+        return {
+            "date":        date_raw,
+            "foreign_rate": foreign_rate,
+            "외국인": {"순매수": foreign_net},
+            "기관":   {"순매수": inst_net},
+            "개인":   {"순매수": indiv_net},
+        }
+    except Exception as e:
+        print(f"[경고] 투자자 데이터 조회 실패 ({ticker}): {e}")
+        return {}
+
+
 def get_etf_nav(ticker: str, days: int = 90) -> pd.Series:
     """ETF NAV 시계열 반환 (네이버 금융 스크래핑)"""
     try:
