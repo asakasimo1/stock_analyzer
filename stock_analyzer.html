@@ -870,6 +870,55 @@
   .etf-tx-type-sell { font-weight: 700; color: var(--primary); }
   .etf-tx-qty { font-weight: 600; color: var(--text); }
   .etf-tx-note { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── 보유종목 + 상세 모달 ──────────────────────────────── */
+  .inv-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .inv-table th { padding:6px 10px; color:var(--muted); font-size:11px; font-weight:500;
+                  white-space:nowrap; border-bottom:1px solid var(--border); }
+  .inv-table td { padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap; vertical-align:middle; }
+  .inv-table tbody tr { cursor:pointer; transition:background .15s; }
+  .inv-table tbody tr:hover { background:rgba(255,255,255,.04); }
+  .inv-table tbody tr:last-child td { border-bottom:none; }
+  .inv-net-pos { color:var(--red);   font-weight:600; }
+  .inv-net-neg { color:var(--primary); font-weight:600; }
+  .inv-net-nil { color:var(--muted); }
+
+  /* 상세 모달 오버레이 */
+  #stock-detail-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:200;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  #stock-detail-overlay.open { display:flex; }
+  #stock-detail-modal {
+    background:var(--card); width:100%; border-radius:16px 16px 0 0;
+    max-height:92dvh; overflow-y:auto; padding-bottom:env(safe-area-inset-bottom,12px);
+  }
+  @media(min-width:600px){
+    #stock-detail-overlay { align-items:center; }
+    #stock-detail-modal   { max-width:660px; border-radius:16px; max-height:88dvh; }
+  }
+  .detail-drag-bar { width:40px; height:4px; background:var(--border);
+    border-radius:4px; margin:10px auto 0; }
+  .detail-header { padding:12px 16px 8px; display:flex; align-items:center; gap:8px; }
+  .detail-tabs { display:flex; border-bottom:1px solid var(--border); }
+  .dtab { flex:1; padding:8px 0; background:none; border:none;
+    border-bottom:2px solid transparent; font-size:13px; font-weight:600;
+    color:var(--muted); cursor:pointer; transition:color .15s,border-color .15s; }
+  .dtab.active { color:var(--text); border-bottom-color:var(--accent); }
+  .detail-body { padding:12px 16px 16px; }
+  .detail-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  @media(max-width:400px){ .detail-metrics { grid-template-columns:repeat(2,1fr); } }
+  .dm { background:var(--bg); border-radius:8px; padding:8px 10px; }
+  .dm-label { font-size:10px; color:var(--muted); }
+  .dm-val   { font-size:15px; font-weight:700; margin-top:2px; }
+  .detail-chart-title { font-size:12px; color:var(--muted); margin:14px 0 6px; font-weight:600; }
+  .detail-annual-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+  .detail-annual-table th { padding:4px 8px; color:var(--muted); font-weight:500;
+    border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
+  .detail-annual-table th:first-child { text-align:left; }
+  .detail-annual-table td { padding:4px 8px; text-align:right; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .detail-annual-table td:first-child { text-align:left; font-weight:500; color:var(--muted); }
+  .detail-annual-table tr:last-child td { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -1503,6 +1552,27 @@
 </div>
 </div><!-- /tab-dashboard -->
 
+<!-- ── 종목 상세 모달 ─────────────────────────────── -->
+<div id="stock-detail-overlay" onclick="if(event.target===this)closeStockDetail()">
+  <div id="stock-detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1">
+      <div>
+        <div style="font-weight:700;font-size:16px" id="detail-name">—</div>
+        <div style="font-size:12px;color:var(--muted)" id="detail-ticker-label">—</div>
+      </div>
+      <button onclick="closeStockDetail()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px">×</button>
+    </div>
+    <div class="detail-tabs">
+      <button class="dtab active" onclick="switchDetailTab('investor')" data-tab="investor">📈 투자자</button>
+      <button class="dtab" onclick="switchDetailTab('price')" data-tab="price">💹 주가/외국인</button>
+      <button class="dtab" onclick="switchDetailTab('finance')" data-tab="finance">📊 재무</button>
+    </div>
+    <div id="detail-body" style="padding:14px 18px">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+</div>
+
 <script>
 
 // ══════════════════════════════════════════════════════════
@@ -1751,63 +1821,268 @@ async function loadInvestorStatus(force = false) {
 }
 
 function renderInvestorTable(data) {
-  const wrap = document.getElementById('investor-table-wrap');
+  const wrap  = document.getElementById('investor-table-wrap');
   const label = document.getElementById('investor-date-label');
   const items = data.items || [];
-  const d = data.date || '';
-  if (d.length === 8) {
-    label.textContent = `기준일 ${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-  }
+  const d  = data.date        || '';
+  const pd = data.pensionDate || '';
+  if (d.length === 8)
+    label.textContent = `전일 종가 기준 / ${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
   if (!items.length) {
     wrap.innerHTML = '<div class="empty-msg">보유 종목 데이터가 없습니다. 포트폴리오 탭에서 종목을 추가하세요.</div>';
     return;
   }
-
   const fmtNet = v => {
-    if (v === 0) return `<span style="color:var(--muted)">—</span>`;
-    const color = v > 0 ? 'var(--green)' : 'var(--red)';
-    const sign  = v > 0 ? '+' : '';
-    return `<span style="color:${color};font-weight:600">${sign}${v.toLocaleString()}</span>`;
+    if (v == null) return '<span style="color:var(--muted)">—</span>';
+    if (v === 0)   return '<span style="color:var(--muted)">0</span>';
+    const c = v > 0 ? 'var(--green)' : 'var(--red)';
+    return `<span style="color:${c};font-weight:600">${v>0?'+':''}${v.toLocaleString()}</span>`;
   };
-
-  const rows = items.map(it => `
-    <tr>
-      <td style="font-weight:600">${it.name}<br>
-        <span style="font-size:10px;color:var(--muted)">${it.ticker}</span>
+  const rows = items.map(it => {
+    const safeN = (it.name||'').replace(/'/g,"\\'");
+    return `<tr style="cursor:pointer" onclick="openStockDetail('${it.ticker}','${safeN}')">
+      <td style="white-space:nowrap">
+        <span style="font-weight:600">${it.name}</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:4px">${it.ticker}</span>
       </td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden">
-            <div style="width:${Math.min(it.foreign_rate,100)}%;height:100%;background:var(--accent);border-radius:4px"></div>
+      <td style="white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:5px">
+          <div style="width:44px;background:var(--border);border-radius:3px;height:5px;overflow:hidden;flex-shrink:0">
+            <div style="width:${Math.min(it.foreign_rate||0,100)}%;height:100%;background:var(--accent);border-radius:3px"></div>
           </div>
-          <span style="font-size:12px;min-width:36px;text-align:right">${it.foreign_rate.toFixed(1)}%</span>
+          <span>${(it.foreign_rate||0).toFixed(1)}%</span>
         </div>
       </td>
-      <td style="text-align:right">${fmtNet(it.foreign_net)}</td>
-      <td style="text-align:right">${fmtNet(it.inst_net)}</td>
-      <td style="text-align:right">${fmtNet(it.indiv_net)}</td>
-    </tr>`).join('');
-
+      <td style="text-align:right;white-space:nowrap">${fmtNet(it.foreign_net)}</td>
+      <td style="text-align:right;white-space:nowrap">${fmtNet(it.inst_net)}</td>
+      <td style="text-align:right;white-space:nowrap">${fmtNet(it.pension_net)}</td>
+      <td style="text-align:right;white-space:nowrap">${fmtNet(it.indiv_net)}</td>
+    </tr>`;
+  }).join('');
+  const pensionNote = pd.length === 8
+    ? `${pd.slice(0,4)}-${pd.slice(4,6)}-${pd.slice(6,8)} 기준 (GitHub Actions 수집)`
+    : '수집 중';
   wrap.innerHTML = `
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table class="inv-table">
         <thead>
-          <tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">
-            <th style="text-align:left;padding:6px 8px">종목</th>
-            <th style="text-align:left;padding:6px 8px;min-width:140px">외국인 지분율</th>
-            <th style="text-align:right;padding:6px 8px">외국인 순매수(주)</th>
-            <th style="text-align:right;padding:6px 8px">기관 순매수(주)</th>
-            <th style="text-align:right;padding:6px 8px">개인 순매수(주)</th>
+          <tr>
+            <th style="text-align:left">종목</th>
+            <th style="text-align:left">외국인 지분율</th>
+            <th style="text-align:right">외국인 순매수</th>
+            <th style="text-align:right">기관 순매수</th>
+            <th style="text-align:right">연기금 순매수</th>
+            <th style="text-align:right">개인 순매수</th>
           </tr>
         </thead>
-        <tbody>
-          ${rows}
-        </tbody>
+        <tbody>${rows}</tbody>
       </table>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 4px">
-      ※ 개인 순매수 = -(외국인+기관) 근사값  |  출처: 네이버 금융
+      ※ 전일 종가 기준 · 출처: 네이버 금융 &nbsp;|&nbsp; 연기금: ${pensionNote}
     </div>`;
+}
+
+// ── 종목 상세 모달 ─────────────────────────────────────────
+let _detailTicker = '', _detailData = null, _detailTab = 'investor';
+
+async function openStockDetail(ticker, name) {
+  _detailTicker = ticker;
+  _detailTab    = 'investor';
+  _detailData   = null;
+  document.getElementById('detail-name').textContent        = name;
+  document.getElementById('detail-ticker-label').textContent = ticker;
+  document.getElementById('detail-body').innerHTML = '<div class="empty-msg">로딩 중...</div>';
+  document.querySelectorAll('.dtab').forEach(b => b.classList.toggle('active', b.dataset.tab === _detailTab));
+  document.getElementById('stock-detail-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  try {
+    const r = await fetch('/api/investor?ticker=' + ticker);
+    _detailData = r.ok ? await r.json() : null;
+  } catch(_) { _detailData = null; }
+  _renderDetailContent();
+}
+
+function closeStockDetail() {
+  document.getElementById('stock-detail-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function switchDetailTab(tab) {
+  _detailTab = tab;
+  document.querySelectorAll('.dtab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  _renderDetailContent();
+}
+
+function _renderDetailContent() {
+  const body = document.getElementById('detail-body');
+  if (!_detailData) { body.innerHTML = '<div class="empty-msg">데이터를 불러올 수 없습니다.</div>'; return; }
+  if (_detailTab === 'investor') body.innerHTML = _renderInvestorTab(_detailData);
+  else if (_detailTab === 'price')   body.innerHTML = _renderPriceTab(_detailData);
+  else if (_detailTab === 'finance') body.innerHTML = _renderFinanceTab(_detailData);
+}
+
+function _fmtC(v) {
+  if (v == null) return '<span style="color:var(--muted)">—</span>';
+  if (v === 0)   return '<span style="color:var(--muted)">0</span>';
+  const c = v > 0 ? 'var(--green)' : 'var(--red)';
+  return '<span style="color:' + c + ';font-weight:600">' + (v>0?'+':'') + v.toLocaleString() + '</span>';
+}
+
+function _renderInvestorTab(data) {
+  const trend   = data.investorTrend || [];
+  const pension = data.pensionTrend  || [];
+  if (!trend.length) return '<div class="empty-msg">투자자 데이터가 없습니다.</div>';
+  const pMap = {};
+  pension.forEach(function(p) { pMap[p.date] = p.pension_net; });
+  const chartData = trend.slice().reverse().slice(-20);
+  const chartHtml = _svgBarChart(chartData, [
+    { key:'foreign_net', color:'#6366f1', label:'외국인' },
+    { key:'inst_net',    color:'#f59e0b', label:'기관'   }
+  ], { height:150 });
+  const rows = trend.map(function(r) {
+    const pnet = pMap[r.date] != null ? pMap[r.date] : null;
+    return '<tr>'
+      + '<td style="white-space:nowrap">' + r.date.slice(0,4) + '-' + r.date.slice(4,6) + '-' + r.date.slice(6,8) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + (r.close ? r.close.toLocaleString() + '원' : '—') + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + _fmtC(r.foreign_net) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + _fmtC(r.inst_net) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + _fmtC(pnet) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">' + (r.foreign_rate||0).toFixed(1) + '%</td>'
+      + '</tr>';
+  }).join('');
+  return chartHtml
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:14px">'
+    + '<table class="inv-table"><thead><tr>'
+    + '<th style="text-align:left">날짜</th><th style="text-align:right">종가</th>'
+    + '<th style="text-align:right">외국인</th><th style="text-align:right">기관</th>'
+    + '<th style="text-align:right">연기금</th><th style="text-align:right">외국인 지분율</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function _renderPriceTab(data) {
+  const price = data.priceData || [];
+  if (!price.length) return '<div class="empty-msg">주가 데이터가 없습니다.</div>';
+  return '<div style="margin-bottom:16px">'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600">종가 추이 (최근 30거래일)</div>'
+    + _svgLineChart(price, 'close', '#6366f1', '종가(원)', {height:140})
+    + '</div><div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600">외국인 소진율 (%)</div>'
+    + _svgLineChart(price, 'foreign_rate', '#f59e0b', '외국인 소진율', {height:100})
+    + '</div>';
+}
+
+function _renderFinanceTab(data) {
+  const f = data.fundamental || {};
+  const r = f.ratios || {};
+  const a = f.annual  || [];
+  const mets = [
+    { label:'PER',      val: r.per      ? r.per + '배'                           : '—' },
+    { label:'PBR',      val: r.pbr      ? r.pbr + '배'                           : '—' },
+    { label:'EPS',      val: r.eps      ? parseInt(r.eps).toLocaleString() + '원' : '—' },
+    { label:'BPS',      val: r.bps      ? parseInt(r.bps).toLocaleString() + '원' : '—' },
+    { label:'배당수익률', val: r.div_yield ? r.div_yield + '%'                      : '—' }
+  ];
+  const metricsHtml = '<div class="detail-metrics">'
+    + mets.map(function(m) {
+        return '<div class="dm"><div class="dm-label">' + m.label + '</div><div class="dm-val">' + m.val + '</div></div>';
+      }).join('')
+    + '</div>';
+  if (!a.length) return metricsHtml + '<div class="empty-msg" style="margin-top:12px">연간 재무 데이터가 없습니다.</div>';
+  const revData = a.filter(function(y) { return y.revenue; }).map(function(y) {
+    return { date: y.year, close: parseFloat((y.revenue||'').replace(/,/g,'')) || 0 };
+  });
+  const revenueChart = revData.length >= 2
+    ? '<div style="margin:14px 0 4px;font-size:12px;color:var(--muted);font-weight:600">연간 매출액 추이</div>'
+      + _svgLineChart(revData, 'close', '#10b981', '매출액(억)', {height:110})
+    : '';
+  const COLS = [
+    {label:'매출액', k:'revenue'}, {label:'영업이익', k:'op_income'}, {label:'순이익', k:'net_income'},
+    {label:'영업이익률', k:'op_margin'}, {label:'ROE', k:'roe'},
+    {label:'EPS', k:'eps'}, {label:'PER', k:'per'}, {label:'PBR', k:'pbr'}, {label:'주당배당금', k:'div'}
+  ];
+  const thead = '<tr><th style="text-align:left">항목</th>'
+    + a.map(function(y) { return '<th style="text-align:right;white-space:nowrap">' + y.year + '</th>'; }).join('')
+    + '</tr>';
+  const tbody = COLS.map(function(col) {
+    return '<tr><td style="font-weight:600;white-space:nowrap">' + col.label + '</td>'
+      + a.map(function(y) { return '<td style="text-align:right;white-space:nowrap">' + (y[col.k]||'—') + '</td>'; }).join('')
+      + '</tr>';
+  }).join('');
+  return metricsHtml + revenueChart
+    + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:14px">'
+    + '<table class="detail-annual-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
+}
+
+// ── SVG 차트 헬퍼 ──────────────────────────────────────────
+function _svgLineChart(data, key, color, label, opts) {
+  opts = opts || {};
+  var W=560, H=opts.height||140, Pl=46, Pr=12, Pt=14, Pb=28;
+  var vals = data.map(function(d) { return +(d[key]) || 0; });
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  var rng = mx - mn || 1;
+  var xs = function(i) { return Pl + i*(W-Pl-Pr)/Math.max(data.length-1,1); };
+  var ys = function(v) { return Pt + (1-(v-mn)/rng)*(H-Pt-Pb); };
+  var pts = data.map(function(d,i) { return xs(i).toFixed(1)+','+ys(+(d[key])||0).toFixed(1); }).join(' ');
+  var bot = H-Pb;
+  var area = xs(0).toFixed(1)+','+bot+' '+pts+' '+xs(data.length-1).toFixed(1)+','+bot;
+  var uid = key + '_' + Math.random().toString(36).slice(2,6);
+  var yTicks = [mn, mn+rng/2, mx];
+  var yLbls = yTicks.map(function(v) {
+    var lbl = Math.abs(v)>=10000 ? (v/1000).toFixed(0)+'K' : v.toFixed(Math.abs(v)%1?1:0);
+    return '<text x="'+(Pl-4)+'" y="'+ys(v).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--muted)" dominant-baseline="middle">'+lbl+'</text>';
+  }).join('');
+  var step = Math.max(1, Math.ceil(data.length/5));
+  var xLbls = data.filter(function(_,i) { return i%step===0 || i===data.length-1; }).map(function(d) {
+    var i=data.indexOf(d), ds=String(d.date||'');
+    var lbl = ds.length===8 ? ds.slice(4,6)+'/'+ds.slice(6,8) : ds.slice(-5);
+    return '<text x="'+xs(i).toFixed(1)+'" y="'+(bot+14)+'" text-anchor="middle" font-size="9" fill="var(--muted)">'+lbl+'</text>';
+  }).join('');
+  return '<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:260px;display:block">'
+    + '<defs><linearGradient id="'+uid+'" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0%" stop-color="'+color+'" stop-opacity="0.25"/>'
+    + '<stop offset="100%" stop-color="'+color+'" stop-opacity="0.02"/>'
+    + '</linearGradient></defs>'
+    + '<polygon points="'+area+'" fill="url(#'+uid+')"/>'
+    + '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linejoin="round"/>'
+    + yLbls + xLbls
+    + '<text x="'+Pl+'" y="'+Pt+'" font-size="10" fill="'+color+'">'+label+'</text>'
+    + '</svg></div>';
+}
+
+function _svgBarChart(data, series, opts) {
+  opts = opts || {};
+  var W=560, H=opts.height||140, Pl=10, Pr=12, Pt=24, Pb=28;
+  var allV = [];
+  data.forEach(function(d) { series.forEach(function(s) { allV.push(d[s.key]||0); }); });
+  var mx = Math.max.apply(null, allV.map(Math.abs).concat([1]));
+  var innerW = W-Pl-Pr;
+  var grpW = innerW/Math.max(data.length,1);
+  var barW = grpW/series.length*0.82;
+  var zero = Pt+(H-Pt-Pb)/2;
+  var bars = '';
+  data.forEach(function(d,di) {
+    series.forEach(function(s,si) {
+      var v=d[s.key]||0;
+      var bh=Math.min(Math.abs(v)/mx*(H-Pt-Pb)/2, (H-Pt-Pb)/2);
+      var x=Pl+di*grpW+si*barW+(grpW-series.length*barW)/2;
+      var y=v>=0?zero-bh:zero;
+      bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+Math.max(bh,0).toFixed(1)+'" fill="'+s.color+'" opacity="0.85" rx="1.5"/>';
+    });
+  });
+  var step = Math.max(1, Math.ceil(data.length/6));
+  var xLbls = data.filter(function(_,i) { return i%step===0 || i===data.length-1; }).map(function(d) {
+    var i=data.indexOf(d), ds=String(d.date||'');
+    var lbl=ds.length===8?ds.slice(4,6)+'/'+ds.slice(6,8):ds.slice(-5);
+    return '<text x="'+(Pl+i*grpW+grpW/2).toFixed(1)+'" y="'+(H-Pb+13)+'" text-anchor="middle" font-size="9" fill="var(--muted)">'+lbl+'</text>';
+  }).join('');
+  var legend = series.map(function(s,i) {
+    return '<text x="'+(Pl+i*64)+'" y="13" font-size="10" fill="'+s.color+'">■ '+s.label+'</text>';
+  }).join('');
+  return '<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:260px;display:block">'
+    + '<line x1="'+Pl+'" y1="'+zero.toFixed(1)+'" x2="'+(W-Pr)+'" y2="'+zero.toFixed(1)+'" stroke="var(--border)" stroke-width="1"/>'
+    + bars + xLbls + legend
+    + '</svg></div>';
 }
 
 // ══════════════════════════════════════════════════════════
