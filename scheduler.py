@@ -42,11 +42,15 @@ _sent_alerts: set = set()
 # 신호 카테고리별 쿨다운 (시간 단위)
 # GitHub Actions 매 30분 재실행 → Gist에 쿨다운 저장으로 프로세스 재시작 후에도 중복 방지
 _SIGNAL_COOLDOWN_HOURS = {
-    "RSI":        6,   # RSI 과매수/과매도: 장중 지속될 수 있으므로 6시간 쿨다운
+    "RSI":        24,  # 상태 신호: 하루 1회로 제한
     "MACD":       24,  # MACD 크로스: 하루 1회로 충분
-    "볼린저밴드":  6,   # BB 돌파: 6시간 쿨다운
-    "크로스":     24,  # MA 골든/데드크로스: 하루 1회로 충분
+    "볼린저밴드":  24,  # 상태 신호: 하루 1회로 제한
+    "크로스":     48,  # MA 골든/데드크로스: 이틀 1회
 }
+
+# RSI·볼린저밴드 단독 신호 필터 조건 (동반 조건 없으면 알림 생략)
+_RSI_BB_MIN_CHG_PCT  = 2.0   # 주가 변동 최소 ±2%
+_RSI_BB_MIN_VOL_RATIO = 1.5  # 20일 평균 거래량 대비 최소 1.5배
 
 
 def _signal_category(alert_text: str) -> str:
@@ -209,31 +213,45 @@ def check_signals(force: bool = False):
                 last    = df["Close"].iloc[-1]
                 prev    = df["Close"].iloc[-2] if len(df) > 1 else last
                 chg_p   = (last - prev) / prev * 100 if prev else 0
+
+                # 거래량 급증 여부 (20일 평균 대비)
+                vol_col = "Volume" if "Volume" in df.columns else None
+                if vol_col and len(df) >= 21:
+                    vol_today = df[vol_col].iloc[-1]
+                    vol_avg20 = df[vol_col].iloc[-21:-1].mean()
+                    vol_ratio = vol_today / vol_avg20 if vol_avg20 > 0 else 0
+                else:
+                    vol_ratio = 0
+
                 signals = tech.get("signals", {})
                 raw_alerts = []
 
-                # RSI 과매수/과매도
+                # RSI 과매수/과매도 — 주가 ±2% 이상 + 거래량 1.5배 이상 동반 시만 알림
                 rsi_sig = signals.get("RSI", "")
-                if "과매수" in str(rsi_sig):
-                    raw_alerts.append(f"🔴 RSI 과매수 — {rsi_sig}")
-                elif "과매도" in str(rsi_sig):
-                    raw_alerts.append(f"🟢 RSI 과매도 — {rsi_sig}")
+                if "과매수" in str(rsi_sig) or "과매도" in str(rsi_sig):
+                    if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
+                        tag = "🔴 RSI 과매수" if "과매수" in str(rsi_sig) else "🟢 RSI 과매도"
+                        raw_alerts.append(f"{tag} — {rsi_sig} (거래량 {vol_ratio:.1f}x)")
+                    else:
+                        log.debug(f"  RSI 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
 
-                # MACD 크로스
+                # MACD 크로스 (이벤트성 → 조건 없이 유지)
                 macd_sig = signals.get("MACD", "")
                 if "골든크로스" in str(macd_sig):
                     raw_alerts.append(f"🟢 MACD 골든크로스 발생!")
                 elif "데드크로스" in str(macd_sig):
                     raw_alerts.append(f"🔴 MACD 데드크로스 발생!")
 
-                # 볼린저밴드 돌파
+                # 볼린저밴드 돌파 — 주가 ±2% 이상 + 거래량 1.5배 이상 동반 시만 알림
                 bb_sig = signals.get("볼린저밴드", "")
-                if "상단 돌파" in str(bb_sig):
-                    raw_alerts.append(f"⚠️ 볼린저밴드 상단 돌파 — {bb_sig}")
-                elif "하단 이탈" in str(bb_sig):
-                    raw_alerts.append(f"⚠️ 볼린저밴드 하단 이탈 — {bb_sig}")
+                if "상단 돌파" in str(bb_sig) or "하단 이탈" in str(bb_sig):
+                    if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
+                        tag = "⚠️ 볼린저밴드 상단 돌파" if "상단 돌파" in str(bb_sig) else "⚠️ 볼린저밴드 하단 이탈"
+                        raw_alerts.append(f"{tag} — {bb_sig} (거래량 {vol_ratio:.1f}x)")
+                    else:
+                        log.debug(f"  BB 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
 
-                # 골든/데드크로스 (MA)
+                # MA 골든/데드크로스 (이벤트성 → 조건 없이 유지)
                 cross_sig = signals.get("크로스", "")
                 if cross_sig:
                     raw_alerts.append(f"🚨 {cross_sig}")
