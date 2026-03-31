@@ -125,32 +125,36 @@ with tab_overview:
     etf_rec = load_etf()
     stk_rec = load_stocks()
 
-    # 예수금: 계산에는 항상 Gist 최신값 직접 사용 (위젯 상태 우회)
-    cash = float(meta.get("cash", 0))
+    # 예수금 결정:
+    # 매수/매도 직후 → session_state의 정확한 계산값 사용 (Gist 전파 지연 우회)
+    # 그 외 → Gist 최신값 사용
+    if "_cash_after_trade" in st.session_state:
+        cash = float(st.session_state["_cash_after_trade"])
+        # Gist가 따라잡으면 session_state 제거
+        gist_cash = float(meta.get("cash", 0))
+        if abs(gist_cash - cash) < 1:
+            del st.session_state["_cash_after_trade"]
+    else:
+        cash = float(meta.get("cash", 0))
 
-    # number_input 을 Gist 값과 항상 동기화
-    # (Gist 값이 바뀌면 세션 상태를 강제 업데이트)
-    cash_in_gist = int(cash)
-    if st.session_state.get("_gist_cash_snapshot") != cash_in_gist:
-        st.session_state["_gist_cash_snapshot"] = cash_in_gist
-        st.session_state["cash_manual_input"]    = cash_in_gist
-
-    col_cash, _ = st.columns([1, 3])
+    col_cash, col_right = st.columns([1, 3])
     with col_cash:
-        new_cash_val = st.number_input(
-            "💵 예수금 (원)",
-            min_value=0, step=10000,
-            format="%d",
-            key="cash_manual_input",
-            help="매수/매도 외 직접 예수금을 수정할 때 사용하세요.",
-        )
-        if st.button("예수금 저장", type="primary"):
-            meta["cash"] = new_cash_val
-            if save_meta(meta):
-                st.success("저장 완료")
-                st.rerun()
-            else:
-                st.error("저장 실패")
+        # 예수금은 metric으로 표시 (위젯 상태 간섭 없음)
+        st.metric("💵 예수금", f"{cash:,.0f}원")
+
+        with st.expander("✏️ 예수금 직접 수정"):
+            new_cash_val = st.number_input(
+                "금액 (원)", min_value=0, value=int(max(cash, 0)),
+                step=10000, format="%d", key="cash_manual_input",
+            )
+            if st.button("예수금 저장", type="primary"):
+                meta["cash"] = new_cash_val
+                if save_meta(meta):
+                    st.session_state["_cash_after_trade"] = float(new_cash_val)
+                    st.success("저장 완료")
+                    st.rerun()
+                else:
+                    st.error("저장 실패")
 
     st.divider()
 
@@ -343,8 +347,10 @@ with tab_etf:
                             "avg_price": etf_buy_price,
                         })
 
-                    meta["cash"] = float(meta.get("cash", 0)) - buy_total
+                    new_cash = float(meta.get("cash", 0)) - buy_total
+                    meta["cash"] = new_cash
                     if _patch_gist({"portfolio_meta.json": meta, "etf.json": records}):
+                        st.session_state["_cash_after_trade"] = new_cash
                         st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
@@ -381,8 +387,10 @@ with tab_etf:
                     else:
                         rec["qty"] = new_qty  # avg_price 유지 (매도는 평균단가 불변)
 
-                    meta["cash"] = float(meta.get("cash", 0)) + sell_total
+                    new_cash = float(meta.get("cash", 0)) + sell_total
+                    meta["cash"] = new_cash
                     if _patch_gist({"portfolio_meta.json": meta, "etf.json": records}):
+                        st.session_state["_cash_after_trade"] = new_cash
                         st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
                         st.rerun()
                     else:
@@ -522,8 +530,10 @@ with tab_stock:
                             "note":      stk_note,
                         })
 
-                    meta["cash"] = float(meta.get("cash", 0)) - buy_total
+                    new_cash = float(meta.get("cash", 0)) - buy_total
+                    meta["cash"] = new_cash
                     if _patch_gist({"portfolio_meta.json": meta, "stocks.json": records}):
+                        st.session_state["_cash_after_trade"] = new_cash
                         st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
@@ -560,8 +570,10 @@ with tab_stock:
                     else:
                         rec["qty"] = new_qty
 
-                    meta["cash"] = float(meta.get("cash", 0)) + sell_total
+                    new_cash = float(meta.get("cash", 0)) + sell_total
+                    meta["cash"] = new_cash
                     if _patch_gist({"portfolio_meta.json": meta, "stocks.json": records}):
+                        st.session_state["_cash_after_trade"] = new_cash
                         st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
                         st.rerun()
                     else:
