@@ -4199,15 +4199,24 @@ async function saveTransaction() {
     if (!resp.ok) throw new Error('저장 실패');
     _transactions.push(record);
 
-    // ETF 레코드 qty 업데이트 (합산에 반영)
+    // ETF 레코드 qty · avg_price 업데이트 (합산에 반영)
     const delta = type === 'buy' ? qty : -qty;
     const etfIdx = _etfRecords.findIndex(r => r.id == Number(etfId));
     if (etfIdx !== -1) {
-      _etfRecords[etfIdx] = { ..._etfRecords[etfIdx], qty: Math.max(0, (_etfRecords[etfIdx].qty || 0) + delta) };
+      const rec     = _etfRecords[etfIdx];
+      const oldQty  = rec.qty || 0;
+      const oldAvg  = rec.avg_price || 0;
+      const newQty  = Math.max(0, oldQty + delta);
+      let   newAvg  = oldAvg;
+      // 매수이고 단가가 입력된 경우에만 가중평균 재계산
+      if (type === 'buy' && price > 0 && newQty > 0) {
+        newAvg = Math.round((oldQty * oldAvg + qty * price) / newQty);
+      }
+      _etfRecords[etfIdx] = { ...rec, qty: newQty, avg_price: newAvg };
       // 대시보드 탭(_portEtf)도 동기화
       const portIdx = _portEtf.findIndex(r => r.id == Number(etfId));
       if (portIdx !== -1) {
-        _portEtf[portIdx] = { ..._portEtf[portIdx], qty: Math.max(0, (_portEtf[portIdx].qty || 0) + delta) };
+        _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
       }
       await saveEtfRecords();
     }
@@ -4228,15 +4237,25 @@ async function deleteTransaction(id) {
     await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
     _transactions = _transactions.filter(t => t.id != id);
 
-    // ETF 레코드 qty 원상복구 (buy 삭제 → qty 감소, sell 삭제 → qty 증가)
+    // ETF 레코드 qty · avg_price 원상복구
     if (tx) {
-      const delta = tx.type === 'buy' ? -tx.qty_change : tx.qty_change;
-      const etfIdx = _etfRecords.findIndex(r => r.id == tx.etf_id);
+      const delta   = tx.type === 'buy' ? -tx.qty_change : tx.qty_change;
+      const etfIdx  = _etfRecords.findIndex(r => r.id == tx.etf_id);
       if (etfIdx !== -1) {
-        _etfRecords[etfIdx] = { ..._etfRecords[etfIdx], qty: Math.max(0, (_etfRecords[etfIdx].qty || 0) + delta) };
+        const rec    = _etfRecords[etfIdx];
+        const curQty = rec.qty || 0;
+        const curAvg = rec.avg_price || 0;
+        const newQty = Math.max(0, curQty + delta);
+        let   newAvg = curAvg;
+        // 매수 거래 삭제이고 단가가 있으면 가중평균 역산
+        if (tx.type === 'buy' && tx.price && newQty > 0) {
+          newAvg = Math.round((curQty * curAvg - tx.qty_change * tx.price) / newQty);
+          if (newAvg < 0) newAvg = curAvg; // 음수 방어
+        }
+        _etfRecords[etfIdx] = { ...rec, qty: newQty, avg_price: newAvg };
         const portIdx = _portEtf.findIndex(r => r.id == tx.etf_id);
         if (portIdx !== -1) {
-          _portEtf[portIdx] = { ..._portEtf[portIdx], qty: Math.max(0, (_portEtf[portIdx].qty || 0) + delta) };
+          _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
         }
         await saveEtfRecords();
       }
