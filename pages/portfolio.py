@@ -344,8 +344,7 @@ with tab_etf:
                         })
 
                     meta["cash"] = float(meta.get("cash", 0)) - buy_total
-                    save_meta(meta)
-                    if save_etf(records):
+                    if _patch_gist({"portfolio_meta.json": meta, "etf.json": records}):
                         st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
@@ -383,8 +382,7 @@ with tab_etf:
                         rec["qty"] = new_qty  # avg_price 유지 (매도는 평균단가 불변)
 
                     meta["cash"] = float(meta.get("cash", 0)) + sell_total
-                    save_meta(meta)
-                    if save_etf(records):
+                    if _patch_gist({"portfolio_meta.json": meta, "etf.json": records}):
                         st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
                         st.rerun()
                     else:
@@ -525,8 +523,7 @@ with tab_stock:
                         })
 
                     meta["cash"] = float(meta.get("cash", 0)) - buy_total
-                    save_meta(meta)
-                    if save_stocks(records):
+                    if _patch_gist({"portfolio_meta.json": meta, "stocks.json": records}):
                         st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
@@ -564,8 +561,7 @@ with tab_stock:
                         rec["qty"] = new_qty
 
                     meta["cash"] = float(meta.get("cash", 0)) + sell_total
-                    save_meta(meta)
-                    if save_stocks(records):
+                    if _patch_gist({"portfolio_meta.json": meta, "stocks.json": records}):
                         st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
                         st.rerun()
                     else:
