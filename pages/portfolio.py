@@ -125,19 +125,30 @@ with tab_overview:
     etf_rec = load_etf()
     stk_rec = load_stocks()
 
-    # 예수금 설정
+    # 예수금: 계산에는 항상 Gist 최신값 직접 사용 (위젯 상태 우회)
+    cash = float(meta.get("cash", 0))
+
+    # number_input 을 Gist 값과 항상 동기화
+    # (Gist 값이 바뀌면 세션 상태를 강제 업데이트)
+    cash_in_gist = int(cash)
+    if st.session_state.get("_gist_cash_snapshot") != cash_in_gist:
+        st.session_state["_gist_cash_snapshot"] = cash_in_gist
+        st.session_state["cash_manual_input"]    = cash_in_gist
+
     col_cash, _ = st.columns([1, 3])
     with col_cash:
-        cash = st.number_input(
+        new_cash_val = st.number_input(
             "💵 예수금 (원)",
-            min_value=0, value=int(meta.get("cash", 0)), step=10000,
+            min_value=0, step=10000,
             format="%d",
-            help="증권 계좌의 현재 예수금을 입력하세요.",
+            key="cash_manual_input",
+            help="매수/매도 외 직접 예수금을 수정할 때 사용하세요.",
         )
         if st.button("예수금 저장", type="primary"):
-            meta["cash"] = cash
+            meta["cash"] = new_cash_val
             if save_meta(meta):
                 st.success("저장 완료")
+                st.rerun()
             else:
                 st.error("저장 실패")
 
