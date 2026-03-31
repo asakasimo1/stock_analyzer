@@ -4198,6 +4198,20 @@ async function saveTransaction() {
     });
     if (!resp.ok) throw new Error('저장 실패');
     _transactions.push(record);
+
+    // ETF 레코드 qty 업데이트 (합산에 반영)
+    const delta = type === 'buy' ? qty : -qty;
+    const etfIdx = _etfRecords.findIndex(r => r.id == Number(etfId));
+    if (etfIdx !== -1) {
+      _etfRecords[etfIdx] = { ..._etfRecords[etfIdx], qty: Math.max(0, (_etfRecords[etfIdx].qty || 0) + delta) };
+      // 대시보드 탭(_portEtf)도 동기화
+      const portIdx = _portEtf.findIndex(r => r.id == Number(etfId));
+      if (portIdx !== -1) {
+        _portEtf[portIdx] = { ..._portEtf[portIdx], qty: Math.max(0, (_portEtf[portIdx].qty || 0) + delta) };
+      }
+      await saveEtfRecords();
+    }
+
     renderEtfCards();
     closeTransModal();
   } catch (e) {
@@ -4210,8 +4224,24 @@ async function saveTransaction() {
 async function deleteTransaction(id) {
   if (!confirm('이 거래 내역을 삭제하시겠습니까?')) return;
   try {
+    const tx = _transactions.find(t => t.id == id);
     await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
     _transactions = _transactions.filter(t => t.id != id);
+
+    // ETF 레코드 qty 원상복구 (buy 삭제 → qty 감소, sell 삭제 → qty 증가)
+    if (tx) {
+      const delta = tx.type === 'buy' ? -tx.qty_change : tx.qty_change;
+      const etfIdx = _etfRecords.findIndex(r => r.id == tx.etf_id);
+      if (etfIdx !== -1) {
+        _etfRecords[etfIdx] = { ..._etfRecords[etfIdx], qty: Math.max(0, (_etfRecords[etfIdx].qty || 0) + delta) };
+        const portIdx = _portEtf.findIndex(r => r.id == tx.etf_id);
+        if (portIdx !== -1) {
+          _portEtf[portIdx] = { ..._portEtf[portIdx], qty: Math.max(0, (_portEtf[portIdx].qty || 0) + delta) };
+        }
+        await saveEtfRecords();
+      }
+    }
+
     renderEtfCards();
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
