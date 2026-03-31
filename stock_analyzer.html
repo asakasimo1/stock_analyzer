@@ -4224,6 +4224,12 @@ async function saveTransaction() {
       await saveEtfRecords();
     }
 
+    // 예수금 자동 조정 (단가 입력된 경우만)
+    if (price > 0) {
+      const cashDelta = type === 'buy' ? -(qty * price) : +(qty * price);
+      await _adjustCash(cashDelta);
+    }
+
     renderEtfCards();
     closeTransModal();
   } catch (e) {
@@ -4262,11 +4268,36 @@ async function deleteTransaction(id) {
         }
         await saveEtfRecords();
       }
+      // 예수금 자동 복구 (단가 있는 경우만)
+      if (tx.price) {
+        const cashDelta = tx.type === 'buy' ? +(tx.qty_change * tx.price) : -(tx.qty_change * tx.price);
+        await _adjustCash(cashDelta);
+      }
     }
 
     renderEtfCards();
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
+  }
+}
+
+// 예수금 조정 헬퍼 — delta만큼 가감 후 Gist 저장 + UI 갱신
+async function _adjustCash(delta) {
+  if (!delta) return;
+  const newCash = Math.max(0, (_portCash || 0) + delta);
+  try {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cash: newCash }),
+    });
+    _portCash = newCash;
+    const ci = document.getElementById('cash-input');
+    if (ci) ci.value = newCash ? newCash.toLocaleString() : '0';
+    if (typeof _renderPortAsset === 'function') _renderPortAsset();
+    if (typeof _renderPortKpi   === 'function') _renderPortKpi();
+  } catch(e) {
+    console.warn('예수금 자동 조정 실패:', e.message);
   }
 }
 
