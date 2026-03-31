@@ -321,10 +321,17 @@ with tab_etf:
                         "qty":       etf_qty,
                         "avg_price": etf_avg,
                     }
+                    # 예수금 차감 처리
+                    meta = load_meta()
+                    new_amt = etf_qty * etf_avg
                     if edit_rec:
+                        old_amt = float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
+                        meta["cash"] = float(meta.get("cash", 0)) - (new_amt - old_amt)
                         records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
                     else:
+                        meta["cash"] = float(meta.get("cash", 0)) - new_amt
                         records.append(new_rec)
+                    save_meta(meta)
                     if save_etf(records):
                         st.success("저장 완료")
                         st.rerun()
@@ -333,6 +340,10 @@ with tab_etf:
         with col_del:
             if edit_rec and st.button("🗑 삭제", use_container_width=True, key="etf_del"):
                 records = [r for r in load_etf() if r["id"] != edit_rec["id"]]
+                # 삭제 시 예수금 환원
+                meta = load_meta()
+                meta["cash"] = float(meta.get("cash", 0)) + float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
+                save_meta(meta)
                 if save_etf(records):
                     st.success("삭제 완료")
                     st.rerun()
@@ -415,10 +426,17 @@ with tab_stock:
                         "avg_price": stk_avg,
                         "note":      stk_note,
                     }
+                    # 예수금 차감 처리
+                    meta = load_meta()
+                    new_amt = stk_qty * stk_avg
                     if edit_rec:
+                        old_amt = float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
+                        meta["cash"] = float(meta.get("cash", 0)) - (new_amt - old_amt)
                         records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
                     else:
+                        meta["cash"] = float(meta.get("cash", 0)) - new_amt
                         records.append(new_rec)
+                    save_meta(meta)
                     if save_stocks(records):
                         st.success("저장 완료")
                         st.rerun()
@@ -427,6 +445,10 @@ with tab_stock:
         with col_del:
             if edit_rec and st.button("🗑 삭제", use_container_width=True, key="stk_del"):
                 records = [r for r in load_stocks() if r["id"] != edit_rec["id"]]
+                # 삭제 시 예수금 환원
+                meta = load_meta()
+                meta["cash"] = float(meta.get("cash", 0)) + float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
+                save_meta(meta)
                 if save_stocks(records):
                     st.success("삭제 완료")
                     st.rerun()
