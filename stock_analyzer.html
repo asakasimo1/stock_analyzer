@@ -1974,7 +1974,6 @@ function renderInvestorTable(data) {
       <td style="text-align:right;white-space:nowrap">${(it.foreign_rate||0).toFixed(1)}%</td>
       <td style="text-align:right;white-space:nowrap">${fmtNet(it.foreign_net)}</td>
       <td style="text-align:right;white-space:nowrap">${fmtNet(it.inst_net)}</td>
-      <td style="text-align:right;white-space:nowrap">${fmtNet(it.pension_net)}</td>
       <td style="text-align:right;white-space:nowrap">${fmtNet(it.indiv_net)}</td>
     </tr>`;
   }).join('');
@@ -1990,7 +1989,6 @@ function renderInvestorTable(data) {
             <th style="text-align:right">외국인%</th>
             <th style="text-align:right">외국인</th>
             <th style="text-align:right">기관</th>
-            <th style="text-align:right">연기금</th>
             <th style="text-align:right">개인</th>
           </tr>
         </thead>
@@ -1998,7 +1996,7 @@ function renderInvestorTable(data) {
       </table>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 4px">
-      ※ 전일 종가 기준 · 순매수 ±1만주 미만 생략 · 연기금: ${pensionNote}
+      ※ 전일 종가 기준 · 순매수 ±1만주 미만 생략
     </div>`;
 }
 
