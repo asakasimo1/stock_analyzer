@@ -1964,13 +1964,12 @@ function renderInvestorTable(data) {
     const man = (v / 10000).toFixed(1);
     return `<span style="color:${c};font-weight:600">${v>0?'+':''}${man}만</span>`;
   };
-  // 종목명 5자 초과 시 말줄임
-  const shortName = n => n && n.length > 5 ? n.slice(0,5) + '…' : (n||'');
   const rows = items.map(it => {
     const safeN = (it.name||'').replace(/'/g,"\\'");
     return `<tr style="cursor:pointer" onclick="openStockDetail('${it.ticker}','${safeN}')">
-      <td style="white-space:nowrap">
-        <span style="font-weight:600">${shortName(it.name)}</span>
+      <td style="white-space:nowrap;min-width:80px">
+        <span style="font-weight:600;font-size:13px">${it.name||''}</span><br>
+        <span style="font-size:11px;color:var(--muted)">${it.ticker}</span>
       </td>
       <td style="text-align:right;white-space:nowrap">${(it.foreign_rate||0).toFixed(1)}%</td>
       <td style="text-align:right;white-space:nowrap">${fmtNet(it.foreign_net)}</td>
