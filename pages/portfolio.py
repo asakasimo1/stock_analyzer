@@ -285,68 +285,147 @@ with tab_etf:
 
     st.divider()
 
-    # ── ETF 추가/수정 폼 ───────────────────────────────────────────────────────
-    with st.expander("➕ ETF 추가 / 수정", expanded=not bool(etf_rec)):
-        edit_id = st.selectbox(
-            "수정할 항목 (새로 추가하려면 '신규')",
-            options=["신규"] + [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in etf_rec],
-            key="etf_edit_sel",
-        )
-        edit_rec = None
-        if edit_id != "신규":
-            idx = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in etf_rec].index(edit_id)
-            edit_rec = etf_rec[idx]
+    # ── ETF 거래 입력 폼 ───────────────────────────────────────────────────────
+    with st.expander("💸 ETF 거래 입력", expanded=not bool(etf_rec)):
+        trade_type = st.radio("거래 유형", ["매수", "매도", "수정/삭제"], horizontal=True, key="etf_trade_type")
 
-        c1, c2 = st.columns(2)
-        etf_name   = c1.text_input("종목명",  value=edit_rec.get("name","")   if edit_rec else "")
-        etf_ticker = c2.text_input("티커코드", value=edit_rec.get("ticker","") if edit_rec else "",
-                                   placeholder="예: 498400")
-        c3, c4 = st.columns(2)
-        etf_qty    = c3.number_input("수량 (주)", min_value=0, step=1,
-                                      value=int(edit_rec.get("qty",0)) if edit_rec else 0)
-        etf_avg    = c4.number_input("평균 매입가 (원)", min_value=0, step=100,
-                                      value=int(edit_rec.get("avg_price",0)) if edit_rec else 0)
+        # ── 매수 ──────────────────────────────────────────────────────────────
+        if trade_type == "매수":
+            c1, c2 = st.columns(2)
+            etf_name   = c1.text_input("종목명", key="etf_buy_name")
+            etf_ticker = c2.text_input("티커코드", placeholder="예: 498400", key="etf_buy_ticker")
+            c3, c4 = st.columns(2)
+            etf_buy_qty   = c3.number_input("매수 수량 (주)", min_value=1, step=1, key="etf_buy_qty")
+            etf_buy_price = c4.number_input("매수가 (원/주)", min_value=0, step=100, key="etf_buy_price")
 
-        col_save, col_del = st.columns([2, 1])
-        with col_save:
-            if st.button("💾 저장", type="primary", use_container_width=True, key="etf_save"):
+            buy_total = etf_buy_qty * etf_buy_price
+            st.info(f"매수금액: **{buy_total:,.0f}원** (예수금에서 차감)")
+
+            if st.button("💾 매수 저장", type="primary", use_container_width=True, key="etf_buy_save"):
                 if not etf_name:
                     st.error("종목명을 입력하세요.")
                 else:
                     records = load_etf()
-                    new_rec = {
-                        "id":        edit_rec["id"] if edit_rec else int(time.time() * 1000),
-                        "name":      etf_name,
-                        "ticker":    etf_ticker,
-                        "qty":       etf_qty,
-                        "avg_price": etf_avg,
-                    }
-                    # 예수금 차감 처리
-                    meta = load_meta()
-                    new_amt = etf_qty * etf_avg
-                    if edit_rec:
-                        old_amt = float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
-                        meta["cash"] = float(meta.get("cash", 0)) - (new_amt - old_amt)
-                        records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
+                    meta    = load_meta()
+                    # 기존 종목 여부 확인 (티커 또는 종목명으로)
+                    existing = None
+                    if etf_ticker:
+                        existing = next((r for r in records if r.get("ticker") == etf_ticker), None)
+                    if existing is None:
+                        existing = next((r for r in records if r.get("name") == etf_name), None)
+
+                    if existing:
+                        # 추가 매수 → 가중평균 재계산
+                        old_qty = float(existing["qty"])
+                        old_avg = float(existing["avg_price"])
+                        new_qty_total = old_qty + etf_buy_qty
+                        new_avg = (old_qty * old_avg + etf_buy_qty * etf_buy_price) / new_qty_total
+                        existing["qty"]       = new_qty_total
+                        existing["avg_price"] = round(new_avg)
                     else:
-                        meta["cash"] = float(meta.get("cash", 0)) - new_amt
-                        records.append(new_rec)
+                        # 신규 종목
+                        records.append({
+                            "id":        int(time.time() * 1000),
+                            "name":      etf_name,
+                            "ticker":    etf_ticker,
+                            "qty":       etf_buy_qty,
+                            "avg_price": etf_buy_price,
+                        })
+
+                    meta["cash"] = float(meta.get("cash", 0)) - buy_total
                     save_meta(meta)
                     if save_etf(records):
-                        st.success("저장 완료")
+                        st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
                         st.error("저장 실패")
-        with col_del:
-            if edit_rec and st.button("🗑 삭제", use_container_width=True, key="etf_del"):
-                records = [r for r in load_etf() if r["id"] != edit_rec["id"]]
-                # 삭제 시 예수금 환원
-                meta = load_meta()
-                meta["cash"] = float(meta.get("cash", 0)) + float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
-                save_meta(meta)
-                if save_etf(records):
-                    st.success("삭제 완료")
-                    st.rerun()
+
+        # ── 매도 ──────────────────────────────────────────────────────────────
+        elif trade_type == "매도":
+            if not etf_rec:
+                st.info("보유 ETF가 없습니다.")
+            else:
+                etf_labels = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in etf_rec]
+                sell_target = st.selectbox("매도할 종목", options=etf_labels, key="etf_sell_sel")
+                t_idx      = etf_labels.index(sell_target)
+                target_rec = etf_rec[t_idx]
+                hold_qty   = float(target_rec.get("qty", 0))
+                hold_avg   = float(target_rec.get("avg_price", 0))
+                st.caption(f"보유 수량: {hold_qty:,.0f}주 | 평균 매입가: {hold_avg:,.0f}원")
+
+                c3, c4 = st.columns(2)
+                sell_qty   = c3.number_input("매도 수량 (주)", min_value=1,
+                                              max_value=int(hold_qty), step=1, key="etf_sell_qty")
+                sell_price = c4.number_input("매도가 (원/주)", min_value=0, step=100, key="etf_sell_price")
+
+                sell_total = sell_qty * sell_price
+                st.info(f"매도금액: **{sell_total:,.0f}원** (예수금에 추가)")
+
+                if st.button("💾 매도 저장", type="primary", use_container_width=True, key="etf_sell_save"):
+                    records = load_etf()
+                    meta    = load_meta()
+                    rec     = next(r for r in records if r["id"] == target_rec["id"])
+                    new_qty = float(rec["qty"]) - sell_qty
+                    if new_qty <= 0:
+                        records = [r for r in records if r["id"] != target_rec["id"]]
+                    else:
+                        rec["qty"] = new_qty  # avg_price 유지 (매도는 평균단가 불변)
+
+                    meta["cash"] = float(meta.get("cash", 0)) + sell_total
+                    save_meta(meta)
+                    if save_etf(records):
+                        st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
+                        st.rerun()
+                    else:
+                        st.error("저장 실패")
+
+        # ── 수정/삭제 (데이터 정정용, 예수금 변동 없음) ────────────────────────
+        else:
+            if not etf_rec:
+                st.info("등록된 ETF가 없습니다.")
+            else:
+                st.caption("⚠️ 수정/삭제는 데이터 정정용입니다. 예수금에 영향을 주지 않습니다.")
+                edit_id = st.selectbox(
+                    "수정할 항목",
+                    options=[f"{r.get('name','-')} ({r.get('ticker','-')})" for r in etf_rec],
+                    key="etf_edit_sel",
+                )
+                idx      = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in etf_rec].index(edit_id)
+                edit_rec = etf_rec[idx]
+
+                c1, c2 = st.columns(2)
+                etf_name   = c1.text_input("종목명",  value=edit_rec.get("name",""),   key="etf_edit_name")
+                etf_ticker = c2.text_input("티커코드", value=edit_rec.get("ticker",""), key="etf_edit_ticker",
+                                           placeholder="예: 498400")
+                c3, c4 = st.columns(2)
+                etf_qty = c3.number_input("수량 (주)", min_value=0, step=1,
+                                           value=int(edit_rec.get("qty", 0)), key="etf_edit_qty")
+                etf_avg = c4.number_input("평균 매입가 (원)", min_value=0, step=100,
+                                           value=int(edit_rec.get("avg_price", 0)), key="etf_edit_avg")
+
+                col_save, col_del = st.columns([2, 1])
+                with col_save:
+                    if st.button("💾 수정 저장", type="primary", use_container_width=True, key="etf_edit_save"):
+                        records = load_etf()
+                        new_rec = {
+                            "id":        edit_rec["id"],
+                            "name":      etf_name,
+                            "ticker":    etf_ticker,
+                            "qty":       etf_qty,
+                            "avg_price": etf_avg,
+                        }
+                        records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
+                        if save_etf(records):
+                            st.success("수정 완료")
+                            st.rerun()
+                        else:
+                            st.error("저장 실패")
+                with col_del:
+                    if st.button("🗑 삭제", use_container_width=True, key="etf_del"):
+                        records = [r for r in load_etf() if r["id"] != edit_rec["id"]]
+                        if save_etf(records):
+                            st.success("삭제 완료")
+                            st.rerun()
 
 
 # ┌─────────────────────────────────────────────────────────────────────────────
@@ -388,67 +467,145 @@ with tab_stock:
 
     st.divider()
 
-    # ── 개별주 추가/수정 폼 ────────────────────────────────────────────────────
-    with st.expander("➕ 개별주 추가 / 수정", expanded=not bool(stk_rec)):
-        edit_id = st.selectbox(
-            "수정할 항목 (새로 추가하려면 '신규')",
-            options=["신규"] + [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in stk_rec],
-            key="stk_edit_sel",
-        )
-        edit_rec = None
-        if edit_id != "신규":
-            idx = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in stk_rec].index(edit_id)
-            edit_rec = stk_rec[idx]
+    # ── 개별주 거래 입력 폼 ────────────────────────────────────────────────────
+    with st.expander("💸 개별주 거래 입력", expanded=not bool(stk_rec)):
+        trade_type = st.radio("거래 유형", ["매수", "매도", "수정/삭제"], horizontal=True, key="stk_trade_type")
 
-        c1, c2 = st.columns(2)
-        stk_name   = c1.text_input("종목명",  value=edit_rec.get("name","")   if edit_rec else "")
-        stk_ticker = c2.text_input("티커코드", value=edit_rec.get("ticker","") if edit_rec else "",
-                                   placeholder="예: 005930")
-        c3, c4 = st.columns(2)
-        stk_qty    = c3.number_input("수량 (주)", min_value=0, step=1,
-                                      value=int(edit_rec.get("qty",0)) if edit_rec else 0)
-        stk_avg    = c4.number_input("평균 매입가 (원)", min_value=0, step=100,
-                                      value=int(edit_rec.get("avg_price",0)) if edit_rec else 0)
-        stk_note   = st.text_input("메모",  value=edit_rec.get("note","") if edit_rec else "")
+        # ── 매수 ──────────────────────────────────────────────────────────────
+        if trade_type == "매수":
+            c1, c2 = st.columns(2)
+            stk_name   = c1.text_input("종목명", key="stk_buy_name")
+            stk_ticker = c2.text_input("티커코드", placeholder="예: 005930", key="stk_buy_ticker")
+            c3, c4 = st.columns(2)
+            stk_buy_qty   = c3.number_input("매수 수량 (주)", min_value=1, step=1, key="stk_buy_qty")
+            stk_buy_price = c4.number_input("매수가 (원/주)", min_value=0, step=100, key="stk_buy_price")
+            stk_note      = st.text_input("메모", key="stk_buy_note")
 
-        col_save, col_del = st.columns([2, 1])
-        with col_save:
-            if st.button("💾 저장", type="primary", use_container_width=True, key="stk_save"):
+            buy_total = stk_buy_qty * stk_buy_price
+            st.info(f"매수금액: **{buy_total:,.0f}원** (예수금에서 차감)")
+
+            if st.button("💾 매수 저장", type="primary", use_container_width=True, key="stk_buy_save"):
                 if not stk_name:
                     st.error("종목명을 입력하세요.")
                 else:
                     records = load_stocks()
-                    new_rec = {
-                        "id":        edit_rec["id"] if edit_rec else int(time.time() * 1000),
-                        "name":      stk_name,
-                        "ticker":    stk_ticker,
-                        "qty":       stk_qty,
-                        "avg_price": stk_avg,
-                        "note":      stk_note,
-                    }
-                    # 예수금 차감 처리
-                    meta = load_meta()
-                    new_amt = stk_qty * stk_avg
-                    if edit_rec:
-                        old_amt = float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
-                        meta["cash"] = float(meta.get("cash", 0)) - (new_amt - old_amt)
-                        records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
+                    meta    = load_meta()
+                    existing = None
+                    if stk_ticker:
+                        existing = next((r for r in records if r.get("ticker") == stk_ticker), None)
+                    if existing is None:
+                        existing = next((r for r in records if r.get("name") == stk_name), None)
+
+                    if existing:
+                        old_qty = float(existing["qty"])
+                        old_avg = float(existing["avg_price"])
+                        new_qty_total = old_qty + stk_buy_qty
+                        new_avg = (old_qty * old_avg + stk_buy_qty * stk_buy_price) / new_qty_total
+                        existing["qty"]       = new_qty_total
+                        existing["avg_price"] = round(new_avg)
                     else:
-                        meta["cash"] = float(meta.get("cash", 0)) - new_amt
-                        records.append(new_rec)
+                        records.append({
+                            "id":        int(time.time() * 1000),
+                            "name":      stk_name,
+                            "ticker":    stk_ticker,
+                            "qty":       stk_buy_qty,
+                            "avg_price": stk_buy_price,
+                            "note":      stk_note,
+                        })
+
+                    meta["cash"] = float(meta.get("cash", 0)) - buy_total
                     save_meta(meta)
                     if save_stocks(records):
-                        st.success("저장 완료")
+                        st.success(f"매수 저장 완료 — 예수금 {buy_total:,.0f}원 차감")
                         st.rerun()
                     else:
                         st.error("저장 실패")
-        with col_del:
-            if edit_rec and st.button("🗑 삭제", use_container_width=True, key="stk_del"):
-                records = [r for r in load_stocks() if r["id"] != edit_rec["id"]]
-                # 삭제 시 예수금 환원
-                meta = load_meta()
-                meta["cash"] = float(meta.get("cash", 0)) + float(edit_rec.get("qty", 0)) * float(edit_rec.get("avg_price", 0))
-                save_meta(meta)
-                if save_stocks(records):
-                    st.success("삭제 완료")
-                    st.rerun()
+
+        # ── 매도 ──────────────────────────────────────────────────────────────
+        elif trade_type == "매도":
+            if not stk_rec:
+                st.info("보유 종목이 없습니다.")
+            else:
+                stk_labels = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in stk_rec]
+                sell_target = st.selectbox("매도할 종목", options=stk_labels, key="stk_sell_sel")
+                t_idx      = stk_labels.index(sell_target)
+                target_rec = stk_rec[t_idx]
+                hold_qty   = float(target_rec.get("qty", 0))
+                hold_avg   = float(target_rec.get("avg_price", 0))
+                st.caption(f"보유 수량: {hold_qty:,.0f}주 | 평균 매입가: {hold_avg:,.0f}원")
+
+                c3, c4 = st.columns(2)
+                sell_qty   = c3.number_input("매도 수량 (주)", min_value=1,
+                                              max_value=int(hold_qty), step=1, key="stk_sell_qty")
+                sell_price = c4.number_input("매도가 (원/주)", min_value=0, step=100, key="stk_sell_price")
+
+                sell_total = sell_qty * sell_price
+                st.info(f"매도금액: **{sell_total:,.0f}원** (예수금에 추가)")
+
+                if st.button("💾 매도 저장", type="primary", use_container_width=True, key="stk_sell_save"):
+                    records = load_stocks()
+                    meta    = load_meta()
+                    rec     = next(r for r in records if r["id"] == target_rec["id"])
+                    new_qty = float(rec["qty"]) - sell_qty
+                    if new_qty <= 0:
+                        records = [r for r in records if r["id"] != target_rec["id"]]
+                    else:
+                        rec["qty"] = new_qty
+
+                    meta["cash"] = float(meta.get("cash", 0)) + sell_total
+                    save_meta(meta)
+                    if save_stocks(records):
+                        st.success(f"매도 저장 완료 — 예수금 {sell_total:,.0f}원 추가")
+                        st.rerun()
+                    else:
+                        st.error("저장 실패")
+
+        # ── 수정/삭제 (데이터 정정용, 예수금 변동 없음) ────────────────────────
+        else:
+            if not stk_rec:
+                st.info("등록된 종목이 없습니다.")
+            else:
+                st.caption("⚠️ 수정/삭제는 데이터 정정용입니다. 예수금에 영향을 주지 않습니다.")
+                edit_id = st.selectbox(
+                    "수정할 항목",
+                    options=[f"{r.get('name','-')} ({r.get('ticker','-')})" for r in stk_rec],
+                    key="stk_edit_sel",
+                )
+                idx      = [f"{r.get('name','-')} ({r.get('ticker','-')})" for r in stk_rec].index(edit_id)
+                edit_rec = stk_rec[idx]
+
+                c1, c2 = st.columns(2)
+                stk_name   = c1.text_input("종목명",  value=edit_rec.get("name",""),   key="stk_edit_name")
+                stk_ticker = c2.text_input("티커코드", value=edit_rec.get("ticker",""), key="stk_edit_ticker",
+                                           placeholder="예: 005930")
+                c3, c4 = st.columns(2)
+                stk_qty  = c3.number_input("수량 (주)", min_value=0, step=1,
+                                            value=int(edit_rec.get("qty", 0)), key="stk_edit_qty")
+                stk_avg  = c4.number_input("평균 매입가 (원)", min_value=0, step=100,
+                                            value=int(edit_rec.get("avg_price", 0)), key="stk_edit_avg")
+                stk_note = st.text_input("메모", value=edit_rec.get("note", ""), key="stk_edit_note")
+
+                col_save, col_del = st.columns([2, 1])
+                with col_save:
+                    if st.button("💾 수정 저장", type="primary", use_container_width=True, key="stk_edit_save"):
+                        records = load_stocks()
+                        new_rec = {
+                            "id":        edit_rec["id"],
+                            "name":      stk_name,
+                            "ticker":    stk_ticker,
+                            "qty":       stk_qty,
+                            "avg_price": stk_avg,
+                            "note":      stk_note,
+                        }
+                        records = [new_rec if r["id"] == edit_rec["id"] else r for r in records]
+                        if save_stocks(records):
+                            st.success("수정 완료")
+                            st.rerun()
+                        else:
+                            st.error("저장 실패")
+                with col_del:
+                    if st.button("🗑 삭제", use_container_width=True, key="stk_del"):
+                        records = [r for r in load_stocks() if r["id"] != edit_rec["id"]]
+                        if save_stocks(records):
+                            st.success("삭제 완료")
+                            st.rerun()
