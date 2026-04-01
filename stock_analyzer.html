@@ -986,8 +986,8 @@
       <div class="port-card-title">📊 ETF 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>수익률</th><th>평가금액</th></tr></thead>
-          <tbody id="port-etf-tbody"><tr><td colspan="3" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 수익률</th><th>평가금액</th></tr></thead>
+          <tbody id="port-etf-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1011,8 +1011,8 @@
       </div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>수익률</th><th>평가금액</th><th></th></tr></thead>
-          <tbody id="port-stock-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 수익률</th><th>평가금액</th><th></th></tr></thead>
+          <tbody id="port-stock-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
       <!-- 예수금 관리 -->
@@ -2670,7 +2670,7 @@ async function _refreshPortfolioRealtime() {
       .map(async r => {
         try {
           const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
-          if (d.price) r.current_price = d.price;
+          if (d.price) { r.current_price = d.price; r.chgPct = d.chgPct ?? null; }
         } catch {}
       });
 
@@ -2679,7 +2679,7 @@ async function _refreshPortfolioRealtime() {
       .map(async r => {
         try {
           const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
-          if (d.price) r.current_price = d.price;
+          if (d.price) { r.current_price = d.price; r.chgPct = d.chgPct ?? null; }
         } catch {}
       });
 
@@ -2751,7 +2751,7 @@ function _renderPortKpi() {
 // ── ETF 보유현황 ───────────────────────────────────────────
 function _renderPortEtf() {
   const tbody = document.getElementById('port-etf-tbody');
-  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="3" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
+  if (!_portEtf.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">ETF 데이터 없음 (ETF 탭에서 먼저 등록하세요)</td></tr>'; return; }
 
   let totalBuy = 0, totalEval = 0, totalProfit = 0;
   const rows = _portEtf.map(r => {
@@ -2763,6 +2763,8 @@ function _renderPortEtf() {
     const profit= eval_ - buy;
     const rate  = buy > 0 ? profit / buy * 100 : null;
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    const dayPct = r.chgPct ?? null;
+    const drc    = dayPct === null ? '' : dayPct >= 0 ? 'up' : 'dn';
     totalBuy += buy; totalEval += eval_; totalProfit += profit;
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
@@ -2770,6 +2772,7 @@ function _renderPortEtf() {
         ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
         ${cur ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
       </td>
+      <td class="${drc}">${dayPct !== null ? `${dayPct>=0?'+':''}${dayPct.toFixed(2)}%` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
     </tr>`;
   }).join('');
@@ -2781,6 +2784,7 @@ function _renderPortEtf() {
       ${totalRate !== null ? `<div>${totalRate>=0?'+':''}${totalRate.toFixed(2)}%</div>` : '-'}
       ${totalBuy ? `<div style="font-size:10px;opacity:.75">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</div>` : ''}
     </td>
+    <td></td>
     <td>${totalEval ? totalEval.toLocaleString()+'원' : '-'}</td>
   </tr>`;
 }
@@ -2829,7 +2833,7 @@ async function clearIpoSale(id) {
 // ── 개별주 보유현황 ────────────────────────────────────────
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
-  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="5" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
   let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false;
   const sRows = _stockRecords.map(r => {
     const buy   = (r.qty||0) * (r.avg_price||0);
@@ -2837,6 +2841,8 @@ function _renderPortStock() {
     const profit= eval_ - buy;
     const rate  = buy > 0 && r.current_price ? profit / buy * 100 : null;
     const rc    = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    const dayPct = r.chgPct ?? null;
+    const drc    = dayPct === null ? '' : dayPct >= 0 ? 'up' : 'dn';
     sTotalBuy += buy;
     if (r.current_price) { sTotalEval += eval_; sTotalProfit += profit; sHasCur = true; }
     return `<tr>
@@ -2845,6 +2851,7 @@ function _renderPortStock() {
         ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
         ${r.current_price ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
       </td>
+      <td class="${drc}">${dayPct !== null ? `${dayPct>=0?'+':''}${dayPct.toFixed(2)}%` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
       <td style="text-align:center;white-space:nowrap">
         <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
@@ -2860,6 +2867,7 @@ function _renderPortStock() {
       ${sTotalRate !== null ? `<div>${sTotalRate>=0?'+':''}${sTotalRate.toFixed(2)}%</div>` : '-'}
       ${sHasCur ? `<div style="font-size:10px;opacity:.75">${sTotalProfit>=0?'+':''}${sTotalProfit.toLocaleString()}원</div>` : ''}
     </td>
+    <td></td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
     <td></td>
   </tr>`;
