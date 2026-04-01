@@ -4291,11 +4291,14 @@ async function deleteTransaction(id) {
   }
 }
 
-// 예수금 조정 헬퍼 — delta만큼 가감 후 Gist 저장 + UI 갱신
+// 예수금 조정 헬퍼 — 서버에서 현재값을 읽어 delta 적용 후 저장 + UI 갱신
 async function _adjustCash(delta) {
   if (!delta) return;
-  const newCash = Math.max(0, (_portCash || 0) + delta);
   try {
+    // 항상 서버 최신값 기준으로 계산 (stale 방지)
+    const metaRes  = await fetch('/api/data').then(r => r.json());
+    const baseCash = (metaRes.portfolio_meta || {}).cash || 0;
+    const newCash  = Math.max(0, baseCash + delta);
     await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4635,7 +4638,7 @@ async function saveDivEntry() {
 async function deleteDivRecord(id) {
   if (!confirm('이 배당 수령 기록을 삭제하시겠습니까?')) return;
   try {
-    const rec = _divRecords.find(r => r.id == id);
+    const rec = _divRecords.find(r => String(r.id) === String(id));
     await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
     _divRecords = _divRecords.filter(r => r.id != id);
     _portDiv    = _portDiv.filter(r => r.id != id);
