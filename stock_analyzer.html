@@ -1150,6 +1150,7 @@
   <div class="div-hist-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-size:14px;font-weight:700;color:var(--text)">💰 배당 수령 내역</div>
+      <button onclick="openDivModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer">+ 배당금 입력</button>
     </div>
     <!-- 연도 필터 탭 -->
     <div id="div-year-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
@@ -4615,6 +4616,10 @@ async function saveDivEntry() {
     });
     if (!resp.ok) throw new Error('저장 실패');
     _divRecords.push(record);
+    // 포트폴리오 탭 _portDiv 동기화 후 관련 UI 갱신
+    _portDiv.push(record);
+    _renderPortKpi();
+    _renderEtfDivChart();
     const expandState = getDivExpandState();
     renderDivHistory();
     applyDivExpandState(expandState);
@@ -4632,6 +4637,9 @@ async function deleteDivRecord(id) {
   try {
     await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
     _divRecords = _divRecords.filter(r => r.id != id);
+    _portDiv    = _portDiv.filter(r => r.id != id);
+    _renderPortKpi();
+    _renderEtfDivChart();
     renderDivHistory();
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
