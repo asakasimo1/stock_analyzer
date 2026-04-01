@@ -4618,6 +4618,8 @@ async function saveDivEntry() {
     _portDiv.push(record);
     _renderPortKpi();
     _renderEtfDivChart();
+    // 세후 배당금을 예수금에 자동 합산
+    await _adjustCash(net);
     const expandState = getDivExpandState();
     renderDivHistory();
     applyDivExpandState(expandState);
@@ -4633,11 +4635,14 @@ async function saveDivEntry() {
 async function deleteDivRecord(id) {
   if (!confirm('이 배당 수령 기록을 삭제하시겠습니까?')) return;
   try {
+    const rec = _divRecords.find(r => r.id == id);
     await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
     _divRecords = _divRecords.filter(r => r.id != id);
     _portDiv    = _portDiv.filter(r => r.id != id);
     _renderPortKpi();
     _renderEtfDivChart();
+    // 삭제 시 세후 배당금을 예수금에서 차감
+    if (rec?.net) await _adjustCash(-rec.net);
     renderDivHistory();
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
