@@ -4522,6 +4522,8 @@ function openDivModal(etfId) {
 
   document.getElementById('dv-note').value = '';
   document.getElementById('dv-gross-input').value = '';
+  document.getElementById('dv-net-input').value = '';
+  document.getElementById('dv-tax-rate-info').textContent = '';
   document.getElementById('dv-preview').style.display = 'none';
 
   // ETF 사전 선택 및 기본값 채우기
@@ -4574,10 +4576,38 @@ function calcDivPreview() {
   document.getElementById('dv-per-share-display').style.color = perShare ? 'var(--text)' : 'var(--muted)';
 
   if (!gross) { preview.style.display = 'none'; return; }
-  const net = Math.round(gross * (1 - TAX_RATE));
-  document.getElementById('dv-gross-val').textContent = gross.toLocaleString() + '원';
-  document.getElementById('dv-net-val').textContent   = net.toLocaleString() + '원';
+
+  const estimated = Math.round(gross * (1 - TAX_RATE));
+  document.getElementById('dv-gross-val').textContent       = gross.toLocaleString() + '원';
+  document.getElementById('dv-net-estimated').textContent   = estimated.toLocaleString() + '원';
+
+  // 실제 수령액 기본값 세팅 (이미 입력된 값 있으면 유지)
+  const netInput = document.getElementById('dv-net-input');
+  if (!netInput.value) netInput.value = estimated;
+
+  updateTaxRateInfo(gross);
   preview.style.display = 'block';
+}
+
+function onNetInputChange() {
+  const gross = parseFloat(document.getElementById('dv-gross-input').value) || 0;
+  updateTaxRateInfo(gross);
+}
+
+function updateTaxRateInfo(gross) {
+  const netInput = document.getElementById('dv-net-input');
+  const info     = document.getElementById('dv-tax-rate-info');
+  const net      = parseFloat(netInput.value) || 0;
+  if (!gross || !net) { info.textContent = ''; return; }
+  const actualTaxRate = ((gross - net) / gross * 100).toFixed(2);
+  const diff = (TAX_RATE * 100 - actualTaxRate).toFixed(2);
+  if (Math.abs(diff) < 0.01) {
+    info.textContent = '실효세율 15.4% (표준)';
+    info.style.color = 'var(--muted)';
+  } else {
+    info.textContent = `실효세율 ${actualTaxRate}% (표준 대비 ${diff > 0 ? '-' : '+'}${Math.abs(diff)}%p)`;
+    info.style.color = '#60a5fa';
+  }
 }
 
 async function saveDivEntry() {
@@ -4588,12 +4618,14 @@ async function saveDivEntry() {
   const perShare = (gross && qty) ? Math.round((gross / qty) * 100) / 100 : 0;
   const note    = document.getElementById('dv-note').value.trim();
 
+  const net = parseFloat(document.getElementById('dv-net-input').value) || 0;
+
   if (!etfId)  { alert('ETF를 선택하세요'); return; }
   if (!ym)     { alert('배당 기준월을 입력하세요'); return; }
-  if (!gross)  { alert('수령 금액을 입력하세요'); return; }
+  if (!gross)  { alert('수령 금액(세전)을 입력하세요'); return; }
+  if (!net)    { alert('실제 수령액(세후)을 입력하세요'); return; }
 
   const etf = _etfRecords.find(x => x.id == etfId);
-  const net = Math.round(gross * (1 - TAX_RATE));
   const record = {
     id: Date.now(),
     etf_id: Number(etfId),
@@ -5820,14 +5852,20 @@ async function loadMarketData() {
           <input id="dv-per-share" type="hidden">
         </div>
       </div>
-      <div id="dv-preview" style="display:none;background:#f0fdf4;border-radius:8px;padding:12px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <div id="dv-preview" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
           <span style="font-size:12px;color:var(--muted)">세전 합계</span>
           <span id="dv-gross-val" style="font-size:13px;font-weight:700;color:var(--text)"></span>
         </div>
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-size:12px;color:var(--muted)">세후 합계 <small style="color:#15803d">(15.4% 차감)</small></span>
-          <span id="dv-net-val" style="font-size:15px;font-weight:700;color:#16a34a"></span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;color:var(--muted)">세후 추정 <small style="color:var(--muted)">(15.4% 기준)</small></span>
+          <span id="dv-net-estimated" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted)">실제 수령액 (세후, 원) <small style="color:#60a5fa">— 과표NAV에 따라 다를 수 있음</small></label>
+          <input id="dv-net-input" type="number" min="0" oninput="onNetInputChange()"
+            style="width:100%;margin-top:4px;padding:10px 12px;background:var(--surface);border:1.5px solid #16a34a;border-radius:8px;color:var(--text);font-size:15px;font-weight:700">
+          <div id="dv-tax-rate-info" style="font-size:11px;color:#60a5fa;margin-top:4px;text-align:right"></div>
         </div>
       </div>
       <div>
