@@ -553,7 +553,10 @@
     .port-kpi-row-3 .port-kpi-card:last-child { grid-column: 1 / -1; }
     /* KPI 4칸 → 모바일 2×2 */
     .port-kpi-row-4 { grid-template-columns: 1fr 1fr !important; }
-    #port-kpi-row   { grid-template-columns: 1fr 1fr !important; }
+    #port-kpi-row   { grid-template-columns: repeat(4, 1fr) !important; gap: 4px !important; }
+    #port-kpi-row .port-kpi-sm { padding: 8px 5px; }
+    #port-kpi-row .port-kpi-lbl { font-size: 8px; }
+    #port-kpi-row .port-kpi-val-sm { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* 차트 2열 → 모바일 1열 */
     .port-chart-row { grid-template-columns: 1fr !important; }
     /* 테이블 모바일: 가로 스크롤 제거, 폰트 축소 */
@@ -753,10 +756,10 @@
   .etf-expand-hint { font-size: 10px; color: var(--muted); padding: 4px 14px; text-align: right; }
   @media (max-width: 768px) {
     .etf-wrap { padding: 12px; }
-    .etf-kpi-row { grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .etf-kpi { padding: 10px 8px; }
-    .etf-kpi-label { font-size: 9px; }
-    .etf-kpi-val { font-size: 13px; }
+    .etf-kpi-row { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .etf-kpi { padding: 8px 5px; }
+    .etf-kpi-label { font-size: 8px; }
+    .etf-kpi-val { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .etf-div-kpi-row { grid-template-columns: repeat(2, 1fr) !important; }
     .div-hist-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .etf-card-body { grid-template-columns: 1fr; }
@@ -2647,7 +2650,7 @@ async function initPortfolio() {
     _portEtf      = etfRes.records || [];
     _portIpo      = ipoRes.records || [];
     _portDiv      = divRes.records || [];
-    _stockRecords = stkRes.records || [];
+    _stockRecords = (stkRes.records || []).map(r => ({ ...r, current_price: null, chg: null, chgPct: null }));
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
     // 예수금 입력란 초기값 세팅
     const ci = document.getElementById('cash-input');
@@ -2710,7 +2713,12 @@ function renderPortfolio() {
 // ── KPI ────────────────────────────────────────────────────
 function _renderPortKpi() {
   const colorVal = (el, val) => { el.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--primary)'; };
-  const signFmt  = v => (v > 0 ? '+' : '') + v.toLocaleString() + '원';
+  const fmtK = v => {
+    if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(1) + '억원';
+    if (Math.abs(v) >= 1e4) return Math.round(v / 1e4).toLocaleString() + '만원';
+    return v.toLocaleString() + '원';
+  };
+  const signFmt  = v => (v > 0 ? '+' : '') + fmtK(v);
 
   // 개별주 평가손익 (현재가 있는 것만, 테이블 합계와 동일 기준)
   const stkProfit = _stockRecords.reduce((s, r) => {
@@ -2741,7 +2749,7 @@ function _renderPortKpi() {
   // 세후 배당 누적
   const divTotal = _portDiv.reduce((s, r) => s + (r.net || 0), 0);
   const divEl = document.getElementById('pk-div-total');
-  divEl.textContent = divTotal ? divTotal.toLocaleString() + '원' : '-';
+  divEl.textContent = divTotal ? fmtK(divTotal) : '-';
   colorVal(divEl, divTotal);
 
   // 차트
@@ -3865,6 +3873,12 @@ function renderEtfCards() {
   const pnlClass  = pnl >= 0 ? 'up' : 'dn';
   const pnlSign   = pnl >= 0 ? '+' : '';
   const fmtMoney  = v => v ? v.toLocaleString() + '원' : '-';
+  const fmtMoneyK = v => {
+    if (!v) return '-';
+    if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(1) + '억원';
+    if (Math.abs(v) >= 1e4) return Math.round(v / 1e4).toLocaleString() + '만원';
+    return v.toLocaleString() + '원';
+  };
 
   // ── 배당 합계 계산 ────────────────────────────────────
   // 연간 배당(세전) = 현재가 × 연간배당률 × 보유수량
@@ -3877,12 +3891,12 @@ function renderEtfCards() {
   const divEtfCount   = _etfRecords.filter(r => r.annual_div_rate && r.div_cycle !== '무배당').length;
 
   document.getElementById('etf-k-count').textContent = _etfRecords.length + '개';
-  document.getElementById('etf-k-buy').textContent   = fmtMoney(buyTotal);
-  document.getElementById('etf-k-eval').textContent  = fmtMoney(evalTotal);
+  document.getElementById('etf-k-buy').textContent   = fmtMoneyK(buyTotal);
+  document.getElementById('etf-k-eval').textContent  = fmtMoneyK(evalTotal);
   const pnlEl = document.getElementById('etf-k-pnl');
   pnlEl.className = 'etf-kpi-val ' + pnlClass;
   pnlEl.textContent = pnlPct !== null
-    ? `${pnlSign}${pnl.toLocaleString()}원 (${pnlSign}${pnlPct.toFixed(2)}%)`
+    ? `${pnlSign}${pnlPct.toFixed(1)}% ${pnlSign}${fmtMoneyK(Math.abs(pnl))}`
     : '-';
 
   const divPreEl  = document.getElementById('etf-k-div-pre');
