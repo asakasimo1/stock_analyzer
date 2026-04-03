@@ -4585,6 +4585,25 @@ async function deleteEtf(id) {
 // 거래 내역 (매수/매도)
 // ══════════════════════════════════════════════════════════
 
+function calcTxPreview() {
+  const qty   = parseInt(document.getElementById('tx-qty').value) || 0;
+  const price = parseFloat(document.getElementById('tx-price').value) || 0;
+  const type  = document.getElementById('tx-type').value;
+  const el    = document.getElementById('tx-preview');
+  if (!el) return;
+  if (!qty || !price) { el.innerHTML = ''; return; }
+  const COMMISSION = 0.00015;
+  const STX_TAX    = 0.0015;
+  const tradeAmt   = qty * price;
+  const commission = Math.round(tradeAmt * COMMISSION);
+  const tax        = type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
+  const net        = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
+  const netSign    = net >= 0 ? '+' : '';
+  const taxLine    = type === 'sell' ? `<span style="color:var(--muted)"> · 거래세 ${tax.toLocaleString()}원</span>` : '';
+  el.innerHTML = `거래금 <b>${tradeAmt.toLocaleString()}원</b> · 수수료 ${commission.toLocaleString()}원${taxLine}<br>
+    예수금 변동: <b style="color:${net>=0?'var(--green)':'var(--red)'}">${netSign}${net.toLocaleString()}원</b>`;
+}
+
 function openTransModal(etfId) {
   const r = _etfRecords.find(x => x.id == etfId);
   if (!r) return;
@@ -4595,6 +4614,7 @@ function openTransModal(etfId) {
   document.getElementById('tx-qty').value         = '';
   document.getElementById('tx-price').value       = '';
   document.getElementById('tx-note').value        = '';
+  document.getElementById('tx-preview').innerHTML = '';
   document.getElementById('trans-modal').style.display = 'block';
 }
 
@@ -4658,16 +4678,19 @@ async function saveTransaction() {
       await saveEtfRecords();
     }
 
-    // 예수금 자동 조정 (KB증권 수수료 0.015% 반영)
+    // 예수금 자동 조정 (KB증권 수수료 0.015% + 매도 증권거래세 0.15%)
     if (price > 0) {
-      const COMMISSION = 0.00015; // KB증권 온라인 0.015%
-      const tradeAmt = qty * price;
-      const fee = Math.round(tradeAmt * COMMISSION);
-      const cashDelta = type === 'buy' ? -(tradeAmt + fee) : +(tradeAmt - fee);
+      const COMMISSION = 0.00015;
+      const STX_TAX    = 0.0015;
+      const tradeAmt   = qty * price;
+      const commission = Math.round(tradeAmt * COMMISSION);
+      const tax        = type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
+      const cashDelta  = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
       await _adjustCash(cashDelta);
     }
 
     renderEtfCards();
+    renderPortfolio();
     closeTransModal();
   } catch (e) {
     alert('저장 중 오류: ' + e.message);
@@ -4705,19 +4728,22 @@ async function deleteTransaction(id) {
         }
         await saveEtfRecords();
       }
-      // 예수금 자동 복구 (KB증권 수수료 0.015% 역산)
+      // 예수금 자동 복구 (KB증권 수수료 0.015% + 매도 증권거래세 0.15% 역산)
       if (tx.price) {
         const COMMISSION = 0.00015;
-        const tradeAmt = tx.qty_change * tx.price;
-        const fee = Math.round(tradeAmt * COMMISSION);
+        const STX_TAX    = 0.0015;
+        const tradeAmt   = tx.qty_change * tx.price;
+        const commission = Math.round(tradeAmt * COMMISSION);
+        const tax        = tx.type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
         // 매수 삭제 → 당시 (매수금 + 수수료)를 되돌려줌
-        // 매도 삭제 → 당시 (매도금 - 수수료)를 회수
-        const cashDelta = tx.type === 'buy' ? +(tradeAmt + fee) : -(tradeAmt - fee);
+        // 매도 삭제 → 당시 (매도금 - 수수료 - 거래세)를 회수
+        const cashDelta = tx.type === 'buy' ? +(tradeAmt + commission) : -(tradeAmt - commission - tax);
         await _adjustCash(cashDelta);
       }
     }
 
     renderEtfCards();
+    renderPortfolio();
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
   }
@@ -6154,7 +6180,7 @@ async function loadMarketData() {
         </div>
         <div>
           <label style="font-size:12px;color:var(--muted)">구분 <span style="color:#f87171">*</span></label>
-          <select id="tx-type" style="width:100%">
+          <select id="tx-type" onchange="calcTxPreview()" style="width:100%">
             <option value="buy">매수</option>
             <option value="sell">매도</option>
           </select>
@@ -6163,13 +6189,14 @@ async function loadMarketData() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
           <label style="font-size:12px;color:var(--muted)">수량 (주) <span style="color:#f87171">*</span></label>
-          <input id="tx-qty" type="number" min="1" placeholder="100">
+          <input id="tx-qty" type="number" min="1" placeholder="100" oninput="calcTxPreview()">
         </div>
         <div>
           <label style="font-size:12px;color:var(--muted)">거래가 (원, 선택)</label>
-          <input id="tx-price" type="number" min="0" placeholder="25500">
+          <input id="tx-price" type="number" min="0" placeholder="25500" oninput="calcTxPreview()">
         </div>
       </div>
+      <div id="tx-preview" style="background:var(--bg);border-radius:8px;padding:10px;font-size:12px;color:var(--muted);min-height:36px"></div>
       <div>
         <label style="font-size:12px;color:var(--muted)">메모 (선택)</label>
         <input id="tx-note" type="text" placeholder="예: 추가 매수">
