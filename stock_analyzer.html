@@ -305,8 +305,9 @@
     transition: color .2s, border-color .2s;
   }
   .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  html { overflow-x: hidden; }
   .tab-page { display: none; }
-  .tab-page.active { display: block; }
+  .tab-page.active { display: block; overflow-x: hidden; }
   .mkt-index-card { background:#111827;border:1px solid #1e2d45;border-radius:12px;padding:16px; }
   .mkt-loading { color:#64748b;font-size:12px;text-align:center;padding:8px 0; }
   .mkt-name { font-size:12px;color:#64748b;margin-bottom:6px; }
@@ -414,7 +415,8 @@
   .empty-msg { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
 
   @media (max-width: 768px) {
-    .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
+    .cal-scroll { max-width: 100%; overflow-x: hidden; }
     .cal-cell { min-height: 56px; padding: 3px 2px; }
     .cal-day  { font-size: 10px; margin-bottom: 2px; }
     .cal-event { font-size: 8px; padding: 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
@@ -1241,51 +1243,48 @@
 </div><!-- /tab-stocks -->
 
 <!-- 개별주 거래 입력 모달 -->
-<div id="stk-trans-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:3000;overflow-y:auto;padding:20px"
+<div id="stk-trans-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto;padding:20px"
   onmousedown="_stkTxDown=event.target" onmouseup="if(_stkTxDown===this&&event.target===this)closeStkTransModal()">
-  <div style="background:var(--surface);border-radius:16px;max-width:400px;margin:40px auto;padding:24px" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <strong id="stk-trans-title" style="font-size:15px">거래 입력</strong>
-      <button onclick="closeStkTransModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button>
+  <div style="background:var(--surface);border-radius:16px;max-width:420px;margin:80px auto;padding:24px;border:1px solid var(--border)" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3 style="margin:0;color:var(--text);font-size:16px">📝 거래 내역 입력</h3>
+      <button onclick="closeStkTransModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">✕</button>
     </div>
     <input type="hidden" id="stk-tx-stock-id">
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:13px;color:var(--text)" id="stk-tx-stock-info"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="display:grid;gap:14px">
+      <div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:13px;font-weight:700;color:var(--text)" id="stk-tx-stock-info"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">거래일 *</label>
-          <input id="stk-tx-date" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+          <label style="font-size:12px;color:var(--muted)">거래일 <span style="color:#f87171">*</span></label>
+          <input id="stk-tx-date" type="date" style="width:100%">
         </div>
         <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">거래 유형 *</label>
-          <select id="stk-tx-type" onchange="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+          <label style="font-size:12px;color:var(--muted)">구분 <span style="color:#f87171">*</span></label>
+          <select id="stk-tx-type" onchange="calcStkTxPreview()" style="width:100%">
             <option value="buy">매수</option>
             <option value="sell">매도</option>
           </select>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">수량 *</label>
-          <input id="stk-tx-qty" type="number" min="1" placeholder="0" oninput="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+          <label style="font-size:12px;color:var(--muted)">수량 (주) <span style="color:#f87171">*</span></label>
+          <input id="stk-tx-qty" type="number" min="1" placeholder="100" oninput="calcStkTxPreview()">
         </div>
         <div>
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">단가 (원) *</label>
-          <input id="stk-tx-price" type="number" min="0" placeholder="0" oninput="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+          <label style="font-size:12px;color:var(--muted)">거래가 (원) <span style="color:#f87171">*</span></label>
+          <input id="stk-tx-price" type="number" min="0" placeholder="0" oninput="calcStkTxPreview()">
         </div>
       </div>
       <div id="stk-tx-preview" style="background:var(--bg);border-radius:8px;padding:10px;font-size:12px;color:var(--muted);min-height:36px"></div>
       <div>
-        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">메모</label>
-        <input id="stk-tx-note" type="text" placeholder="선택" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        <label style="font-size:12px;color:var(--muted)">메모 (선택)</label>
+        <input id="stk-tx-note" type="text" placeholder="예: 추가 매수">
       </div>
     </div>
-    <button id="stk-tx-save-btn" onclick="saveStkTransaction()" style="margin-top:16px;width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer">저장</button>
-
-    <!-- 거래 내역 목록 -->
-    <div id="stk-tx-hist" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">거래 내역</div>
-      <div id="stk-tx-hist-list" style="max-height:180px;overflow-y:auto"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button onclick="closeStkTransModal()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;color:var(--text)">취소</button>
+      <button id="stk-tx-save-btn" onclick="saveStkTransaction()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">저장</button>
     </div>
   </div>
 </div>
@@ -3364,8 +3363,10 @@ function renderStockCards() {
     const ps     = profit >= 0 ? '+' : '';
     const chgCls = (r.chgPct || 0) >= 0 ? 'up' : 'dn';
     const chgSgn = (r.chgPct || 0) >= 0 ? '+' : '';
+    const txList = (_stkTransactions || []).filter(t => t.stock_id == r.id)
+      .sort((a, b) => b.date > a.date ? 1 : -1);
 
-    return `<div class="etf-card">
+    return `<div class="etf-card" onclick="toggleStkExpand(${r.id})">
       <div class="etf2-face">
         <div class="etf2-top">
           <div style="flex:1;min-width:0">
@@ -3375,7 +3376,6 @@ function renderStockCards() {
             </div>
           </div>
           <div class="etf-head-actions" onclick="event.stopPropagation()">
-            <button onclick="openStkTransModal(${r.id})" title="거래 입력">📝</button>
             <button onclick="openStockModal(${r.id})" title="편집">✏️</button>
             <button class="del" onclick="deleteStockRecord(${r.id})">🗑️</button>
           </div>
@@ -3402,6 +3402,7 @@ function renderStockCards() {
             <div class="etf2-metric-val">${eval_ ? eval_.toLocaleString() + '원' : '-'}</div>
           </div>
         </div>
+        <div class="etf2-chart-wrap">${genSparkline(r)}</div>
         <div class="etf2-footer">
           <div class="etf2-footer-item">
             <span class="etf2-footer-label">평가손익</span>
@@ -3410,8 +3411,47 @@ function renderStockCards() {
           ${r.note ? `<div class="etf2-footer-item"><span class="etf2-footer-label">메모</span><span class="etf2-footer-val" style="color:var(--muted)">${r.note}</span></div>` : ''}
         </div>
       </div>
+      <div class="etf-detail" id="stk-detail-${r.id}">
+        <div class="etf-cols">
+          <div class="etf-col">
+            <div class="etf-col-title">보유 정보</div>
+            <div class="etf-row"><span class="etf-row-label">보유수량</span><span class="etf-row-val">${(r.qty || 0).toLocaleString()}주</span></div>
+            <div class="etf-row"><span class="etf-row-label">평균매수가</span><span class="etf-row-val">${(r.avg_price || 0).toLocaleString()}원</span></div>
+            <div class="etf-row"><span class="etf-row-label">매입금액</span><span class="etf-row-val">${buy_.toLocaleString()}원</span></div>
+            <div class="etf-row"><span class="etf-row-label">평가금액</span><span class="etf-row-val">${eval_ ? eval_.toLocaleString() + '원' : '-'}</span></div>
+          </div>
+        </div>
+        <div class="etf-tx-section" onclick="event.stopPropagation()">
+          <div class="etf-tx-header">
+            <span class="etf-tx-title">거래 내역</span>
+            <button class="etf-tx-btn" onclick="openStkTransModal(${r.id})">+ 거래 추가</button>
+          </div>
+          <div id="stk-tx-${r.id}">
+            ${txList.map(t => `
+              <div class="etf-tx-row">
+                <span class="etf-tx-date">${t.date}</span>
+                <span class="etf-tx-type-${t.type}">${t.type === 'buy' ? '매수' : '매도'}</span>
+                <span class="etf-tx-qty">${t.type === 'buy' ? '+' : '-'}${(t.qty_change||0).toLocaleString()}주${t.price ? ' @' + t.price.toLocaleString() + '원' : ''}</span>
+                <button class="div-del-btn" onclick="deleteStkTransaction(${t.id})">삭제</button>
+              </div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:4px 0">거래 내역 없음 — [+ 거래 추가]로 매수/매도를 기록하세요</div>'}
+          </div>
+        </div>
+        <div class="etf-pnl-bar">
+          <div class="etf-pnl-group">
+            <span class="etf-pnl-label">평가손익</span>
+            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원</span>
+          </div>
+          ${pPct !== null ? `<div class="etf-pnl-group"><span class="etf-pnl-label">수익률</span><span class="etf-pnl-val ${pc}">${ps}${pPct.toFixed(2)}%</span></div>` : ''}
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleStkExpand(id) {
+  const el = document.getElementById('stk-detail-' + id);
+  if (!el) return;
+  el.classList.toggle('open');
 }
 
 async function refreshAllStockPrices() {
@@ -3446,29 +3486,14 @@ function openStkTransModal(stockId) {
   const r = _stockRecords.find(s => s.id == stockId);
   if (!r) return;
   document.getElementById('stk-tx-stock-id').value = stockId;
-  document.getElementById('stk-trans-title').textContent = `거래 입력 — ${r.name || r.ticker || ''}`;
   document.getElementById('stk-tx-stock-info').textContent =
     `${r.name}${r.ticker ? ' (' + r.ticker + ')' : ''}  ·  보유 ${(r.qty||0).toLocaleString()}주  ·  평균 ${(r.avg_price||0).toLocaleString()}원`;
-  document.getElementById('stk-tx-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('stk-tx-type').value = 'buy';
-  document.getElementById('stk-tx-qty').value  = '';
-  document.getElementById('stk-tx-price').value = r.avg_price || '';
-  document.getElementById('stk-tx-note').value = '';
+  document.getElementById('stk-tx-date').value  = new Date().toISOString().slice(0, 10);
+  document.getElementById('stk-tx-type').value  = 'buy';
+  document.getElementById('stk-tx-qty').value   = '';
+  document.getElementById('stk-tx-price').value = r.current_price || r.avg_price || '';
+  document.getElementById('stk-tx-note').value  = '';
   document.getElementById('stk-tx-preview').innerHTML = '';
-  // 거래 내역 표시
-  const txList = (_stkTransactions || []).filter(t => t.stock_id == stockId)
-    .sort((a, b) => b.date > a.date ? 1 : -1);
-  const histEl = document.getElementById('stk-tx-hist-list');
-  histEl.innerHTML = txList.length
-    ? txList.map(t => {
-        const sign = t.type === 'buy' ? '<span style="color:var(--red)">매수</span>' : '<span style="color:var(--green)">매도</span>';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <div>${t.date} ${sign} ${(t.qty_change||0).toLocaleString()}주 @ ${(t.price||0).toLocaleString()}원</div>
-          <button onclick="deleteStkTransaction(${t.id})" style="background:none;border:none;color:var(--red);cursor:pointer;padding:0 4px">🗑</button>
-        </div>`;
-      }).join('')
-    : '<div style="color:var(--muted);font-size:12px;padding:8px 0">거래 내역 없음</div>';
-  calcStkTxPreview();
   document.getElementById('stk-trans-modal').style.display = 'block';
 }
 
@@ -3554,10 +3579,9 @@ async function saveStkTransaction() {
     const cashDelta  = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
     await _adjustCash(cashDelta);
 
+    closeStkTransModal();
     renderStockCards();
     renderPortfolio();
-    // 모달 내 거래내역 새로고침
-    openStkTransModal(stockId);
   } catch (e) {
     alert('저장 중 오류: ' + e.message);
   } finally {
@@ -3608,8 +3632,6 @@ async function deleteStkTransaction(id) {
 
     renderStockCards();
     renderPortfolio();
-    // 모달 내 거래내역 새로고침
-    if (tx) openStkTransModal(tx.stock_id);
   } catch (e) {
     alert('삭제 중 오류: ' + e.message);
   }
