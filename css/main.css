@@ -297,9 +297,9 @@
     transition: color .2s, border-color .2s;
   }
   .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
-  html { overflow-x: hidden; }
+  html { overflow-x: hidden; width: 100%; max-width: 100vw; }
   .tab-page { display: none; }
-  .tab-page.active { display: block; overflow-x: hidden; }
+  .tab-page.active { display: block; overflow-x: hidden; max-width: 100%; }
   .mkt-index-card { background:#111827;border:1px solid #1e2d45;border-radius:12px;padding:16px; }
   .mkt-loading { color:#64748b;font-size:12px;text-align:center;padding:8px 0; }
   .mkt-name { font-size:12px;color:#64748b;margin-bottom:6px; }
@@ -407,6 +407,7 @@
   .empty-msg { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
 
   @media (max-width: 768px) {
+    body { width: 100%; max-width: 100vw; overflow-x: hidden; }
     .cal-wrap { padding: 12px; min-width: 0; max-width: 100%; }
     .cal-scroll { overflow-x: hidden; }
     .cal-grid { width: 100%; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: 56px; }
@@ -415,13 +416,16 @@
     .cal-event { font-size: 8px; padding: 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
     .cal-ev-full  { display: none; }
     .cal-ev-short { display: inline; }
-    header { padding: 0 20px; }
+    header { padding: 0 16px; overflow: hidden; max-width: 100vw; }
+    .header-stats { gap: 12px; flex-shrink: 1; overflow: hidden; }
+    .hstat-val { font-size: 14px; }
     main { grid-template-columns: 1fr; padding: 16px; }
     .trades-card  { grid-column: 1; grid-row: 2; }
     .analysis-card { grid-column: 1; grid-row: 3; }
-    .header-stats { gap: 16px; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
-    .dash-grid { grid-template-columns: 1fr; padding: 16px; }
+    .dash-grid { grid-template-columns: 1fr; padding: 12px; width: 100%; box-sizing: border-box; }
+    .card { min-width: 0; max-width: 100%; overflow-x: hidden; }
+    #investor-table-wrap { overflow-x: auto; }
     .tab-nav { padding: 12px 16px 0; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
     .tab-nav::-webkit-scrollbar { display: none; }
     .tab-btn { white-space: nowrap; padding: 10px 14px; font-size: 13px; }
@@ -871,6 +875,7 @@
   .etf-tx-note { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ── 보유종목 + 상세 모달 ──────────────────────────────── */
+  #investor-table-wrap { overflow-x: auto; max-width: 100%; }
   .inv-table { width:100%; border-collapse:collapse; font-size:13px; }
   .inv-table th { padding:6px 10px; color:var(--muted); font-size:11px; font-weight:500;
                   white-space:nowrap; border-bottom:1px solid var(--border); }
