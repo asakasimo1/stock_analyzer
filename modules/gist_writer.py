@@ -58,9 +58,22 @@ def _headers():
 def _read_gist(filename: str) -> list:
     """Gist에서 기존 데이터 읽기"""
     if not GIST_ID:
+        print("[Gist] GIST_ID 미설정 — 읽기 건너뜀")
+        return []
+    if not GH_TOKEN:
+        print("[Gist] GH_TOKEN 미설정 — 읽기 건너뜀")
         return []
     try:
         r = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=_headers(), timeout=10)
+        if r.status_code == 401:
+            print(f"[Gist] 인증 실패 (401) — GH_TOKEN이 만료되었거나 잘못되었습니다")
+            return []
+        if r.status_code == 404:
+            print(f"[Gist] Gist를 찾을 수 없음 (404) — GIST_ID를 확인하세요: {GIST_ID}")
+            return []
+        if not r.text:
+            print(f"[Gist] 빈 응답 (status={r.status_code}) — 토큰/네트워크 확인 필요")
+            return []
         files = r.json().get("files", {})
         if filename in files:
             content = files[filename].get("content", "[]")

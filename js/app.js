@@ -82,7 +82,6 @@ async function initDashboard() {
 }
 
 function renderDashboard(data) {
-  renderBriefingList(data.briefing || []);
   renderPicksList(data.picks || []);
   renderIpoList(data.ipo || []);
   renderCalendar(data);
@@ -96,6 +95,7 @@ function renderBriefingList(items) { _briefingItems = items; _renderBriefing(); 
 
 function _renderBriefing() {
   const el = document.getElementById('list-briefing');
+  if (!el) return;
   const items = _briefingItems;
   if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 브리핑 데이터가 없습니다</div>'; return; }
 
@@ -137,10 +137,36 @@ function _renderBriefing() {
 }
 
 // ── 매수 추천 목록 ───────────────────────────────────────
-function renderPicksList(items) {
+let _picksItems = [], _picksExpanded = false;
+
+function renderPicksList(items) { _picksItems = items; _renderPicks(); }
+
+function _renderPicks() {
   const el = document.getElementById('list-picks');
+  const items = [..._picksItems].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 추천 데이터가 없습니다</div>'; return; }
-  el.innerHTML = items.slice(0, 20).map(item => `
+
+  // 마지막 업데이트 날짜 기준 경과일
+  const lastDate = items[0].date;
+  const daysDiff = Math.floor((new Date() - new Date(lastDate)) / 86400000);
+  const staleMsg = daysDiff > 3
+    ? `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:12px;color:#92400e;margin-bottom:8px">
+        ⚠️ 마지막 업데이트: <b>${lastDate}</b> (${daysDiff}일 전) — GitHub Actions 실행 상태를 확인하세요
+       </div>` : '';
+
+  const visible = items.slice(0, 3);
+  const toShow  = _picksExpanded ? items.slice(0, 20) : visible;
+  const hasMore = items.length > 3;
+
+  const moreBtn = hasMore ? `
+    <div style="text-align:center;padding:6px 0">
+      <button onclick="_picksExpanded=!_picksExpanded;_renderPicks()"
+        style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 18px;font-size:12px;color:var(--muted);cursor:pointer">
+        ${_picksExpanded ? '▲ 접기' : '▼ 더보기'}
+      </button>
+    </div>` : '';
+
+  el.innerHTML = staleMsg + toShow.map(item => `
     <div class="result-item">
       <div class="result-item-header">
         <span class="result-badge pick">🎯 매수 추천</span>
@@ -153,7 +179,7 @@ function renderPicksList(items) {
             ${p.score != null ? `<span style="font-size:10px">${p.score}점</span>` : ''}
           </span>`).join('')}
       </div>
-    </div>`).join('');
+    </div>`).join('') + moreBtn;
 }
 
 // ── 공모주 구글 캘린더 연동 ───────────────────────────────
@@ -287,8 +313,8 @@ function _renderIpoList() {
   const order = ['청약중','청약예정','상장예정','상장완료','청약포기','배정실패'];
   const allSorted = [...items].sort((a,b) => order.indexOf(a.status||'') - order.indexOf(b.status||''));
 
-  const toShow = _ipoExpanded ? allSorted : upcoming.slice(0, 3);
-  const hasMore = upcoming.length > 3 || items.some(ipo => !_ipoDate(ipo) || _ipoDate(ipo) < today);
+  const toShow = _ipoExpanded ? allSorted : upcoming.slice(0, 1);
+  const hasMore = upcoming.length > 1 || items.some(ipo => !_ipoDate(ipo) || _ipoDate(ipo) < today);
 
   const moreBtn = hasMore ? `
     <div style="text-align:center;padding:6px 0">

@@ -24,6 +24,7 @@
 """
 import sys
 import os
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -168,6 +169,7 @@ def _get_supply_demand(ticker: str, fromdate: str, todate: str) -> dict:
     empty = {"foreign_net": 0, "inst_net": 0, "indiv_net": 0,
              "foreign_trend": "보합", "inst_trend": "보합"}
     try:
+        time.sleep(0.2)  # KRX API 레이트 리밋 방지
         df = krx.get_market_trading_value_by_date(fromdate, todate, ticker)
         if df is None or df.empty:
             return empty
@@ -441,6 +443,7 @@ def scan(
         )
         if result:
             results.append(result)
+        time.sleep(0.3)  # KRX API 레이트 리밋 방지
 
     # ── 3. 스코어 정렬 → TOP N ──────────────────────────────────────────────
     _log(f"[3/4] 필터 통과: {len(results)}개 → TOP {top_n} 선정...")
