@@ -952,6 +952,7 @@
   <button class="tab-btn" onclick="switchTab('portfolio')">📈 포트폴리오</button>
   <button class="tab-btn" onclick="switchTab('market')">📊 시장현황</button>
   <button class="tab-btn" onclick="switchTab('etf')">💹 ETF</button>
+  <button class="tab-btn" onclick="switchTab('stocks')">📊 개별주</button>
 </nav>
 
 
@@ -1009,14 +1010,11 @@
 
     <!-- 개별주 보유현황 -->
     <div class="port-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="port-card-title" style="margin:0">📌 개별주 보유현황</div>
-        <button onclick="openStockModal()" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">+ 추가</button>
-      </div>
+      <div class="port-card-title">📌 개별주 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 손익</th><th>평가금액</th><th></th></tr></thead>
-          <tbody id="port-stock-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 손익</th><th>평가금액</th></tr></thead>
+          <tbody id="port-stock-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
       <!-- 예수금 관리 -->
@@ -1217,6 +1215,80 @@
 
 </div>
 </div><!-- /tab-etf -->
+
+<!-- 개별주 탭 -->
+<div id="tab-stocks" class="tab-page">
+<div class="etf-wrap">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <div style="font-size:14px;font-weight:700;color:var(--text)">📊 개별주 보유 목록</div>
+    <div style="display:flex;gap:8px">
+      <button id="stk-refresh-btn" onclick="refreshAllStockPrices()" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">⟳ 현재가 업데이트</button>
+      <button onclick="openStockModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">+ 종목 추가</button>
+    </div>
+  </div>
+
+  <div id="stk-card-list" style="margin-top:12px"><div style="text-align:center;color:var(--muted);padding:48px 20px">로딩 중...</div></div>
+
+  <div class="etf-kpi-row" style="margin-top:8px">
+    <div class="etf-kpi"><div class="etf-kpi-label">종목 수</div><div class="etf-kpi-val" id="stk-k-count">-</div></div>
+    <div class="etf-kpi"><div class="etf-kpi-label">총 매입금</div><div class="etf-kpi-val" id="stk-k-buy">-</div></div>
+    <div class="etf-kpi"><div class="etf-kpi-label">총 평가금</div><div class="etf-kpi-val" id="stk-k-eval">-</div></div>
+    <div class="etf-kpi"><div class="etf-kpi-label">평가손익</div><div class="etf-kpi-val" id="stk-k-pnl">-</div></div>
+  </div>
+
+</div>
+</div><!-- /tab-stocks -->
+
+<!-- 개별주 거래 입력 모달 -->
+<div id="stk-trans-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:3000;overflow-y:auto;padding:20px"
+  onmousedown="_stkTxDown=event.target" onmouseup="if(_stkTxDown===this&&event.target===this)closeStkTransModal()">
+  <div style="background:var(--surface);border-radius:16px;max-width:400px;margin:40px auto;padding:24px" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <strong id="stk-trans-title" style="font-size:15px">거래 입력</strong>
+      <button onclick="closeStkTransModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button>
+    </div>
+    <input type="hidden" id="stk-tx-stock-id">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:13px;color:var(--text)" id="stk-tx-stock-info"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">거래일 *</label>
+          <input id="stk-tx-date" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">거래 유형 *</label>
+          <select id="stk-tx-type" onchange="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+            <option value="buy">매수</option>
+            <option value="sell">매도</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">수량 *</label>
+          <input id="stk-tx-qty" type="number" min="1" placeholder="0" oninput="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">단가 (원) *</label>
+          <input id="stk-tx-price" type="number" min="0" placeholder="0" oninput="calcStkTxPreview()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </div>
+      </div>
+      <div id="stk-tx-preview" style="background:var(--bg);border-radius:8px;padding:10px;font-size:12px;color:var(--muted);min-height:36px"></div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">메모</label>
+        <input id="stk-tx-note" type="text" placeholder="선택" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box">
+      </div>
+    </div>
+    <button id="stk-tx-save-btn" onclick="saveStkTransaction()" style="margin-top:16px;width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer">저장</button>
+
+    <!-- 거래 내역 목록 -->
+    <div id="stk-tx-hist" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">거래 내역</div>
+      <div id="stk-tx-hist-list" style="max-height:180px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
 
 <!-- 월배당 목표 시뮬레이터 모달 -->
 <div id="msim-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;overflow-y:auto;padding:20px" onmousedown="_modalDownTarget=event.target" onmouseup="if(_modalDownTarget===this&&event.target===this)closeMonthlySim()">
@@ -1591,7 +1663,7 @@
 // ══════════════════════════════════════════════════════════
 // 탭 전환
 // ══════════════════════════════════════════════════════════
-const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf'];
+const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks'];
 
 function switchTab(name) {
   document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
@@ -1607,6 +1679,7 @@ function switchTab(name) {
   if (name === 'ipo') loadIpoRecords();
   if (name === 'market') loadMarketData();
   if (name === 'etf') loadEtfRecords();
+  if (name === 'stocks') loadStockRecords();
 }
 
 // ── 탭 스와이프 (모바일) ──────────────────────────────────
@@ -2845,7 +2918,7 @@ async function clearIpoSale(id) {
 // ── 개별주 보유현황 ────────────────────────────────────────
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
-  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="5" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">개별주 없음 · 개별주 탭에서 추가하세요</td></tr>'; return; }
   let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false, sTotalDayPnl = 0, sHasDayPnl = false;
   const sRows = _stockRecords.map(r => {
     const buy    = (r.qty||0) * (r.avg_price||0);
@@ -2866,9 +2939,6 @@ function _renderPortStock() {
       </td>
       <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
-      <td style="text-align:center">
-        <button onclick="deleteStockRecord(${r.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
-      </td>
     </tr>`;
   }).join('');
   const sTotalRate = sTotalBuy > 0 && sHasCur ? (sTotalProfit / sTotalBuy * 100) : null;
@@ -2882,7 +2952,6 @@ function _renderPortStock() {
     </td>
     <td class="${sdtrc}">${sHasDayPnl ? `${sTotalDayPnl>=0?'+':''}${sTotalDayPnl.toLocaleString()}원` : '-'}</td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
-    <td></td>
   </tr>`;
 }
 
@@ -3214,6 +3283,7 @@ async function saveStockRecord() {
     if (idx !== -1) _stockRecords[idx] = d.record; else _stockRecords.push(d.record);
     closeStockModal();
     renderPortfolio();
+    renderStockCards();
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '💾 저장'; }
   }
@@ -3224,6 +3294,325 @@ async function deleteStockRecord(id) {
   await fetch('/api/stocks?id=' + id, { method:'DELETE' });
   _stockRecords = _stockRecords.filter(s => s.id != id);
   renderPortfolio();
+  renderStockCards();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 개별주 탭
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _stkTransactions = [];   // 개별주 거래 내역 (stock_id 기반)
+let _stkRefreshing   = false;
+
+async function loadStockRecords() {
+  try {
+    const r = await fetch('/api/stocks');
+    const d = await r.json();
+    _stockRecords = (d.records || []).map(s => ({ ...s, current_price: null, chg: null, chgPct: null }));
+  } catch { _stockRecords = []; }
+  try {
+    const r = await fetch('/api/transactions');
+    const all = (await r.json()).records || [];
+    _stkTransactions = all.filter(t => t.stock_id);
+  } catch { _stkTransactions = []; }
+  renderStockCards();
+}
+
+function renderStockCards() {
+  const list = document.getElementById('stk-card-list');
+  if (!list) return;
+
+  const fmtK = v => {
+    if (!v) return '-';
+    if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(1) + '억원';
+    if (Math.abs(v) >= 1e4) return Math.round(v / 1e4).toLocaleString() + '만원';
+    return v.toLocaleString() + '원';
+  };
+
+  const buyTotal  = _stockRecords.reduce((s, r) => s + (r.qty || 0) * (r.avg_price || 0), 0);
+  const evalTotal = _stockRecords.reduce((s, r) => s + (r.qty || 0) * (r.current_price || 0), 0);
+  const pnl       = evalTotal - buyTotal;
+  const pnlPct    = buyTotal > 0 ? pnl / buyTotal * 100 : null;
+  const pnlClass  = pnl >= 0 ? 'up' : 'dn';
+  const pnlSign   = pnl >= 0 ? '+' : '';
+
+  const countEl = document.getElementById('stk-k-count');
+  const buyEl   = document.getElementById('stk-k-buy');
+  const evalEl  = document.getElementById('stk-k-eval');
+  const pnlEl   = document.getElementById('stk-k-pnl');
+  if (countEl) countEl.textContent = _stockRecords.length + '개';
+  if (buyEl)   buyEl.textContent   = fmtK(buyTotal);
+  if (evalEl)  evalEl.textContent  = fmtK(evalTotal);
+  if (pnlEl) {
+    pnlEl.className = 'etf-kpi-val ' + pnlClass;
+    pnlEl.textContent = pnlPct !== null
+      ? `${pnlSign}${pnlPct.toFixed(1)}% ${pnlSign}${fmtK(Math.abs(pnl))}`
+      : '-';
+  }
+
+  if (!_stockRecords.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:48px 20px">등록된 종목이 없습니다.<br><small>위 버튼으로 추가해보세요.</small></div>';
+    return;
+  }
+
+  list.innerHTML = _stockRecords.map(r => {
+    const buy_   = (r.qty || 0) * (r.avg_price || 0);
+    const eval_  = (r.qty || 0) * (r.current_price || 0);
+    const profit = eval_ - buy_;
+    const pPct   = buy_ > 0 && r.current_price ? profit / buy_ * 100 : null;
+    const pc     = profit >= 0 ? 'up' : 'dn';
+    const ps     = profit >= 0 ? '+' : '';
+    const chgCls = (r.chgPct || 0) >= 0 ? 'up' : 'dn';
+    const chgSgn = (r.chgPct || 0) >= 0 ? '+' : '';
+
+    return `<div class="etf-card">
+      <div class="etf2-face">
+        <div class="etf2-top">
+          <div style="flex:1;min-width:0">
+            <div class="etf2-name">${r.name || '종목명 없음'}</div>
+            <div class="etf2-badges">
+              ${r.ticker ? `<span class="etf-ticker-badge">${r.ticker}</span>` : ''}
+            </div>
+          </div>
+          <div class="etf-head-actions" onclick="event.stopPropagation()">
+            <button onclick="openStkTransModal(${r.id})" title="거래 입력">📝</button>
+            <button onclick="openStockModal(${r.id})" title="편집">✏️</button>
+            <button class="del" onclick="deleteStockRecord(${r.id})">🗑️</button>
+          </div>
+        </div>
+        <div class="etf2-price-area">
+          ${r.current_price
+            ? `<span class="etf2-price">${r.current_price.toLocaleString()}원</span>`
+            : `<span class="etf2-price" style="color:var(--muted)">-</span>`}
+          ${r.chgPct != null
+            ? `<span class="etf2-chg ${chgCls}">${chgSgn}${r.chgPct}%</span>`
+            : ''}
+        </div>
+        <div class="etf2-metrics">
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">매입가</div>
+            <div class="etf2-metric-val">${(r.avg_price || 0).toLocaleString()}원</div>
+          </div>
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">수량</div>
+            <div class="etf2-metric-val">${(r.qty || 0).toLocaleString()}주</div>
+          </div>
+          <div class="etf2-metric">
+            <div class="etf2-metric-label">평가금액</div>
+            <div class="etf2-metric-val">${eval_ ? eval_.toLocaleString() + '원' : '-'}</div>
+          </div>
+        </div>
+        <div class="etf2-footer">
+          <div class="etf2-footer-item">
+            <span class="etf2-footer-label">평가손익</span>
+            <span class="etf2-footer-val ${pc}">${pPct !== null ? `${ps}${profit.toLocaleString()}원 (${ps}${pPct.toFixed(2)}%)` : '-'}</span>
+          </div>
+          ${r.note ? `<div class="etf2-footer-item"><span class="etf2-footer-label">메모</span><span class="etf2-footer-val" style="color:var(--muted)">${r.note}</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshAllStockPrices() {
+  if (!_stockRecords.length) return;
+  if (_stkRefreshing) return;
+  _stkRefreshing = true;
+  const btn = document.getElementById('stk-refresh-btn');
+  if (btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
+
+  let updated = 0;
+  await Promise.all(_stockRecords.map(async r => {
+    if (!r.ticker) return;
+    try {
+      const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
+      if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; updated++; }
+    } catch {}
+  }));
+
+  renderStockCards();
+  if (btn) {
+    btn.textContent = updated ? `✔ ${updated}개 업데이트됨` : '⟳ 현재가 업데이트';
+    btn.disabled = false;
+    if (updated) setTimeout(() => { if (btn) btn.textContent = '⟳ 현재가 업데이트'; }, 2500);
+  }
+  _stkRefreshing = false;
+}
+
+// 개별주 거래 입력 모달
+let _stkTxDown;
+
+function openStkTransModal(stockId) {
+  const r = _stockRecords.find(s => s.id == stockId);
+  if (!r) return;
+  document.getElementById('stk-tx-stock-id').value = stockId;
+  document.getElementById('stk-trans-title').textContent = `거래 입력 — ${r.name || r.ticker || ''}`;
+  document.getElementById('stk-tx-stock-info').textContent =
+    `${r.name}${r.ticker ? ' (' + r.ticker + ')' : ''}  ·  보유 ${(r.qty||0).toLocaleString()}주  ·  평균 ${(r.avg_price||0).toLocaleString()}원`;
+  document.getElementById('stk-tx-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('stk-tx-type').value = 'buy';
+  document.getElementById('stk-tx-qty').value  = '';
+  document.getElementById('stk-tx-price').value = r.avg_price || '';
+  document.getElementById('stk-tx-note').value = '';
+  document.getElementById('stk-tx-preview').innerHTML = '';
+  // 거래 내역 표시
+  const txList = (_stkTransactions || []).filter(t => t.stock_id == stockId)
+    .sort((a, b) => b.date > a.date ? 1 : -1);
+  const histEl = document.getElementById('stk-tx-hist-list');
+  histEl.innerHTML = txList.length
+    ? txList.map(t => {
+        const sign = t.type === 'buy' ? '<span style="color:var(--red)">매수</span>' : '<span style="color:var(--green)">매도</span>';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+          <div>${t.date} ${sign} ${(t.qty_change||0).toLocaleString()}주 @ ${(t.price||0).toLocaleString()}원</div>
+          <button onclick="deleteStkTransaction(${t.id})" style="background:none;border:none;color:var(--red);cursor:pointer;padding:0 4px">🗑</button>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:12px;padding:8px 0">거래 내역 없음</div>';
+  calcStkTxPreview();
+  document.getElementById('stk-trans-modal').style.display = 'block';
+}
+
+function closeStkTransModal() {
+  document.getElementById('stk-trans-modal').style.display = 'none';
+}
+
+function calcStkTxPreview() {
+  const qty   = parseInt(document.getElementById('stk-tx-qty').value) || 0;
+  const price = parseFloat(document.getElementById('stk-tx-price').value) || 0;
+  const type  = document.getElementById('stk-tx-type').value;
+  const el    = document.getElementById('stk-tx-preview');
+  if (!el) return;
+  if (!qty || !price) { el.innerHTML = ''; return; }
+  const COMMISSION = 0.00015;
+  const STX_TAX    = 0.0015;   // 증권거래세 0.15% (매도시만)
+  const tradeAmt   = qty * price;
+  const commission = Math.round(tradeAmt * COMMISSION);
+  const tax        = type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
+  const net        = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
+  const netSign    = net >= 0 ? '+' : '';
+  const taxLine    = type === 'sell' ? `<span style="color:var(--muted)"> · 거래세 ${tax.toLocaleString()}원</span>` : '';
+  el.innerHTML = `거래금 <b>${tradeAmt.toLocaleString()}원</b> · 수수료 ${commission.toLocaleString()}원${taxLine}<br>
+    예수금 변동: <b style="color:${net>=0?'var(--green)':'var(--red)'}">${netSign}${net.toLocaleString()}원</b>`;
+}
+
+async function saveStkTransaction() {
+  const stockId = parseInt(document.getElementById('stk-tx-stock-id').value);
+  const date    = document.getElementById('stk-tx-date').value;
+  const type    = document.getElementById('stk-tx-type').value;
+  const qty     = parseInt(document.getElementById('stk-tx-qty').value) || 0;
+  const price   = parseFloat(document.getElementById('stk-tx-price').value) || 0;
+  const note    = document.getElementById('stk-tx-note').value.trim();
+
+  if (!date)  { alert('거래일을 입력하세요'); return; }
+  if (!qty)   { alert('수량을 입력하세요'); return; }
+  if (!price) { alert('단가를 입력하세요'); return; }
+
+  const stk = _stockRecords.find(s => s.id == stockId);
+  const record = {
+    id: Date.now(), stock_id: stockId,
+    ticker: stk?.ticker || '', name: stk?.name || '',
+    date, type, qty_change: qty, price, note,
+  };
+
+  const btn = document.getElementById('stk-tx-save-btn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    // 거래 내역 저장
+    const resp = await fetch('/api/transactions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record }),
+    });
+    if (!resp.ok) throw new Error('거래 저장 실패');
+    _stkTransactions.push(record);
+
+    // 보유 수량 · 평균단가 업데이트
+    const stkIdx = _stockRecords.findIndex(s => s.id == stockId);
+    if (stkIdx !== -1) {
+      const s      = _stockRecords[stkIdx];
+      const oldQty = s.qty || 0;
+      const oldAvg = s.avg_price || 0;
+      const delta  = type === 'buy' ? qty : -qty;
+      const newQty = Math.max(0, oldQty + delta);
+      let   newAvg = oldAvg;
+      if (type === 'buy' && price > 0 && newQty > 0) {
+        newAvg = Math.round((oldQty * oldAvg + qty * price) / newQty);
+      }
+      _stockRecords[stkIdx] = { ...s, qty: newQty, avg_price: newAvg };
+      // Gist 저장
+      await fetch('/api/stocks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record: _stockRecords[stkIdx] }),
+      });
+    }
+
+    // 예수금 자동 조정 (KB증권 수수료 0.015% + 매도 증권거래세 0.15%)
+    const COMMISSION = 0.00015;
+    const STX_TAX    = 0.0015;
+    const tradeAmt   = qty * price;
+    const commission = Math.round(tradeAmt * COMMISSION);
+    const tax        = type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
+    const cashDelta  = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
+    await _adjustCash(cashDelta);
+
+    renderStockCards();
+    renderPortfolio();
+    // 모달 내 거래내역 새로고침
+    openStkTransModal(stockId);
+  } catch (e) {
+    alert('저장 중 오류: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '저장';
+  }
+}
+
+async function deleteStkTransaction(id) {
+  if (!confirm('이 거래 내역을 삭제하시겠습니까?')) return;
+  try {
+    const tx = _stkTransactions.find(t => t.id == id);
+    await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
+    _stkTransactions = _stkTransactions.filter(t => t.id != id);
+
+    // 보유 수량 · 평균단가 역산
+    if (tx) {
+      const stkIdx = _stockRecords.findIndex(s => s.id == tx.stock_id);
+      if (stkIdx !== -1) {
+        const s      = _stockRecords[stkIdx];
+        const curQty = s.qty || 0;
+        const curAvg = s.avg_price || 0;
+        const delta  = tx.type === 'buy' ? -tx.qty_change : tx.qty_change;
+        const newQty = Math.max(0, curQty + delta);
+        let   newAvg = curAvg;
+        if (tx.type === 'buy' && tx.price && newQty > 0) {
+          newAvg = Math.round((curQty * curAvg - tx.qty_change * tx.price) / newQty);
+          if (newAvg < 0) newAvg = curAvg;
+        }
+        _stockRecords[stkIdx] = { ...s, qty: newQty, avg_price: newAvg };
+        await fetch('/api/stocks', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ record: _stockRecords[stkIdx] }),
+        });
+      }
+      // 예수금 역산 (KB증권 수수료 + 매도 증권거래세)
+      if (tx.price) {
+        const COMMISSION = 0.00015;
+        const STX_TAX    = 0.0015;
+        const tradeAmt   = tx.qty_change * tx.price;
+        const commission = Math.round(tradeAmt * COMMISSION);
+        const tax        = tx.type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
+        // 매수 거래 삭제 → 당시 빠진 금액(원금+수수료) 환불
+        // 매도 거래 삭제 → 당시 들어온 금액(원금-수수료-거래세) 회수
+        const cashDelta = tx.type === 'buy' ? +(tradeAmt + commission) : -(tradeAmt - commission - tax);
+        await _adjustCash(cashDelta);
+      }
+    }
+
+    renderStockCards();
+    renderPortfolio();
+    // 모달 내 거래내역 새로고침
+    if (tx) openStkTransModal(tx.stock_id);
+  } catch (e) {
+    alert('삭제 중 오류: ' + e.message);
+  }
 }
 
 // 페이지 로드 시 대시보드 즉시 초기화 (모든 변수/함수 선언 완료 후)
