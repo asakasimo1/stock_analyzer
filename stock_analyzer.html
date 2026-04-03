@@ -1008,14 +1008,11 @@
 
     <!-- 개별주 보유현황 -->
     <div class="port-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="port-card-title" style="margin:0">📌 개별주 보유현황</div>
-        <button onclick="openStockModal()" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">+ 추가</button>
-      </div>
+      <div class="port-card-title">📌 개별주 보유현황</div>
       <div class="port-table-wrap">
         <table class="port-table">
-          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 손익</th><th>평가금액</th><th></th></tr></thead>
-          <tbody id="port-stock-tbody"><tr><td colspan="5" class="port-loading">로딩 중...</td></tr></tbody>
+          <thead><tr><th>종목명</th><th>총 수익률</th><th>금일 손익</th><th>평가금액</th></tr></thead>
+          <tbody id="port-stock-tbody"><tr><td colspan="4" class="port-loading">로딩 중...</td></tr></tbody>
         </table>
       </div>
       <!-- 예수금 관리 -->
@@ -2844,7 +2841,7 @@ async function clearIpoSale(id) {
 // ── 개별주 보유현황 ────────────────────────────────────────
 function _renderPortStock() {
   const tbody = document.getElementById('port-stock-tbody');
-  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="5" class="port-loading">개별주 없음 · + 추가 버튼으로 등록하세요</td></tr>'; return; }
+  if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">개별주 없음</td></tr>'; return; }
   let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false, sTotalDayPnl = 0, sHasDayPnl = false;
   const sRows = _stockRecords.map(r => {
     const buy    = (r.qty||0) * (r.avg_price||0);
@@ -2865,10 +2862,6 @@ function _renderPortStock() {
       </td>
       <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
-      <td style="text-align:center;white-space:nowrap">
-        <button onclick="openStockModal(${r.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px">✏️</button>
-        <button onclick="deleteStockRecord(${r.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">🗑</button>
-      </td>
     </tr>`;
   }).join('');
   const sTotalRate = sTotalBuy > 0 && sHasCur ? (sTotalProfit / sTotalBuy * 100) : null;
@@ -2882,7 +2875,6 @@ function _renderPortStock() {
     </td>
     <td class="${sdtrc}">${sHasDayPnl ? `${sTotalDayPnl>=0?'+':''}${sTotalDayPnl.toLocaleString()}원` : '-'}</td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
-    <td></td>
   </tr>`;
 }
 
