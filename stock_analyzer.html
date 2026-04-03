@@ -4313,18 +4313,19 @@ async function _adjustCash(delta) {
     const metaRes  = await fetch('/api/data').then(r => r.json());
     const baseCash = (metaRes.portfolio_meta || {}).cash || 0;
     const newCash  = Math.max(0, baseCash + delta);
-    await fetch('/api/data', {
+    const saveRes  = await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cash: newCash }),
     });
+    if (!saveRes.ok) throw new Error(`예수금 저장 실패 (${saveRes.status})`);
     _portCash = newCash;
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = newCash ? newCash.toLocaleString() : '0';
     if (typeof _renderPortAsset === 'function') _renderPortAsset();
     if (typeof _renderPortKpi   === 'function') _renderPortKpi();
   } catch(e) {
-    console.warn('예수금 자동 조정 실패:', e.message);
+    alert(`⚠️ 예수금 자동 조정 실패: ${e.message}\n거래는 저장되었으니 예수금을 수동으로 업데이트해 주세요.`);
   }
 }
 
