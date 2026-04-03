@@ -30,8 +30,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import requests
-from bs4 import BeautifulSoup
-
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
@@ -42,13 +40,6 @@ except ImportError:
 
 import config
 from modules import technical
-
-_NAVER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
-}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -84,40 +75,23 @@ def _safe_download(ticker: str, fromdate: str, todate: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _get_top_tickers_from_naver(market_code: int, pages: int = 2) -> list:
+def _get_top_tickers_by_market_cap(market: str, top_n: int = 100) -> list:
     """
-    네이버 금융 거래량 상위 페이지에서 티커 코드 리스트 반환.
-    market_code: 0=KOSPI, 1=KOSDAQ
-    pages: 조회 페이지 수 (1페이지 = 최대 50개)
+    pykrx로 시가총액 상위 N위 티커 반환.
+    market: 'KOSPI' | 'KOSDAQ'
     """
-    tickers = []
-    for page in range(1, pages + 1):
-        url = (
-            f"https://finance.naver.com/sise/sise_quant.naver"
-            f"?sosok={market_code}&page={page}"
-        )
-        try:
-            r = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
-            soup = BeautifulSoup(r.text, "html.parser")
-            table = soup.select_one("table.type_2")
-            if not table:
-                break
-            for row in table.select("tr"):
-                cols = row.select("td")
-                if len(cols) < 6:
-                    continue
-                name_a = cols[1].select_one("a")
-                if not name_a:
-                    continue
-                href = name_a.get("href", "")
-                if "code=" not in href:
-                    continue
-                code = href.split("code=")[-1][:6]
-                if code and len(code) == 6 and code.isdigit():
-                    tickers.append(code)
-        except Exception:
-            break
-    return tickers
+    try:
+        date = _last_trading_date(0)
+        df = krx.get_market_cap_by_ticker(date, market=market)
+        if df is None or df.empty:
+            return []
+        cap_col = next((c for c in df.columns if "시가총액" in str(c)), None)
+        if cap_col:
+            df = df.sort_values(cap_col, ascending=False)
+        return list(df.index[:top_n])
+    except Exception as e:
+        print(f"[buy_signal] 시가총액 조회 실패 ({market}): {e}")
+        return []
 
 
 def _get_stock_name(ticker: str) -> str:
@@ -398,30 +372,21 @@ def scan(
         if progress_cb:
             progress_cb(msg)
 
-    # ── 1. 네이버 금융에서 거래량 상위 티커 수집 ────────────────────────────
-    _log(f"[1/4] 네이버 금융 거래량 상위 티커 수집 중...")
+    # ── 1. 시가총액 상위 티커 수집 (KOSPI 100위 이내 + KOSDAQ 100위 이내) ────
+    _log(f"[1/4] 시가총액 상위 티커 수집 중...")
 
-    market_code_map = {"KOSPI": 0, "KOSDAQ": 1}
+    seen = set()
     tickers = []
     for mkt in markets:
-        code = market_code_map.get(mkt)
-        if code is None:
-            continue
-        mkt_tickers = _get_top_tickers_from_naver(code, pages=2)
-        _log(f"  {mkt}: {len(mkt_tickers)}개 수집")
-        tickers.extend(mkt_tickers)
-
-    # 중복 제거 후 상위 top_volume개
-    seen = set()
-    unique_tickers = []
-    for t in tickers:
-        if t not in seen:
-            seen.add(t)
-            unique_tickers.append(t)
-    tickers = unique_tickers[:top_volume]
+        mkt_tickers = _get_top_tickers_by_market_cap(mkt, top_n=top_volume)
+        _log(f"  {mkt} 시가총액 상위 {len(mkt_tickers)}위 수집")
+        for t in mkt_tickers:
+            if t not in seen:
+                seen.add(t)
+                tickers.append(t)
 
     if not tickers:
-        _log("  ⚠ 티커 수집 실패 (네이버 금융 접속 확인 필요)")
+        _log("  ⚠ 티커 수집 실패 (pykrx API 확인 필요)")
         return []
 
     _log(f"  총 {len(tickers)}개 후보 티커 확보")
