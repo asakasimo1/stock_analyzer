@@ -56,19 +56,18 @@ function parseFrgnRows(html, maxRows = 30) {
   return rows;
 }
 
-/** Gist 읽기 헬퍼 */
+import { fetchGistCached } from './_gist-cache.js';
+
+/** Gist 읽기 헬퍼 (캐시 사용) */
 async function readGist(gistId, ghToken, filename) {
-  const headers = {
-    ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'stock-analyzer',
-  };
-  const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers });
-  if (!r.ok) return null;
-  const gist = await r.json();
-  const file = gist.files?.[filename];
-  if (!file) return null;
-  return JSON.parse(file.content || 'null');
+  try {
+    const gist = await fetchGistCached(gistId, ghToken);
+    const file = gist.files?.[filename];
+    if (!file) return null;
+    return JSON.parse(file.content || 'null');
+  } catch (_) {
+    return null;
+  }
 }
 
 // ── 포트폴리오 요약 ───────────────────────────────────────────────────────────
@@ -132,6 +131,7 @@ async function handlePortfolio(req, res) {
 
   const latestDate = results.reduce((acc, r) => (r.date > acc ? r.date : acc), '');
   const pensionDate = pensionMap?.__date__ ?? '';
+  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
   return res.status(200).json({ items: results, date: latestDate, pensionDate });
 }
 

@@ -7,6 +7,8 @@
  * Gist 내 파일명: dividends.json
  * 레코드 구조: { id, etf_id, ticker, name, ym, per_share, qty, gross, net, note }
  */
+import { fetchGistCached, invalidateGistCache } from './_gist-cache.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -26,9 +28,7 @@ export default async function handler(req, res) {
   };
 
   const readRecords = async () => {
-    const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
-    if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-    const gist = await r.json();
+    const gist = await fetchGistCached(gistId, ghToken);
     const file = gist.files?.['dividends.json'];
     return file ? JSON.parse(file.content || '[]') : [];
   };
@@ -43,11 +43,13 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Gist 저장 실패 ${r.status}`);
+    invalidateGistCache();
   };
 
   try {
     if (req.method === 'GET') {
       const records = await readRecords();
+      res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
       return res.status(200).json({ records });
     }
 

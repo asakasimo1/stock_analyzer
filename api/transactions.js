@@ -8,6 +8,8 @@
  * Gist 파일명: transactions.json
  * 레코드: { id, etf_id, ticker, name, date, type:'buy'|'sell', qty_change, price, note }
  */
+import { fetchGistCached, invalidateGistCache } from './_gist-cache.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -27,9 +29,7 @@ export default async function handler(req, res) {
   };
 
   const readRecords = async () => {
-    const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
-    if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-    const gist = await r.json();
+    const gist = await fetchGistCached(gistId, ghToken);
     const file = gist.files?.['transactions.json'];
     return file ? JSON.parse(file.content || '[]') : [];
   };
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
       }),
     });
     if (!r.ok) throw new Error(`Gist 저장 실패 ${r.status}`);
+    invalidateGistCache();
   };
 
   try {
@@ -50,6 +51,7 @@ export default async function handler(req, res) {
       let records = await readRecords();
       const etfId = req.query.etf_id;
       if (etfId) records = records.filter(r => String(r.etf_id) === String(etfId));
+      res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
       return res.status(200).json({ records });
     }
 
