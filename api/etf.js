@@ -1,11 +1,11 @@
 /**
- * Vercel API — ETF 데이터 CRUD (GitHub Gist 연동) + ETF 검색
- * GET  /api/etf             → etf.json 전체 반환
- * GET  /api/etf?search=q    → 내장 ETF 목록 검색 (구 /api/etf-search)
- * POST /api/etf             → body: { records: [...] }  → Gist 저장
+ * Vercel API — ETF 데이터 CRUD (JSONBin 연동) + ETF 검색
+ * GET  /api/etf             → etf 전체 반환
+ * GET  /api/etf?search=q    → 내장 ETF 목록 검색
+ * POST /api/etf             → body: { records: [...] }  → 저장
  */
 
-import { fetchGistCached, invalidateGistCache } from './_gist-cache.js';
+import { readBin, writeBin } from './_jsonbin.js';
 
 const ETF_LIST = [
   { t: '069500', n: 'KODEX 200',                              c: '분기배당' },
@@ -101,26 +101,13 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const gistId  = process.env.GIST_ID;
-  const ghToken = process.env.GH_TOKEN;
+  const binId = process.env.JSONBIN_BIN_ID;
+  const key   = process.env.JSONBIN_KEY;
+  if (!binId || !key) return res.status(500).json({ error: 'JSONBIN 환경변수 미설정' });
 
-  if (!gistId) {
-    return res.status(500).json({ error: 'GIST_ID 미설정' });
-  }
-  if (!ghToken && req.method === 'POST') {
-    return res.status(500).json({ error: 'GH_TOKEN 미설정 (저장 불가)' });
-  }
-
-  const ghHeaders = {
-    ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'stock-analyzer',
-  };
-
-  // ── GET: 검색 (구 /api/etf-search) ──────────────────────────────────────
+  // ── GET: 검색 ─────────────────────────────────────────────────────────────
   if (req.method === 'GET' && req.query.search !== undefined) {
     const q = (req.query.search || '').trim().toLowerCase();
     if (!q) return res.status(200).json({ items: [] });
@@ -131,35 +118,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ items });
   }
 
-  // ── GET: Gist 읽기 (캐시 사용) ───────────────────────────────────────────
+  // ── GET: 읽기 ─────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const gist = await fetchGistCached(gistId, ghToken);
-      const file = gist.files?.['etf.json'];
-      const records = file ? JSON.parse(file.content || '[]') : [];
+      const data = await readBin(binId, key);
       res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-      return res.status(200).json({ records });
+      return res.status(200).json({ records: data.etf ?? [] });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
   }
 
-  // ── POST: 저장 ─────────────────────────────────────────────────────────────
+  // ── POST: 저장 ────────────────────────────────────────────────────────────
   if (req.method === 'POST') {
     try {
       const { records } = req.body;
       if (!Array.isArray(records)) return res.status(400).json({ error: 'records 배열 필요' });
-
-      const payload = {
-        files: { 'etf.json': { content: JSON.stringify(records, null, 2) } },
-      };
-      const r = await fetch(`https://api.github.com/gists/${gistId}`, {
-        method: 'PATCH',
-        headers: { ...ghHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) return res.status(r.status).json({ error: `Gist 저장 실패 ${r.status}` });
-      invalidateGistCache();
+      const data = await readBin(binId, key);
+      await writeBin(binId, key, { ...data, etf: records });
       return res.status(200).json({ ok: true, count: records.length });
     } catch (e) {
       return res.status(500).json({ error: e.message });

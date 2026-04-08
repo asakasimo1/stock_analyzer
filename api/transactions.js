@@ -1,14 +1,12 @@
 /**
- * Vercel API — 매수/매도 거래 내역 (GitHub Gist 연동)
+ * Vercel API — 매수/매도 거래 내역 (JSONBin 연동)
  * GET    /api/transactions         → { records: [...] }
- * GET    /api/transactions?etf_id= → { records: [...] }  (특정 ETF만)
+ * GET    /api/transactions?etf_id= → { records: [...] }
  * POST   /api/transactions         → body: { record } → { ok, record }
  * DELETE /api/transactions?id=     → { ok }
- *
- * Gist 파일명: transactions.json
- * 레코드: { id, etf_id, ticker, name, date, type:'buy'|'sell', qty_change, price, note }
  */
-import { fetchGistCached, invalidateGistCache } from './_gist-cache.js';
+
+import { readBin, writeBin } from './_jsonbin.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,39 +14,14 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const gistId  = process.env.GIST_ID;
-  const ghToken = process.env.GH_TOKEN;
-
-  if (!gistId) return res.status(500).json({ error: 'GIST_ID 미설정' });
-  if (!ghToken && req.method !== 'GET') return res.status(500).json({ error: 'GH_TOKEN 미설정' });
-
-  const ghHeaders = {
-    ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'stock-analyzer',
-  };
-
-  const readRecords = async () => {
-    const gist = await fetchGistCached(gistId, ghToken);
-    const file = gist.files?.['transactions.json'];
-    return file ? JSON.parse(file.content || '[]') : [];
-  };
-
-  const writeRecords = async (records) => {
-    const r = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: 'PATCH',
-      headers: { ...ghHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        files: { 'transactions.json': { content: JSON.stringify(records, null, 2) } },
-      }),
-    });
-    if (!r.ok) throw new Error(`Gist 저장 실패 ${r.status}`);
-    invalidateGistCache();
-  };
+  const binId = process.env.JSONBIN_BIN_ID;
+  const key   = process.env.JSONBIN_KEY;
+  if (!binId || !key) return res.status(500).json({ error: 'JSONBIN 환경변수 미설정' });
 
   try {
     if (req.method === 'GET') {
-      let records = await readRecords();
+      const data = await readBin(binId, key);
+      let records = data.transactions ?? [];
       const etfId = req.query.etf_id;
       if (etfId) records = records.filter(r => String(r.etf_id) === String(etfId));
       res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
@@ -58,18 +31,20 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { record } = req.body;
       if (!record) return res.status(400).json({ error: 'record 필요' });
-      const records = await readRecords();
+      const data = await readBin(binId, key);
+      const records = data.transactions ?? [];
       if (!record.id) record.id = Date.now();
       records.push(record);
-      await writeRecords(records);
+      await writeBin(binId, key, { ...data, transactions: records });
       return res.status(200).json({ ok: true, record });
     }
 
     if (req.method === 'DELETE') {
       const id = req.query.id;
       if (!id) return res.status(400).json({ error: 'id 필요' });
-      const records = await readRecords();
-      await writeRecords(records.filter(r => String(r.id) !== String(id)));
+      const data = await readBin(binId, key);
+      const records = (data.transactions ?? []).filter(r => String(r.id) !== String(id));
+      await writeBin(binId, key, { ...data, transactions: records });
       return res.status(200).json({ ok: true });
     }
 

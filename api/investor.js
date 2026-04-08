@@ -56,15 +56,13 @@ function parseFrgnRows(html, maxRows = 30) {
   return rows;
 }
 
-import { fetchGistCached } from './_gist-cache.js';
+import { readBin } from './_jsonbin.js';
 
-/** Gist 읽기 헬퍼 (캐시 사용) */
-async function readGist(gistId, ghToken, filename) {
+/** JSONBin에서 특정 키 읽기 헬퍼 */
+async function readBinKey(binId, key, field) {
   try {
-    const gist = await fetchGistCached(gistId, ghToken);
-    const file = gist.files?.[filename];
-    if (!file) return null;
-    return JSON.parse(file.content || 'null');
+    const data = await readBin(binId, key);
+    return data?.[field] ?? null;
   } catch (_) {
     return null;
   }
@@ -72,18 +70,18 @@ async function readGist(gistId, ghToken, filename) {
 
 // ── 포트폴리오 요약 ───────────────────────────────────────────────────────────
 async function handlePortfolio(req, res) {
-  const gistId  = process.env.GIST_ID;
-  const ghToken = process.env.GH_TOKEN;
-  if (!gistId) return res.status(500).json({ error: 'GIST_ID 미설정' });
+  const binId = process.env.JSONBIN_BIN_ID;
+  const key   = process.env.JSONBIN_KEY;
+  if (!binId || !key) return res.status(500).json({ error: 'JSONBIN 환경변수 미설정' });
 
-  // Gist에서 보유 종목 + 연기금 데이터 병렬 로드
+  // JSONBin에서 보유 종목 + 연기금 데이터 로드 (캐시 공유)
   let tickers = [];
   let pensionMap = {};
   try {
     const [stockData, etfData, pensionData] = await Promise.all([
-      readGist(gistId, ghToken, 'stocks.json'),
-      readGist(gistId, ghToken, 'etf.json'),
-      readGist(gistId, ghToken, 'pension_data.json'),
+      readBinKey(binId, key, 'stocks'),
+      readBinKey(binId, key, 'etf'),
+      readBinKey(binId, key, 'pension_data'),
     ]);
     const stocks = Array.isArray(stockData) ? stockData : [];
     const etfs   = Array.isArray(etfData)   ? etfData   : [];
@@ -162,14 +160,14 @@ async function handleDetail(req, res, ticker) {
   // 재무 정보 파싱
   const fundamental = parseFundamental(fundHtml, ticker);
 
-  // 연기금 (Gist)
-  const gistId  = process.env.GIST_ID;
-  const ghToken = process.env.GH_TOKEN;
+  // 연기금 (JSONBin)
+  const binId = process.env.JSONBIN_BIN_ID;
+  const key   = process.env.JSONBIN_KEY;
   let pensionTrend = null;
-  if (gistId) {
+  if (binId && key) {
     try {
-      const pd = await readGist(gistId, ghToken, 'pension_data.json');
-      if (pd?.trend?.[ticker]) pensionTrend = pd.trend[ticker]; // [{date, pension_net}, ...]
+      const pd = await readBinKey(binId, key, 'pension_data');
+      if (pd?.trend?.[ticker]) pensionTrend = pd.trend[ticker];
     } catch (_) {}
   }
 
