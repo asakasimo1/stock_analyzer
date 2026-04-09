@@ -1217,9 +1217,8 @@ function _renderPortEtf() {
     if (dayPnl !== null) { totalDayPnl += dayPnl; hasDayPnl = true; }
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
-      <td class="${rc}" style="line-height:1.4">
-        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
-        ${cur ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
+      <td class="${rc}">
+        ${rate !== null ? `${profit>=0?'+':''}${profit.toLocaleString()}원 (${rate>=0?'+':''}${rate.toFixed(1)}%)` : '-'}
       </td>
       <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
@@ -1230,9 +1229,8 @@ function _renderPortEtf() {
   const dtrc = totalDayPnl >= 0 ? 'up' : 'dn';
   tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${trc}" style="line-height:1.4">
-      ${totalRate !== null ? `<div>${totalRate>=0?'+':''}${totalRate.toFixed(2)}%</div>` : '-'}
-      ${totalBuy ? `<div style="font-size:10px;opacity:.75">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</div>` : ''}
+    <td class="${trc}">
+      ${totalRate !== null ? `${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원 (${totalRate>=0?'+':''}${totalRate.toFixed(1)}%)` : '-'}
     </td>
     <td class="${dtrc}">${hasDayPnl ? `${totalDayPnl>=0?'+':''}${totalDayPnl.toLocaleString()}원` : '-'}</td>
     <td>${totalEval ? totalEval.toLocaleString()+'원' : '-'}</td>
@@ -1253,11 +1251,8 @@ function _renderPortIpo() {
     const pc     = profit >= 0 ? 'up' : 'dn';
     return `<tr>
       <td>${r.name||'-'}</td>
-      <td class="${pc}" style="line-height:1.4">
-        <div>${rate>=0?'+':''}${rate}%</div>
-        <div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>
-      </td>
-      <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
+      <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원 (${rate>=0?'+':''}${rate}%)</td>
+      <td class="${pc}">${profit>=0?'+':''}${profit.toLocaleString()}원</td>
     </tr>`;
   }).join('');
 }
@@ -1298,9 +1293,8 @@ function _renderPortStock() {
     if (dayPnl !== null) { sTotalDayPnl += dayPnl; sHasDayPnl = true; }
     return `<tr>
       <td>${r.name||'-'}${r.ticker ? `<div style="font-size:10px;color:var(--muted)">${r.ticker}</div>` : ''}</td>
-      <td class="${rc}" style="line-height:1.4">
-        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
-        ${r.current_price ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
+      <td class="${rc}">
+        ${rate !== null ? `${profit>=0?'+':''}${profit.toLocaleString()}원 (${rate>=0?'+':''}${rate.toFixed(1)}%)` : '-'}
       </td>
       <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
@@ -1311,9 +1305,8 @@ function _renderPortStock() {
   const sdtrc = sTotalDayPnl >= 0 ? 'up' : 'dn';
   tbody.innerHTML = sRows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${strc}" style="line-height:1.4">
-      ${sTotalRate !== null ? `<div>${sTotalRate>=0?'+':''}${sTotalRate.toFixed(2)}%</div>` : '-'}
-      ${sHasCur ? `<div style="font-size:10px;opacity:.75">${sTotalProfit>=0?'+':''}${sTotalProfit.toLocaleString()}원</div>` : ''}
+    <td class="${strc}">
+      ${sTotalRate !== null ? `${sTotalProfit>=0?'+':''}${sTotalProfit.toLocaleString()}원 (${sTotalRate>=0?'+':''}${sTotalRate.toFixed(1)}%)` : '-'}
     </td>
     <td class="${sdtrc}">${sHasDayPnl ? `${sTotalDayPnl>=0?'+':''}${sTotalDayPnl.toLocaleString()}원` : '-'}</td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
@@ -1711,7 +1704,7 @@ function renderStockCards() {
   if (pnlEl) {
     pnlEl.className = 'etf-kpi-val ' + pnlClass;
     pnlEl.textContent = pnlPct !== null
-      ? `${pnlSign}${pnlPct.toFixed(1)}% ${pnlSign}${fmtK(Math.abs(pnl))}`
+      ? `${pnlSign}${fmtK(Math.abs(pnl))} (${pnlSign}${pnlPct.toFixed(1)}%)`
       : '-';
   }
 
@@ -1805,9 +1798,8 @@ function renderStockCards() {
         <div class="etf-pnl-bar">
           <div class="etf-pnl-group">
             <span class="etf-pnl-label">평가손익</span>
-            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원</span>
+            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원${pPct !== null ? ` (${ps}${pPct.toFixed(1)}%)` : ''}</span>
           </div>
-          ${pPct !== null ? `<div class="etf-pnl-group"><span class="etf-pnl-label">수익률</span><span class="etf-pnl-val ${pc}">${ps}${pPct.toFixed(2)}%</span></div>` : ''}
         </div>
       </div>
     </div>`;
@@ -2660,7 +2652,7 @@ function renderEtfCards() {
   const pnlEl = document.getElementById('etf-k-pnl');
   pnlEl.className = 'etf-kpi-val ' + pnlClass;
   pnlEl.textContent = pnlPct !== null
-    ? `${pnlSign}${pnlPct.toFixed(1)}% ${pnlSign}${fmtMoneyK(Math.abs(pnl))}`
+    ? `${pnlSign}${fmtMoneyK(Math.abs(pnl))} (${pnlSign}${pnlPct.toFixed(1)}%)`
     : '-';
 
   const divPreEl  = document.getElementById('etf-k-div-pre');
@@ -2816,9 +2808,8 @@ function renderEtfCards() {
         <div class="etf-pnl-bar">
           <div class="etf-pnl-group">
             <span class="etf-pnl-label">평가손익</span>
-            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원</span>
+            <span class="etf-pnl-val ${pc}">${ps}${profit.toLocaleString()}원${pPct !== null ? ` (${ps}${pPct.toFixed(1)}%)` : ''}</span>
           </div>
-          ${pPct !== null ? `<div class="etf-pnl-group"><span class="etf-pnl-label">수익률</span><span class="etf-pnl-val ${pc}">${ps}${pPct.toFixed(2)}%</span></div>` : ''}
         </div>
       </div>
     </div>`;
