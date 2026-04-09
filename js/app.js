@@ -23,23 +23,23 @@ function switchTab(name) {
 
 // ── 탭 스와이프 (모바일) ──────────────────────────────────
 (function() {
-  let _sx = 0, _sy = 0, _multi = false;
+  let _sx = 0, _sy = 0, _multi = false, _startTarget = null;
   document.addEventListener('touchstart', e => {
     if (e.touches.length > 1) { _multi = true; return; }  // 핀치 줌 등 멀티터치 무시
     _multi = false;
     _sx = e.touches[0].clientX;
     _sy = e.touches[0].clientY;
+    _startTarget = e.target;  // 시작점 요소 저장
   }, { passive: true });
   document.addEventListener('touchcancel', () => { _multi = true; }, { passive: true });
   document.addEventListener('touchend', e => {
     if (_multi) return;                          // 멀티터치 후 탭 전환 차단
     if (e.changedTouches.length !== 1) return;  // 손가락이 1개일 때만 스와이프 판정
-    const t = e.target;
-    // 버튼·입력·링크·인터랙티브 요소에서 끝난 경우 탭 전환 차단
-    if (t.closest('button, a, input, select, textarea, [onclick]')) return;
     const dx = e.changedTouches[0].clientX - _sx;
     const dy = e.changedTouches[0].clientY - _sy;
     if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    // 시작점 기준으로 인터랙티브 요소 차단 (카드 onclick은 제외, 버튼/입력만 차단)
+    if (_startTarget && _startTarget.closest('button, a, input, select, textarea')) return;
     const active = document.querySelector('.tab-btn.active');
     if (!active) return;
     const cur = active.getAttribute('onclick').match(/switchTab\('(\w+)'\)/)?.[1];
