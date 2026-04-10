@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/ipo-fetch",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "builds": [
     { "src": "stock_analyzer.html", "use": "@vercel/static" },
     { "src": "css/main.css", "use": "@vercel/static" },
@@ -14,7 +20,8 @@
     { "src": "api/market.js", "use": "@vercel/node" },
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
-    { "src": "api/investor.js", "use": "@vercel/node" }
+    { "src": "api/investor.js", "use": "@vercel/node" },
+    { "src": "api/cron/ipo-fetch.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -31,6 +38,7 @@
     { "src": "/api/market", "dest": "/api/market.js" },
     { "src": "/api/stocks", "dest": "/api/stocks.js" },
     { "src": "/api/stock", "dest": "/api/stock.js" },
-    { "src": "/api/investor", "dest": "/api/investor.js" }
+    { "src": "/api/investor", "dest": "/api/investor.js" },
+    { "src": "/api/cron/ipo-fetch", "dest": "/api/cron/ipo-fetch.js" }
   ]
 }
