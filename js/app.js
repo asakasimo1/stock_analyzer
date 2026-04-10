@@ -1071,13 +1071,27 @@ async function saveCash() {
   } catch(e) { alert('예수금 저장 실패: ' + e.message); }
 }
 const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
+let _portGen = 0; // 세대 카운터 — 구세대 비동기 작업이 renderPortfolio 호출하는 것을 막음
 
 // ══════════════════════════════════════════════════════════
 // 포트폴리오 (ETF Gist + IPO Gist + 개별주 Gist 기반)
 // ══════════════════════════════════════════════════════════
 
 async function initPortfolio() {
-  // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
+  const gen = ++_portGen; // 새 세대 발급
+  clearInterval(_portAutoTimer);
+
+  // 기존 데이터 즉시 지우기
+  ['port-etf-tbody','port-stock-tbody','port-ipo-tbody'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<tr><td colspan="4" class="port-loading">로딩 중…</td></tr>';
+  });
+  ['pk-stk-eval','pk-etf-eval','pk-ipo-profit','pk-div-total'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.style.color = ''; }
+  });
+
+  // 항상 최신 데이터로 갱신
   try {
     const [etfRes, ipoRes, divRes, stkRes, metaRes] = await Promise.all([
       fetch('/api/etf').then(r=>r.json()),
@@ -1086,27 +1100,26 @@ async function initPortfolio() {
       fetch('/api/stocks').then(r=>r.json()),
       fetch('/api/data').then(r=>r.json()),
     ]);
+    if (gen !== _portGen) return; // 새 initPortfolio가 호출된 경우 중단
     _portEtf      = etfRes.records || [];
     _portIpo      = ipoRes.records || [];
     _portDiv      = divRes.records || [];
     _stockRecords = (stkRes.records || []).map(r => ({ ...r, current_price: null, chg: null, chgPct: null }));
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
-    // 예수금 입력란 초기값 세팅
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = _portCash ? _portCash.toLocaleString() : '';
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
-  renderPortfolio(); // 저장된 데이터로 먼저 표시
-  _refreshPortfolioRealtime(); // 실시간 현재가 백그라운드 조회
+  if (gen !== _portGen) return;
+  await _refreshPortfolioRealtime(); // 현재가까지 받은 뒤 한 번만 렌더
+  if (gen !== _portGen) return;
+  renderPortfolio();
   _startPortAutoRefresh();
 }
 
 // 포트폴리오 탭 — 실시간 현재가 일괄 조회 (Gist 저장 없이 화면만 갱신)
-let _portRefreshing = false;
 async function _refreshPortfolioRealtime() {
-  if (_portRefreshing) return;   // 중복 실행 차단
-  _portRefreshing = true;
   try {
     const etfFetches = _portEtf
       .filter(r => r.ticker)
@@ -1127,10 +1140,7 @@ async function _refreshPortfolioRealtime() {
       });
 
     await Promise.all([...etfFetches, ...stkFetches]);
-    renderPortfolio();
-  } finally {
-    _portRefreshing = false;
-  }
+  } catch {}
 }
 
 function _startPortAutoRefresh() {

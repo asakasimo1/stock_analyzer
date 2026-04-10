@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/ipo-fetch",
+      "path": "/api/ipo",
       "schedule": "0 0 * * *"
     }
   ],
@@ -20,8 +20,7 @@
     { "src": "api/market.js", "use": "@vercel/node" },
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
-    { "src": "api/investor.js", "use": "@vercel/node" },
-    { "src": "api/cron/ipo-fetch.js", "use": "@vercel/node" }
+    { "src": "api/investor.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },

@@ -43,8 +43,8 @@ def _write_jsonbin(data: dict) -> bool:
         return False
     r = requests.put(
         f"{JSONBIN_BASE}/{JSONBIN_BIN_ID}",
-        headers={"X-Master-Key": JSONBIN_KEY, "Content-Type": "application/json"},
-        data=json.dumps(data, ensure_ascii=False),
+        headers={"X-Master-Key": JSONBIN_KEY},
+        json=data,
         timeout=20,
     )
     if r.ok:
