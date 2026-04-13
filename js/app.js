@@ -84,9 +84,9 @@ async function initDashboard() {
 
 function renderDashboard(data) {
   renderTraderTrades(data.trader_trades || []);
+  renderTraderSummary(data.trader_trades || []);
   renderIpoList(data.ipo || []);
   renderCalendar(data);
-  loadInvestorStatus();
 }
 
 // ── 브리핑 목록 ─────────────────────────────────────────
@@ -392,6 +392,133 @@ function _renderIpoList() {
       ${calBtns.length ? `<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${calBtns.join('')}</div>` : ''}
     </div>`;
   }).join('') + moreBtn;
+}
+
+// ── 매매 현황 (stock_trader 거래 내역 집계) ──────────────
+function renderTraderSummary(trades) {
+  const wrap = document.getElementById('trader-summary-wrap');
+  if (!wrap) return;
+  if (!trades.length) {
+    wrap.innerHTML = '<div class="empty-msg">거래 내역이 없습니다</div>';
+    return;
+  }
+
+  // ── 현재 보유 종목: 매수 후 아직 매도되지 않은 종목 ──
+  const buyMap  = {};   // ticker → 가장 최근 매수 기록
+  const sellSet = new Set();
+  const sorted  = [...trades].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  sorted.forEach(t => {
+    if (t.type === 'buy')  buyMap[t.ticker] = t;
+    if (t.type === 'sell') sellSet.add(t.ticker + '_' + (buyMap[t.ticker]?.date || ''));
+  });
+  // 매수 후 아직 매도 안 된 것만
+  const holdings = Object.values(buyMap).filter(t => !sellSet.has(t.ticker + '_' + t.date));
+
+  // ── 종결된 거래 손익 집계 ──
+  const closed = trades.filter(t => t.type === 'sell' && t.pnl != null);
+  const totalPnl    = closed.reduce((s, t) => s + Number(t.pnl), 0);
+  const wins        = closed.filter(t => t.pnl > 0).length;
+  const winRate     = closed.length ? Math.round(wins / closed.length * 100) : null;
+  const avgPnlPct   = closed.length
+    ? (closed.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / closed.length).toFixed(2)
+    : null;
+
+  // ── 색상 헬퍼 ──
+  const c  = v => v >= 0 ? '#16a34a' : '#dc2626';
+  const sg = v => v >= 0 ? '+' : '';
+
+  // ── 요약 카드 (상단) ──
+  const summaryHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">
+      <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">현재 보유</div>
+        <div style="font-size:22px;font-weight:700">${holdings.length}<span style="font-size:13px;color:var(--muted)">종목</span></div>
+      </div>
+      <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">총 거래</div>
+        <div style="font-size:22px;font-weight:700">${closed.length}<span style="font-size:13px;color:var(--muted)">건</span></div>
+      </div>
+      <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">누적 손익</div>
+        <div style="font-size:18px;font-weight:700;color:${c(totalPnl)}">${sg(totalPnl)}${Math.round(totalPnl).toLocaleString()}<span style="font-size:11px">원</span></div>
+      </div>
+      <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">승률</div>
+        <div style="font-size:22px;font-weight:700;color:${winRate >= 50 ? '#16a34a' : '#dc2626'}">${winRate ?? '—'}<span style="font-size:13px;color:var(--muted)">%</span></div>
+      </div>
+      <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균 수익률</div>
+        <div style="font-size:20px;font-weight:700;color:${avgPnlPct >= 0 ? '#16a34a' : '#dc2626'}">${avgPnlPct != null ? sg(Number(avgPnlPct)) + avgPnlPct : '—'}<span style="font-size:13px;color:var(--muted)">%</span></div>
+      </div>
+    </div>`;
+
+  // ── 현재 보유 종목 테이블 ──
+  let holdHtml = '';
+  if (holdings.length) {
+    const rows = holdings.map(t => `
+      <tr>
+        <td style="font-weight:600;white-space:nowrap">${t.name || t.ticker}<br>
+          <span style="font-size:11px;color:var(--muted)">${t.ticker}</span></td>
+        <td style="text-align:right">${Number(t.qty).toLocaleString()}주</td>
+        <td style="text-align:right">${Number(t.price).toLocaleString()}원</td>
+        <td style="text-align:right;font-weight:600">${Number(t.amount).toLocaleString()}원</td>
+        <td style="text-align:right;font-size:11px;color:var(--muted)">${t.date}</td>
+      </tr>`).join('');
+    holdHtml = `
+      <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:6px">📌 현재 보유 종목</div>
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table class="inv-table">
+          <thead><tr>
+            <th style="text-align:left">종목</th>
+            <th style="text-align:right">수량</th>
+            <th style="text-align:right">매수단가</th>
+            <th style="text-align:right">매수금액</th>
+            <th style="text-align:right">매수일</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── 종결 거래 내역 (최근 10건) ──
+  const recentClosed = [...closed]
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))
+    .slice(0, 10);
+  let closedHtml = '';
+  if (recentClosed.length) {
+    const rows = recentClosed.map(t => {
+      const up   = Number(t.pnl) >= 0;
+      const sign = up ? '+' : '';
+      const reasonLabel = t.reason ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">[${t.reason}]</span>` : '';
+      return `<tr>
+        <td style="font-weight:600;white-space:nowrap">${t.name || t.ticker}<br>
+          <span style="font-size:11px;color:var(--muted)">${t.ticker}</span>${reasonLabel}</td>
+        <td style="text-align:right">${Number(t.qty).toLocaleString()}주</td>
+        <td style="text-align:right">${Number(t.price).toLocaleString()}원</td>
+        <td style="text-align:right;font-weight:600">${Number(t.amount).toLocaleString()}원</td>
+        <td style="text-align:right;font-weight:700;color:${up?'#16a34a':'#dc2626'}">${sign}${Math.round(t.pnl).toLocaleString()}원<br>
+          <span style="font-size:11px">${sign}${t.pnl_pct}%</span></td>
+        <td style="text-align:right;font-size:11px;color:var(--muted)">${t.date}</td>
+      </tr>`;
+    }).join('');
+    closedHtml = `
+      <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:6px">📊 최근 매도 내역</div>
+      <div style="overflow-x:auto">
+        <table class="inv-table">
+          <thead><tr>
+            <th style="text-align:left">종목</th>
+            <th style="text-align:right">수량</th>
+            <th style="text-align:right">매도단가</th>
+            <th style="text-align:right">매도금액</th>
+            <th style="text-align:right">손익</th>
+            <th style="text-align:right">날짜</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  wrap.innerHTML = summaryHtml + holdHtml + closedHtml;
 }
 
 // ── 보유 종목 투자자 현황 ─────────────────────────────────
