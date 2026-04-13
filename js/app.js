@@ -162,35 +162,48 @@ function renderTraderTrades(items) {
     </div>` : '';
 
   el.innerHTML = toShow.map(t => {
-    const isBuy   = t.type === 'buy';
-    const badge   = isBuy
-      ? `<span style="background:#dcfce7;color:#166534;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600">🟢 매수</span>`
-      : `<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600">🔴 매도</span>`;
-    const pnlHtml = (!isBuy && t.pnl != null) ? (() => {
-      const up = t.pnl >= 0;
-      return `<span style="color:${up ? '#16a34a' : '#dc2626'};font-size:12px;font-weight:600;margin-left:6px">
-        ${up ? '+' : ''}${Number(t.pnl).toLocaleString()}원 (${up ? '+' : ''}${t.pnl_pct}%)
-      </span>`;
-    })() : '';
+    const isBuy  = t.type === 'buy';
+    const badge  = isBuy
+      ? `<span style="background:#dcfce7;color:#166534;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">매수</span>`
+      : `<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700">매도</span>`;
     const reasonHtml = t.reason
-      ? `<span style="font-size:11px;color:var(--muted);margin-left:4px">[${t.reason}]</span>`
-      : '';
+      ? `<span style="font-size:11px;color:var(--muted)">[${t.reason}]</span>` : '';
+
+    // 손익 (매도 시)
+    let pnlHtml = '';
+    if (!isBuy && t.pnl != null) {
+      const up   = t.pnl >= 0;
+      const sign = up ? '+' : '';
+      pnlHtml = `<span style="color:${up?'#16a34a':'#dc2626'};font-size:12px;font-weight:700">
+        손익 ${sign}${Number(t.pnl).toLocaleString()}원&nbsp;(${sign}${t.pnl_pct}%)
+      </span>`;
+    }
+
     return `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <!-- 종목명 + 매수/매도 뱃지 -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
           ${badge}
-          <span style="font-weight:600;font-size:13px">${t.name || t.ticker}</span>
+          <span style="font-weight:700;font-size:13px">${t.name || t.ticker}</span>
           <span style="font-size:11px;color:var(--muted)">${t.ticker}</span>
           ${reasonHtml}
         </div>
-        <div style="font-size:12px;color:var(--muted)">
-          ${Number(t.price).toLocaleString()}원 × ${t.qty}주
-          = <b>${Number(t.amount).toLocaleString()}원</b>
-          ${pnlHtml}
+        <!-- 수량 · 단가 · 총금액 -->
+        <div style="font-size:12px;color:var(--fg);margin-bottom:2px">
+          <span style="color:var(--muted)">수량</span> <b>${Number(t.qty).toLocaleString()}주</b>
+          &nbsp;·&nbsp;
+          <span style="color:var(--muted)">단가</span> <b>${Number(t.price).toLocaleString()}원</b>
+          &nbsp;·&nbsp;
+          <span style="color:var(--muted)">금액</span> <b>${Number(t.amount).toLocaleString()}원</b>
         </div>
+        <!-- 손익 (매도만) -->
+        ${pnlHtml}
       </div>
-      <div style="font-size:11px;color:var(--muted);white-space:nowrap;margin-left:8px">${t.date}<br>${t.time}</div>
+      <div style="font-size:11px;color:var(--muted);white-space:nowrap;margin-left:10px;text-align:right">
+        ${t.date}<br>${t.time}
+      </div>
     </div>`;
   }).join('') + moreBtn;
 }
@@ -704,7 +717,6 @@ function renderCalendar(data) {
   };
 
   (data.briefing || []).forEach(b => add(b.date, 'briefing', `📊 브리핑 (${(b.stocks||[]).length}종목)`, b));
-  (data.picks    || []).forEach(p => add(p.date, 'pick',     `🎯 추천 (${(p.picks||[]).length}종목)`, p));
   (data.signals  || []).forEach(s => add(s.date, 'signal',   `📡 ${s.name} ${s.alerts?.[0]?.substring(0,10)||''}`, s));
 
   // 공모주 청약일 / 상장일 (로컬 시간 기준 날짜 파싱)
@@ -763,7 +775,6 @@ function renderCalendar(data) {
     if (dow >= 1 && dow <= 5) { // 평일
       if (!events[key]) events[key] = [];
       events[key].unshift({ type: 'briefing', text: '⏰ 07:30 브리핑', detail: null });
-      events[key].push({ type: 'pick', text: '⏰ 08:50 매수추천', detail: null });
     }
   }
 
@@ -853,26 +864,6 @@ function showDayDetail(key) {
         });
       });
       if (!(b.stocks||[]).length) html += `<div style="color:var(--muted)">종목 데이터 없음</div>`;
-      html += `</div>`;
-    });
-    html += `</div>`;
-  }
-
-  // 매수 추천
-  const picks = evs.filter(e => e.type === 'pick' && e.detail);
-  if (picks.length) {
-    html += `<div class="day-modal-section"><div class="day-modal-section-title">🎯 매수 추천</div>`;
-    picks.forEach(ev => {
-      const p = ev.detail;
-      html += `<div class="day-modal-ev">`;
-      (p.picks || []).forEach(s => {
-        html += `<div style="display:flex;align-items:flex-start;justify-content:space-between;
-          padding:4px 0;border-bottom:1px solid var(--border);gap:8px">
-          <span style="font-weight:600;flex-shrink:0">${s.name||s.code||''}</span>
-          <span style="font-size:12px;color:var(--muted);text-align:right">${s.reason||''}</span>
-        </div>`;
-      });
-      if (!(p.picks||[]).length) html += `<div style="color:var(--muted)">추천 데이터 없음</div>`;
       html += `</div>`;
     });
     html += `</div>`;
