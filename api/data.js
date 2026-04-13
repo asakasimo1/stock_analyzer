@@ -58,6 +58,7 @@ export default async function handler(req, res) {
       signals:        [],
       ipo:            [],
       portfolio_meta: {},
+      trader_trades:  [],
     };
 
     for (const [key, fileObj] of Object.entries(files)) {
@@ -68,6 +69,7 @@ export default async function handler(req, res) {
         if (key === 'signals.json')         result.signals        = data || [];
         if (key === 'ipo.json')             result.ipo            = data || [];
         if (key === 'portfolio_meta.json')  result.portfolio_meta = data || {};
+        if (key === 'trader_trades.json')   result.trader_trades  = data || [];
       } catch (_) {}
     }
 

@@ -36,7 +36,8 @@ function switchTab(name) {
     if (e.changedTouches.length !== 1) return;  // 손가락이 1개일 때만 스와이프 판정
     const t = e.target;
     // 버튼·입력·링크·인터랙티브 요소에서 끝난 경우 탭 전환 차단
-    if (t.closest('button, a, input, select, textarea, [onclick]')) return;
+    
+    if (t.closest('button, a, input, select, textarea')) return;
     const dx = e.changedTouches[0].clientX - _sx;
     const dy = e.changedTouches[0].clientY - _sy;
     if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
@@ -82,7 +83,7 @@ async function initDashboard() {
 }
 
 function renderDashboard(data) {
-  renderPicksList(data.picks || []);
+  renderTraderTrades(data.trader_trades || []);
   renderIpoList(data.ipo || []);
   renderCalendar(data);
   loadInvestorStatus();
@@ -136,50 +137,62 @@ function _renderBriefing() {
     </div>`).join('') + moreBtn;
 }
 
-// ── 매수 추천 목록 ───────────────────────────────────────
-let _picksItems = [], _picksExpanded = false;
+// ── 거래 내역 (stock_trader 실거래) ─────────────────────
+let _traderTradesExpanded = false;
 
-function renderPicksList(items) { _picksItems = items; _renderPicks(); }
+function renderTraderTrades(items) {
+  const el = document.getElementById('list-trader-trades');
+  if (!el) return;
+  const sorted = [...items].sort((a, b) =>
+    (b.date + b.time).localeCompare(a.date + a.time));
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty-msg">거래 내역이 없습니다</div>';
+    return;
+  }
 
-function _renderPicks() {
-  const el = document.getElementById('list-picks');
-  const items = [..._picksItems].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  if (!items.length) { el.innerHTML = '<div class="empty-msg">아직 추천 데이터가 없습니다</div>'; return; }
-
-  // 마지막 업데이트 날짜 기준 경과일
-  const lastDate = items[0].date;
-  const daysDiff = Math.floor((new Date() - new Date(lastDate)) / 86400000);
-  const staleMsg = daysDiff > 3
-    ? `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:12px;color:#92400e;margin-bottom:8px">
-        ⚠️ 마지막 업데이트: <b>${lastDate}</b> (${daysDiff}일 전) — GitHub Actions 실행 상태를 확인하세요
-       </div>` : '';
-
-  const visible = items.slice(0, 3);
-  const toShow  = _picksExpanded ? items.slice(0, 20) : visible;
-  const hasMore = items.length > 3;
+  const toShow  = _traderTradesExpanded ? sorted.slice(0, 50) : sorted.slice(0, 10);
+  const hasMore = sorted.length > 10;
 
   const moreBtn = hasMore ? `
     <div style="text-align:center;padding:6px 0">
-      <button onclick="_picksExpanded=!_picksExpanded;_renderPicks()"
+      <button onclick="_traderTradesExpanded=!_traderTradesExpanded;renderTraderTrades(${JSON.stringify(items).replace(/</g,'\\u003c')})"
         style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 18px;font-size:12px;color:var(--muted);cursor:pointer">
-        ${_picksExpanded ? '▲ 접기' : '▼ 더보기'}
+        ${_traderTradesExpanded ? '▲ 접기' : `▼ 더보기 (${sorted.length}건)`}
       </button>
     </div>` : '';
 
-  el.innerHTML = staleMsg + toShow.map(item => `
-    <div class="result-item">
-      <div class="result-item-header">
-        <span class="result-badge pick">🎯 매수 추천</span>
-        <span style="font-size:11px;color:var(--muted)">${item.date} ${item.time}</span>
+  el.innerHTML = toShow.map(t => {
+    const isBuy   = t.type === 'buy';
+    const badge   = isBuy
+      ? `<span style="background:#dcfce7;color:#166534;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600">🟢 매수</span>`
+      : `<span style="background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600">🔴 매도</span>`;
+    const pnlHtml = (!isBuy && t.pnl != null) ? (() => {
+      const up = t.pnl >= 0;
+      return `<span style="color:${up ? '#16a34a' : '#dc2626'};font-size:12px;font-weight:600;margin-left:6px">
+        ${up ? '+' : ''}${Number(t.pnl).toLocaleString()}원 (${up ? '+' : ''}${t.pnl_pct}%)
+      </span>`;
+    })() : '';
+    const reasonHtml = t.reason
+      ? `<span style="font-size:11px;color:var(--muted);margin-left:4px">[${t.reason}]</span>`
+      : '';
+    return `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          ${badge}
+          <span style="font-weight:600;font-size:13px">${t.name || t.ticker}</span>
+          <span style="font-size:11px;color:var(--muted)">${t.ticker}</span>
+          ${reasonHtml}
+        </div>
+        <div style="font-size:12px;color:var(--muted)">
+          ${Number(t.price).toLocaleString()}원 × ${t.qty}주
+          = <b>${Number(t.amount).toLocaleString()}원</b>
+          ${pnlHtml}
+        </div>
       </div>
-      <div class="result-stocks">
-        ${(item.picks || []).map(p => `
-          <span class="stock-chip" style="background:#d1fae5;color:#065f46">
-            ${p.name || p.ticker}
-            ${p.score != null ? `<span style="font-size:10px">${p.score}점</span>` : ''}
-          </span>`).join('')}
-      </div>
-    </div>`).join('') + moreBtn;
+      <div style="font-size:11px;color:var(--muted);white-space:nowrap;margin-left:8px">${t.date}<br>${t.time}</div>
+    </div>`;
+  }).join('') + moreBtn;
 }
 
 // ── 공모주 구글 캘린더 연동 ───────────────────────────────
