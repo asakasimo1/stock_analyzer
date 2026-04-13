@@ -53,23 +53,25 @@ export default async function handler(req, res) {
     const files = gist.files || {};
 
     const result = {
-      briefing:       [],
-      picks:          [],
-      signals:        [],
-      ipo:            [],
-      portfolio_meta: {},
-      trader_trades:  [],
+      briefing:          [],
+      picks:             [],
+      signals:           [],
+      ipo:               [],
+      portfolio_meta:    {},
+      trader_trades:     [],
+      account_balance:   null,
     };
 
     for (const [key, fileObj] of Object.entries(files)) {
       try {
         const data = JSON.parse(fileObj.content || 'null');
-        if (key === 'briefing.json')        result.briefing       = data || [];
-        if (key === 'picks.json')           result.picks          = data || [];
-        if (key === 'signals.json')         result.signals        = data || [];
-        if (key === 'ipo.json')             result.ipo            = data || [];
-        if (key === 'portfolio_meta.json')  result.portfolio_meta = data || {};
-        if (key === 'trader_trades.json')   result.trader_trades  = data || [];
+        if (key === 'briefing.json')         result.briefing         = data || [];
+        if (key === 'picks.json')            result.picks            = data || [];
+        if (key === 'signals.json')          result.signals          = data || [];
+        if (key === 'ipo.json')              result.ipo              = data || [];
+        if (key === 'portfolio_meta.json')   result.portfolio_meta   = data || {};
+        if (key === 'trader_trades.json')    result.trader_trades    = data || [];
+        if (key === 'account_balance.json')  result.account_balance  = data || null;
       } catch (_) {}
     }
 
