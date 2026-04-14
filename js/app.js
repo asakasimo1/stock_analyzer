@@ -4732,16 +4732,25 @@ function atRenderHoldingChips() {
 // ── 종목명 자동완성 ──────────────────────────────────────
 let _atAcTimer = null;
 
+function onAtNameFocus() {
+  const holdings = _atAccount?.holdings || [];
+  if (holdings.length) showAtAcLocal(holdings);
+}
+
 function onAtNameInput(val) {
   clearTimeout(_atAcTimer);
-  // 보유종목 먼저 로컬 필터
-  if (_atAccount) {
-    const matched = (_atAccount.holdings || []).filter(h =>
-      h.name.includes(val.trim()) || h.ticker.startsWith(val.trim())
-    );
-    if (matched.length) { showAtAcLocal(matched); return; }
+  const holdings = _atAccount?.holdings || [];
+  if (!val.trim()) {
+    // 입력 지우면 보유종목 전체 다시 표시
+    if (holdings.length) showAtAcLocal(holdings);
+    else hideAtAc();
+    return;
   }
-  if (!val.trim()) { hideAtAc(); return; }
+  // 보유종목 먼저 로컬 필터
+  const matched = holdings.filter(h =>
+    h.name.includes(val.trim()) || h.ticker.startsWith(val.trim())
+  );
+  if (matched.length) { showAtAcLocal(matched); return; }
   _atAcTimer = setTimeout(() => fetchAtAc(val.trim()), 220);
 }
 

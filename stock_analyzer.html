@@ -793,8 +793,8 @@
       <div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
         <div style="position:relative">
-          <input id="at-name" type="text" placeholder="예: 케이티알파" autocomplete="off"
-            oninput="onAtNameInput(this.value)" onblur="hideAtAc()"
+          <input id="at-name" type="text" placeholder="클릭하면 보유종목 표시" autocomplete="off"
+            onfocus="onAtNameFocus()" oninput="onAtNameInput(this.value)" onblur="hideAtAc()"
             style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
           <div id="at-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
             background:var(--surface);border:1.5px solid var(--primary);border-radius:8px;overflow:hidden;
