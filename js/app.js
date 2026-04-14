@@ -5359,7 +5359,7 @@ async function fetchAcAc(q) {
   try {
     const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
     const d = await r.json();
-    const items = d.results || [];
+    const items = d.items || [];
     if (!items.length) { hideAcAc(); return; }
     const box = document.getElementById('ac-ac-list');
     if (!box) return;
