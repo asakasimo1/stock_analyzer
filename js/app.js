@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════
 // 탭 전환
 // ══════════════════════════════════════════════════════════
-const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks'];
+const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks', 'autotrade'];
 
 function switchTab(name) {
   document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
@@ -19,6 +19,7 @@ function switchTab(name) {
   if (name === 'market') loadMarketData();
   if (name === 'etf') loadEtfRecords();
   if (name === 'stocks') loadStockRecords();
+  if (name === 'autotrade') initAutoTrade();
 }
 
 // ── 탭 스와이프 (모바일) ──────────────────────────────────
@@ -4558,5 +4559,244 @@ async function loadMarketData() {
   }
 
   if (btn) { btn.textContent = '⟳ 새로고침'; btn.disabled = false; }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// 자동매매 탭
+// ══════════════════════════════════════════════════════════
+const AT_BUY_FEE  = 0.00015;
+const AT_SELL_FEE = 0.00015 + 0.0018;
+
+let _atJobs = [];
+let _atAccount = null;
+let _atRefreshTimer = null;
+
+async function initAutoTrade() {
+  await atLoadAll();
+  // 탭 활성 중 30초마다 자동 갱신
+  clearInterval(_atRefreshTimer);
+  _atRefreshTimer = setInterval(() => {
+    if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
+      atLoadAll();
+    } else {
+      clearInterval(_atRefreshTimer);
+    }
+  }, 30000);
+}
+
+async function atLoadAll() {
+  try {
+    const [rJobs, rData] = await Promise.all([
+      fetch('/api/profit-sell'),
+      fetch('/api/data'),
+    ]);
+    _atJobs    = rJobs.ok    ? await rJobs.json()   : [];
+    const data = rData.ok    ? await rData.json()   : {};
+    _atAccount = data.account_balance || null;
+  } catch (e) {
+    console.warn('자동매매 데이터 로드 실패:', e);
+  }
+  atRenderAccount();
+  atRenderJobs();
+}
+
+// ── 계좌 현황 ────────────────────────────────────────────
+function atRenderAccount() {
+  const el = document.getElementById('at-account');
+  if (!el) return;
+  if (!_atAccount) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">계좌 정보 없음 (15:35 일간 리포트 후 업데이트)</div>';
+    // 보유종목 없으면 폼 자동입력도 초기화
+    return;
+  }
+  const a = _atAccount;
+  const pnlColor = a.day_pnl >= 0 ? 'var(--up)' : 'var(--down)';
+  const holdings = (a.holdings || []).map(h => `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;cursor:pointer;color:var(--primary)" onclick="atFillFromHolding('${h.ticker}','${h.name}',${h.qty},${h.avg_price})">${h.ticker}</td>
+      <td style="padding:6px 8px">${h.name}</td>
+      <td style="padding:6px 8px;text-align:right">${h.qty}주</td>
+      <td style="padding:6px 8px;text-align:right">${h.avg_price.toLocaleString()}원</td>
+      <td style="padding:6px 8px;text-align:right">${h.eval_price.toLocaleString()}원</td>
+      <td style="padding:6px 8px;text-align:right;color:${h.pnl_pct>=0?'var(--up)':'var(--down)'}">${h.pnl_pct>=0?'+':''}${h.pnl_pct.toFixed(2)}%</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">🏦 한국투자증권 계좌 <span style="font-size:11px;color:var(--muted);font-weight:400">기준: ${a.updated_at}</span></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+        <div><div style="font-size:11px;color:var(--muted)">총평가금액</div><div style="font-size:16px;font-weight:700">${a.total_eval.toLocaleString()}원</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">예수금</div><div style="font-size:16px;font-weight:700">${a.cash.toLocaleString()}원</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">당일 손익</div><div style="font-size:16px;font-weight:700;color:${pnlColor}">${a.day_pnl>=0?'+':''}${a.day_pnl.toLocaleString()}원 (${a.day_ret>=0?'+':''}${a.day_ret.toFixed(2)}%)</div></div>
+      </div>
+      ${holdings ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+          <th style="padding:4px 8px;text-align:left;font-weight:500">코드</th>
+          <th style="padding:4px 8px;text-align:left;font-weight:500">종목명</th>
+          <th style="padding:4px 8px;text-align:right;font-weight:500">수량</th>
+          <th style="padding:4px 8px;text-align:right;font-weight:500">평균단가</th>
+          <th style="padding:4px 8px;text-align:right;font-weight:500">현재가</th>
+          <th style="padding:4px 8px;text-align:right;font-weight:500">수익률</th>
+        </tr></thead>
+        <tbody>${holdings}</tbody>
+      </table>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">코드 클릭 시 아래 폼에 자동입력</div>` : '<div style="color:var(--muted);font-size:12px">보유 종목 없음</div>'}
+    </div>`;
+}
+
+// ── 폼 자동입력 ──────────────────────────────────────────
+function atFillFromHolding(ticker, name, qty, buyPrice) {
+  document.getElementById('at-ticker').value    = ticker;
+  document.getElementById('at-name').value      = name;
+  document.getElementById('at-qty').value       = qty;
+  document.getElementById('at-buyprice').value  = buyPrice;
+  atUpdateHint();
+}
+
+function atAutoFill() {
+  const ticker = document.getElementById('at-ticker').value.trim();
+  if (!_atAccount) return;
+  const h = (_atAccount.holdings || []).find(h => h.ticker === ticker);
+  if (h) atFillFromHolding(h.ticker, h.name, h.qty, h.avg_price);
+}
+
+function atTypeChange() {
+  atUpdateHint();
+}
+
+function atUpdateHint() {
+  const type   = document.querySelector('input[name="at-type"]:checked')?.value || 'amount';
+  const target = parseFloat(document.getElementById('at-target').value) || 0;
+  const bp     = parseInt(document.getElementById('at-buyprice').value) || 0;
+  const qty    = parseInt(document.getElementById('at-qty').value) || 1;
+  const hint   = document.getElementById('at-target-hint');
+  if (!hint) return;
+
+  if (type === 'amount') {
+    if (bp && target) {
+      const tp = Math.ceil((bp * (1 + AT_BUY_FEE) * qty + target) / qty / (1 - AT_SELL_FEE));
+      hint.textContent = `수수료 차감 후 순이익 ${target.toLocaleString()}원 → 목표 매도단가 ${tp.toLocaleString()}원`;
+    } else {
+      hint.textContent = '수수료 차감 후 순이익 금액 (원) 기준';
+    }
+  } else {
+    if (bp && target) {
+      const tp = Math.ceil(bp * (1 + target / 100) / (1 - AT_SELL_FEE));
+      hint.textContent = `수익률 ${target}% → 목표 매도단가 ${tp.toLocaleString()}원`;
+    } else {
+      hint.textContent = '매수단가 대비 수익률 (%) 기준';
+    }
+  }
+}
+
+// ── 잡 등록 ──────────────────────────────────────────────
+async function atRegister() {
+  const ticker   = document.getElementById('at-ticker').value.trim().toUpperCase();
+  const name     = document.getElementById('at-name').value.trim() || ticker;
+  const qty      = parseInt(document.getElementById('at-qty').value);
+  const buyPrice = parseInt(document.getElementById('at-buyprice').value);
+  const type     = document.querySelector('input[name="at-type"]:checked')?.value || 'amount';
+  const target   = parseFloat(document.getElementById('at-target').value);
+  const msg      = document.getElementById('at-msg');
+
+  if (!ticker || !qty || !buyPrice || isNaN(target) || target <= 0) {
+    msg.style.color = 'var(--down)';
+    msg.textContent = '모든 항목을 올바르게 입력하세요';
+    return;
+  }
+
+  const targetPrice = type === 'amount'
+    ? Math.ceil((buyPrice * (1 + AT_BUY_FEE) * qty + target) / qty / (1 - AT_SELL_FEE))
+    : Math.ceil(buyPrice * (1 + target / 100) / (1 - AT_SELL_FEE));
+
+  const job = { ticker, name, qty, buy_price: buyPrice, target_type: type, target_value: target, target_price: targetPrice };
+
+  msg.style.color = 'var(--muted)';
+  msg.textContent = '등록 중...';
+
+  try {
+    const r = await fetch('/api/profit-sell', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(job),
+    });
+    if (r.ok) {
+      msg.style.color = 'var(--up)';
+      msg.textContent = `✅ ${name}(${ticker}) 잡 등록 완료 — 목표단가 ${targetPrice.toLocaleString()}원`;
+      await atLoadAll();
+    } else {
+      msg.style.color = 'var(--down)';
+      msg.textContent = '등록 실패 — 다시 시도하세요';
+    }
+  } catch (e) {
+    msg.style.color = 'var(--down)';
+    msg.textContent = `오류: ${e.message}`;
+  }
+}
+
+// ── 잡 취소 ──────────────────────────────────────────────
+async function atCancel(ticker) {
+  if (!confirm(`${ticker} 잡을 취소하시겠습니까?`)) return;
+  try {
+    const r = await fetch(`/api/profit-sell?ticker=${ticker}`, { method: 'DELETE' });
+    if (r.ok) await atLoadAll();
+  } catch (e) {
+    alert('취소 실패: ' + e.message);
+  }
+}
+
+// ── 잡 목록 렌더링 ───────────────────────────────────────
+function atRenderJobs() {
+  const active  = _atJobs.filter(j => j.status === 'active');
+  const history = _atJobs.filter(j => j.status !== 'active');
+
+  const elActive = document.getElementById('at-active-list');
+  if (elActive) {
+    if (!active.length) {
+      elActive.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">등록된 활성 잡 없음</div>';
+    } else {
+      elActive.innerHTML = active.map(j => {
+        const typeLabel = j.target_type === 'amount'
+          ? `순이익 +${j.target_value.toLocaleString()}원`
+          : `수익률 +${j.target_value}%`;
+        return `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">${j.name} <span style="font-size:12px;color:var(--muted)">${j.ticker}</span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">${j.qty}주 · 매수 ${j.buy_price.toLocaleString()}원 · 목표 ${typeLabel}</div>
+              <div style="font-size:12px;color:var(--primary);margin-top:2px">매도단가 ${(j.target_price||0).toLocaleString()}원 이상</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">등록: ${j.created_at || ''} · GitHub Actions 5분 주기 체크</div>
+            </div>
+            <button onclick="atCancel('${j.ticker}')"
+              style="background:none;border:1px solid var(--down);color:var(--down);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  const elHistory = document.getElementById('at-history-list');
+  if (elHistory) {
+    if (!history.length) {
+      elHistory.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">내역 없음</div>';
+    } else {
+      elHistory.innerHTML = history.slice(0, 20).map(j => {
+        const isDone = j.status === 'done';
+        const badge  = isDone
+          ? '<span style="background:#1a7a3a22;color:var(--up);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
+          : '<span style="background:#7a1a1a22;color:var(--down);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
+        const detail = isDone
+          ? `매도 ${(j.sell_price||0).toLocaleString()}원 · ${j.executed_at || ''}`
+          : `취소일 ${j.cancelled_at || ''}`;
+        return `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${j.name} <span style="font-size:11px;color:var(--muted)">${j.ticker}</span> ${badge}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${detail}</div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+  }
 }
 

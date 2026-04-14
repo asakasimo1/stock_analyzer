@@ -34,6 +34,7 @@
   <button class="tab-btn" onclick="switchTab('market')">📊 시장현황</button>
   <button class="tab-btn" onclick="switchTab('etf')">💹 ETF</button>
   <button class="tab-btn" onclick="switchTab('stocks')">📊 개별주</button>
+  <button class="tab-btn" onclick="switchTab('autotrade')">🤖 자동매매</button>
 </nav>
 
 
@@ -698,6 +699,71 @@
 
 </div>
 </div><!-- /tab-dashboard -->
+
+<!-- 자동매매 탭 -->
+<div id="tab-autotrade" class="tab-page">
+<div class="etf-wrap" style="max-width:800px">
+
+  <!-- 계좌 현황 -->
+  <div id="at-account" style="margin-bottom:20px"></div>
+
+  <!-- 잡 등록 폼 -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목코드</div>
+        <input id="at-ticker" placeholder="예: 036030" maxlength="6"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+          oninput="atAutoFill()" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명</div>
+        <input id="at-name" placeholder="자동입력"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">수량</div>
+        <input id="at-qty" type="number" min="1" placeholder="자동입력"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균매수단가 (원)</div>
+        <input id="at-buyprice" type="number" min="0" placeholder="자동입력"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">목표 유형</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+          <input type="radio" name="at-type" value="amount" checked onchange="atTypeChange()" /> 수익금액 (원)
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+          <input type="radio" name="at-type" value="pct" onchange="atTypeChange()" /> 수익률 (%)
+        </label>
+      </div>
+      <input id="at-target" type="number" min="0" step="1" placeholder="예: 50"
+        style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      <div id="at-target-hint" style="font-size:11px;color:var(--muted);margin-top:5px">수수료 차감 후 순이익 50원 이상 시 매도</div>
+    </div>
+    <button onclick="atRegister()"
+      style="margin-top:14px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      등록
+    </button>
+    <div id="at-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+  </div>
+
+  <!-- 활성 잡 -->
+  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ 활성 잡</div>
+  <div id="at-active-list" style="margin-bottom:20px"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
+
+  <!-- 완료/취소 내역 -->
+  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 완료 / 취소 내역</div>
+  <div id="at-history-list"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
+
+</div>
+</div><!-- /tab-autotrade -->
 
 <!-- ── 종목 상세 모달 ─────────────────────────────── -->
 <div id="stock-detail-overlay" onclick="if(event.target===this)closeStockDetail()">
