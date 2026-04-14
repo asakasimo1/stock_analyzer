@@ -4571,18 +4571,70 @@ const AT_SELL_FEE = 0.00015 + 0.0018;
 let _atJobs = [];
 let _atAccount = null;
 let _atRefreshTimer = null;
+let _atPriceTimer = null;
 
 async function initAutoTrade() {
   await atLoadAll();
-  // 탭 활성 중 30초마다 자동 갱신
+
+  // 잡 목록 30초마다 재로드
   clearInterval(_atRefreshTimer);
   _atRefreshTimer = setInterval(() => {
     if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
       atLoadAll();
     } else {
       clearInterval(_atRefreshTimer);
+      clearInterval(_atPriceTimer);
     }
   }, 30000);
+
+  // 현재가·수익률 30초마다 갱신
+  clearInterval(_atPriceTimer);
+  atRefreshPrices();
+  _atPriceTimer = setInterval(() => {
+    if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
+      atRefreshPrices();
+    }
+  }, 30000);
+}
+
+async function atRefreshPrices() {
+  const active = _atJobs.filter(j => j.status === 'active');
+  for (const job of active) {
+    try {
+      const r = await fetch(`/api/stock?ticker=${job.ticker}`);
+      const d = await r.json();
+      if (!d.price) continue;
+
+      const cur      = d.price;
+      const buyTotal = job.buy_price * job.qty * (1 + AT_BUY_FEE);
+      const sellNet  = cur * job.qty * (1 - AT_SELL_FEE);
+      const netPnl   = sellNet - buyTotal;
+      const netPct   = netPnl / buyTotal * 100;
+      const toTarget = (job.target_price || 0) - cur;
+      const pnlColor = netPnl >= 0 ? 'var(--up)' : 'var(--down)';
+
+      const priceEl  = document.getElementById(`at-price-${job.ticker}`);
+      const pnlEl    = document.getElementById(`at-pnl-${job.ticker}`);
+      const ttEl     = document.getElementById(`at-tt-${job.ticker}`);
+      const barEl    = document.getElementById(`at-bar-${job.ticker}`);
+
+      if (priceEl) priceEl.textContent = `${cur.toLocaleString()}원  (${d.chgPct >= 0 ? '+' : ''}${d.chgPct}%)`;
+      if (pnlEl)   pnlEl.innerHTML = `<span style="color:${pnlColor};font-weight:700">${netPnl >= 0 ? '+' : ''}${Math.round(netPnl).toLocaleString()}원 (${netPct >= 0 ? '+' : ''}${netPct.toFixed(2)}%)</span>`;
+      if (ttEl) {
+        ttEl.textContent = toTarget > 0
+          ? `목표까지 +${toTarget.toLocaleString()}원`
+          : `🎯 목표 초과! +${Math.abs(toTarget).toLocaleString()}원`;
+        ttEl.style.color = toTarget <= 0 ? 'var(--up)' : 'var(--muted)';
+      }
+      // 진행률 바: 매수가 → 목표가 기준
+      if (barEl && job.target_price && job.buy_price) {
+        const range    = job.target_price - job.buy_price;
+        const progress = range > 0 ? Math.min(100, Math.max(0, (cur - job.buy_price) / range * 100)) : 0;
+        barEl.style.width = `${progress}%`;
+        barEl.style.background = toTarget <= 0 ? 'var(--up)' : 'var(--primary)';
+      }
+    } catch (_) {}
+  }
 }
 
 async function atLoadAll() {
@@ -4826,20 +4878,59 @@ function atRenderJobs() {
     } else {
       elActive.innerHTML = active.map(j => {
         const typeLabel = j.target_type === 'amount'
-          ? `순이익 +${j.target_value.toLocaleString()}원`
+          ? `순이익 +${Number(j.target_value).toLocaleString()}원`
           : `수익률 +${j.target_value}%`;
         return `
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-            <div style="flex:1">
-              <div style="font-size:14px;font-weight:700;color:var(--text)">${j.name} <span style="font-size:12px;color:var(--muted)">${j.ticker}</span></div>
-              <div style="font-size:12px;color:var(--muted);margin-top:3px">${j.qty}주 · 매수 ${j.buy_price.toLocaleString()}원 · 목표 ${typeLabel}</div>
-              <div style="font-size:12px;color:var(--primary);margin-top:2px">매도단가 ${(j.target_price||0).toLocaleString()}원 이상</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">등록: ${j.created_at || ''} · GitHub Actions 5분 주기 체크</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px">
+            <!-- 헤더 행 -->
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;color:var(--text)">${j.name}
+                  <span style="font-size:12px;color:var(--muted);font-weight:400">${j.ticker}</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px">
+                  ${j.qty}주 · 매수 ${Number(j.buy_price).toLocaleString()}원 · 목표 ${typeLabel}
+                </div>
+              </div>
+              <button onclick="atCancel('${j.ticker}')"
+                style="flex-shrink:0;background:none;border:1px solid var(--down);color:var(--down);
+                       border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+                ✕ 취소
+              </button>
             </div>
-            <button onclick="atCancel('${j.ticker}')"
-              style="background:none;border:1px solid var(--down);color:var(--down);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
+
+            <!-- 현재가·수익 행 -->
+            <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+              <div>
+                <div style="font-size:10px;color:var(--muted)">현재가</div>
+                <div id="at-price-${j.ticker}" style="font-size:13px;font-weight:600;color:var(--text)">조회 중...</div>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--muted)">예상 순손익</div>
+                <div id="at-pnl-${j.ticker}" style="font-size:13px">—</div>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--muted)">목표단가</div>
+                <div style="font-size:13px;color:var(--primary);font-weight:600">${(j.target_price||0).toLocaleString()}원</div>
+              </div>
+              <div style="margin-left:auto;text-align:right">
+                <div id="at-tt-${j.ticker}" style="font-size:11px;color:var(--muted)">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:1px">등록: ${j.created_at||''}</div>
+              </div>
+            </div>
+
+            <!-- 진행률 바 -->
+            <div style="margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+              <div id="at-bar-${j.ticker}" style="height:100%;width:0%;background:var(--primary);transition:width .4s;border-radius:2px"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+              <span>매수 ${Number(j.buy_price).toLocaleString()}원</span>
+              <span>목표 ${(j.target_price||0).toLocaleString()}원</span>
+            </div>
           </div>`;
       }).join('');
+      // 렌더 직후 현재가 즉시 반영
+      atRefreshPrices();
     }
   }
 
