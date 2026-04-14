@@ -857,8 +857,8 @@
       <div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
         <div style="position:relative">
-          <input id="ac-name" type="text" placeholder="예: 삼성전자" autocomplete="off"
-            oninput="onAcNameInput(this.value)" onblur="hideAcAc()"
+          <input id="ac-name" type="text" placeholder="클릭하면 보유종목 표시" autocomplete="off"
+            onfocus="onAcNameFocus()" oninput="onAcNameInput(this.value)" onblur="hideAcAc()"
             style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
           <div id="ac-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
             background:var(--surface);border:1.5px solid #16a34a;border-radius:8px;overflow:hidden;

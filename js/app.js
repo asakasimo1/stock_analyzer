@@ -4754,20 +4754,34 @@ function onAtNameInput(val) {
   _atAcTimer = setTimeout(() => fetchAtAc(val.trim()), 220);
 }
 
-function showAtAcLocal(holdings) {
+async function showAtAcLocal(holdings) {
   const list = document.getElementById('at-ac-list');
   if (!list) return;
+  if (!holdings.length) { hideAtAc(); return; }
   list.innerHTML = holdings.map(h => {
     const safeN = h.name.replace(/'/g, "\\'");
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
     return `<div onmousedown="selectAtAcItem('${safeN}','${h.ticker}',${h.qty},${h.avg_price})"
       style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
              align-items:center;border-bottom:1px solid var(--border)"
       onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
       <span>${h.name} <span style="font-size:11px;color:var(--up)">★보유</span></span>
-      <span style="font-size:11px;color:var(--primary);font-weight:600">${h.ticker}</span>
+      <span style="text-align:right;font-size:11px">
+        <span id="at-lp-${h.ticker}" style="color:var(--text);font-weight:600">조회중</span>
+        <span style="color:${pnlColor};margin-left:4px">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct.toFixed(1)}%</span>
+      </span>
     </div>`;
   }).join('');
   list.style.display = 'block';
+
+  for (const h of holdings) {
+    try {
+      const r = await fetch(`/api/stock?ticker=${h.ticker}`);
+      const d = await r.json();
+      const el = document.getElementById(`at-lp-${h.ticker}`);
+      if (el && d.price) el.textContent = `${d.price.toLocaleString()}원`;
+    } catch { /* ignore */ }
+  }
 }
 
 async function fetchAtAc(q) {
@@ -5270,29 +5284,79 @@ function abRenderHistory() {
 
 // ── 자동완성 ──────────────────────────────────────────────
 let _acAcTimer = null;
+
+function onAcNameFocus() {
+  const holdings = _atAccount?.holdings || [];
+  if (holdings.length) showAcAcLocal(holdings);
+}
+
 function onAcNameInput(v) {
   clearTimeout(_acAcTimer);
-  if (v.trim().length < 1) { hideAcAc(); return; }
+  const holdings = _atAccount?.holdings || [];
+  if (!v.trim()) {
+    if (holdings.length) showAcAcLocal(holdings);
+    else hideAcAc();
+    return;
+  }
+  const matched = holdings.filter(h =>
+    h.name.includes(v.trim()) || h.ticker.startsWith(v.trim())
+  );
+  if (matched.length) { showAcAcLocal(matched); return; }
   _acAcTimer = setTimeout(() => fetchAcAc(v.trim()), 280);
 }
+
+async function showAcAcLocal(holdings) {
+  const box = document.getElementById('ac-ac-list');
+  if (!box) return;
+  if (!holdings.length) { hideAcAc(); return; }
+
+  // 현재가 비동기 조회 (순서대로 렌더 후 업데이트)
+  box.innerHTML = holdings.map(h => {
+    const safeN = h.name.replace(/'/g, "\\'");
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
+    return `<div onmousedown="selectAcAcItem('${h.ticker}','${safeN}',event)"
+      style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);
+             display:flex;justify-content:space-between;align-items:center"
+      onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
+      <span>${h.name} <span style="font-size:11px;color:var(--up)">★보유</span></span>
+      <span style="text-align:right;font-size:11px">
+        <span id="ac-lp-${h.ticker}" style="color:var(--text);font-weight:600">조회중</span>
+        <span style="color:${pnlColor};margin-left:4px">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct.toFixed(1)}%</span>
+      </span>
+    </div>`;
+  }).join('');
+  box.style.display = 'block';
+
+  // 현재가 업데이트
+  for (const h of holdings) {
+    try {
+      const r = await fetch(`/api/stock?ticker=${h.ticker}`);
+      const d = await r.json();
+      const el = document.getElementById(`ac-lp-${h.ticker}`);
+      if (el && d.price) el.textContent = `${d.price.toLocaleString()}원`;
+    } catch { /* ignore */ }
+  }
+}
+
 async function fetchAcAc(q) {
   try {
     const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
     const d = await r.json();
-    showAcAc(d.results || []);
+    const items = d.results || [];
+    if (!items.length) { hideAcAc(); return; }
+    const box = document.getElementById('ac-ac-list');
+    if (!box) return;
+    box.innerHTML = items.slice(0, 8).map(it =>
+      `<div onmousedown="selectAcAcItem('${it.ticker}','${it.name.replace(/'/g,"\\'")}',event)"
+        style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);
+               display:flex;justify-content:space-between;align-items:center"
+        onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
+        <span>${it.name}</span>
+        <span style="font-size:11px;color:var(--muted)">${it.ticker}</span>
+      </div>`
+    ).join('');
+    box.style.display = 'block';
   } catch { hideAcAc(); }
-}
-function showAcAc(items) {
-  const box = document.getElementById('ac-ac-list');
-  if (!box) return;
-  if (!items.length) { hideAcAc(); return; }
-  box.innerHTML = items.slice(0, 8).map(it =>
-    `<div onmousedown="selectAcAcItem('${it.ticker}','${it.name.replace(/'/g,"\\'")}',event)"
-      style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-      onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''"
-    >${it.name} <span style="color:var(--muted)">${it.ticker}</span></div>`
-  ).join('');
-  box.style.display = 'block';
 }
 function hideAcAc() {
   const b = document.getElementById('ac-ac-list');
