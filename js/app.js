@@ -4947,9 +4947,9 @@ function atRenderJobs() {
               </div>
               <div style="margin-left:auto;text-align:right">
                 <div id="at-tt-${j.ticker}" style="font-size:11px;color:var(--muted)">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:1px">등록: ${j.created_at||''}</div>
               </div>
             </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">등록: ${j.created_at||''}</div>
 
             <!-- 진행률 바 -->
             <div style="margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
@@ -5193,9 +5193,9 @@ function abRenderJobs() {
           </div>` : ''}
           <div style="margin-left:auto;text-align:right">
             <div id="ab-status-${j.ticker}" style="font-size:12px;color:var(--muted)">대기 중</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:1px">등록: ${j.created_at||''}</div>
           </div>
         </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">등록: ${j.created_at||''}</div>
         ${j.condition_type === 'limit' ? `
         <div style="margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
           <div id="ab-bar-${j.ticker}" style="height:100%;width:0%;background:#2563eb;transition:width .4s;border-radius:2px"></div>

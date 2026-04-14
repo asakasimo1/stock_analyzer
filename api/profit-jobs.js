@@ -54,7 +54,7 @@ export default async function handler(req, res) {
   };
 
   const nowKst = () =>
-    new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }).slice(0, 16);
+    new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
 
   if (req.method === 'GET') {
     res.setHeader('Cache-Control', 'no-store');
