@@ -14,7 +14,9 @@
     { "src": "api/market.js", "use": "@vercel/node" },
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
-    { "src": "api/investor.js", "use": "@vercel/node" }
+    { "src": "api/investor.js", "use": "@vercel/node" },
+    { "src": "api/profit-sell.js", "use": "@vercel/node" },
+    { "src": "api/profit-buy.js",  "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -31,6 +33,8 @@
     { "src": "/api/market(.*)", "dest": "/api/market.js" },
     { "src": "/api/stocks(.*)", "dest": "/api/stocks.js" },
     { "src": "/api/stock(.*)", "dest": "/api/stock.js" },
-    { "src": "/api/investor(.*)", "dest": "/api/investor.js" }
+    { "src": "/api/investor(.*)", "dest": "/api/investor.js" },
+    { "src": "/api/profit-sell(.*)", "dest": "/api/profit-sell.js" },
+    { "src": "/api/profit-buy(.*)",  "dest": "/api/profit-buy.js" }
   ]
 }

@@ -707,6 +707,80 @@
   <!-- 계좌 현황 -->
   <div id="at-account" style="margin-bottom:20px"></div>
 
+  <!-- ── 매수 섹션 ─────────────────────────────────────── -->
+  <div style="background:var(--surface);border:1.5px solid #2563eb44;border-radius:14px;padding:18px 20px;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🛒 매수 잡 등록</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+
+      <!-- 종목명 검색 -->
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
+        <div style="position:relative">
+          <input id="ab-name" type="text" placeholder="예: 삼성전자" autocomplete="off"
+            oninput="onAbNameInput(this.value)" onblur="hideAbAc()"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          <div id="ab-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
+            background:var(--surface);border:1.5px solid var(--primary);border-radius:8px;overflow:hidden;
+            box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+          종목코드: <span id="ab-ticker-display" style="color:var(--primary);font-weight:600">—</span>
+          <input id="ab-ticker" type="hidden" />
+        </div>
+      </div>
+
+      <!-- 매수 조건 -->
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 조건</div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="ab-cond" value="limit" checked onchange="abCondChange()" /> 가격 이하 시
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="ab-cond" value="market" onchange="abCondChange()" /> 즉시 시장가
+          </label>
+        </div>
+        <div id="ab-limit-row">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원) — 현재가 ≤ 이 가격일 때 매수</div>
+          <input id="ab-target-price" type="number" min="0" placeholder="예: 4800"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="abUpdateHint()" />
+        </div>
+        <div id="ab-hint" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+      </div>
+
+      <!-- 수량 / 금액 -->
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 기준</div>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="ab-qty-type" value="qty" checked onchange="abQtyTypeChange()" /> 수량 (주)
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="ab-qty-type" value="amount" onchange="abQtyTypeChange()" /> 금액 (원)
+          </label>
+        </div>
+        <input id="ab-qty-val" type="number" min="1" placeholder="예: 2"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        <div id="ab-qty-hint" style="font-size:11px;color:var(--muted);margin-top:4px">매수할 수량 (주)</div>
+      </div>
+    </div>
+
+    <button onclick="abRegister()"
+      style="margin-top:14px;width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      매수 잡 등록
+    </button>
+    <div id="ab-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+  </div>
+
+  <!-- 매수 활성 잡 -->
+  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ 매수 대기</div>
+  <div id="ab-active-list" style="margin-bottom:24px"><div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div></div>
+
+  <!-- 구분선 -->
+  <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
+
+  <!-- ── 매도 섹션 ─────────────────────────────────────── -->
   <!-- 잡 등록 폼 -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px">
     <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
@@ -766,7 +840,7 @@
   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ 활성 잡</div>
   <div id="at-active-list" style="margin-bottom:20px"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
 
-  <!-- 완료/취소 내역 -->
+  <!-- 완료/취소 내역 (매수+매도 통합) -->
   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 완료 / 취소 내역</div>
   <div id="at-history-list"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
 

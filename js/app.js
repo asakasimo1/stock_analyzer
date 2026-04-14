@@ -4568,7 +4568,8 @@ async function loadMarketData() {
 const AT_BUY_FEE  = 0.00015;
 const AT_SELL_FEE = 0.00015 + 0.0018;
 
-let _atJobs = [];
+let _atJobs  = [];
+let _abJobs  = [];
 let _atAccount = null;
 let _atRefreshTimer = null;
 let _atPriceTimer = null;
@@ -4639,17 +4640,20 @@ async function atRefreshPrices() {
 
 async function atLoadAll() {
   try {
-    const [rJobs, rData] = await Promise.all([
+    const [rSell, rBuy, rData] = await Promise.all([
       fetch('/api/profit-sell'),
+      fetch('/api/profit-buy'),
       fetch('/api/data'),
     ]);
-    _atJobs    = rJobs.ok    ? await rJobs.json()   : [];
-    const data = rData.ok    ? await rData.json()   : {};
+    _atJobs    = rSell.ok ? await rSell.json() : [];
+    _abJobs    = rBuy.ok  ? await rBuy.json()  : [];
+    const data = rData.ok ? await rData.json() : {};
     _atAccount = data.account_balance || null;
   } catch (e) {
     console.warn('자동매매 데이터 로드 실패:', e);
   }
   atRenderAccount();
+  abRenderJobs();
   atRenderJobs();
 }
 
@@ -4956,6 +4960,314 @@ function atRenderJobs() {
           </div>`;
       }).join('');
     }
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// 자동매매 — 매수 잡 (ab = auto buy)
+// ══════════════════════════════════════════════════════════
+
+// ── 종목명 자동완성 ──────────────────────────────────────
+let _abAcTimer = null;
+
+function onAbNameInput(val) {
+  clearTimeout(_abAcTimer);
+  if (!val.trim()) { hideAbAc(); return; }
+  _abAcTimer = setTimeout(() => fetchAbAc(val.trim()), 220);
+}
+
+async function fetchAbAc(q) {
+  try {
+    const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    showAbAc(d.items || []);
+  } catch { hideAbAc(); }
+}
+
+function showAbAc(items) {
+  const list = document.getElementById('ab-ac-list');
+  if (!list || !items.length) { hideAbAc(); return; }
+  list.innerHTML = items.map(it => {
+    const safeN = it.name.replace(/'/g, "\\'");
+    const mkt = it.market ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${it.market}</span>` : '';
+    return `<div onmousedown="selectAbAcItem('${safeN}','${it.ticker}')"
+      style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
+             align-items:center;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
+      <span>${it.name}${mkt}</span>
+      <span style="font-size:11px;color:var(--primary);font-weight:600">${it.ticker}</span>
+    </div>`;
+  }).join('');
+  list.style.display = 'block';
+}
+
+function hideAbAc() {
+  setTimeout(() => {
+    const list = document.getElementById('ab-ac-list');
+    if (list) list.style.display = 'none';
+  }, 150);
+}
+
+function selectAbAcItem(name, ticker) {
+  document.getElementById('ab-name').value = name;
+  document.getElementById('ab-ticker').value = ticker;
+  document.getElementById('ab-ticker-display').textContent = ticker;
+  hideAbAc();
+  abUpdateHint();
+}
+
+// ── 폼 UI 인터랙션 ───────────────────────────────────────
+function abCondChange() {
+  const cond = document.querySelector('input[name="ab-cond"]:checked')?.value;
+  const row  = document.getElementById('ab-limit-row');
+  if (row) row.style.display = cond === 'limit' ? 'block' : 'none';
+  abUpdateHint();
+}
+
+function abQtyTypeChange() {
+  const type  = document.querySelector('input[name="ab-qty-type"]:checked')?.value;
+  const hint  = document.getElementById('ab-qty-hint');
+  const input = document.getElementById('ab-qty-val');
+  if (type === 'amount') {
+    if (hint)  hint.textContent  = '매수 금액 (원) — 현재가 기준 수량 자동 계산';
+    if (input) input.placeholder = '예: 100000';
+  } else {
+    if (hint)  hint.textContent  = '매수할 수량 (주)';
+    if (input) input.placeholder = '예: 2';
+  }
+  abUpdateHint();
+}
+
+function abUpdateHint() {
+  const cond    = document.querySelector('input[name="ab-cond"]:checked')?.value || 'limit';
+  const tp      = parseInt(document.getElementById('ab-target-price')?.value) || 0;
+  const qtyType = document.querySelector('input[name="ab-qty-type"]:checked')?.value || 'qty';
+  const qtyVal  = parseInt(document.getElementById('ab-qty-val')?.value) || 0;
+  const hint    = document.getElementById('ab-hint');
+  if (!hint) return;
+
+  if (cond === 'market') {
+    hint.textContent = '다음 GitHub Actions 실행(최대 5분) 시 즉시 시장가 매수';
+    hint.style.color = 'var(--primary)';
+  } else if (tp && qtyVal) {
+    const label = qtyType === 'amount'
+      ? `${tp.toLocaleString()}원 이하 시 ${tp.toLocaleString()}원어치 매수`
+      : `${tp.toLocaleString()}원 이하 시 ${qtyVal}주 매수`;
+    hint.textContent = label;
+    hint.style.color = 'var(--muted)';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+// ── 잡 등록 ──────────────────────────────────────────────
+async function abRegister() {
+  const ticker    = document.getElementById('ab-ticker').value.trim();
+  const name      = document.getElementById('ab-name').value.trim() || ticker;
+  const cond      = document.querySelector('input[name="ab-cond"]:checked')?.value || 'limit';
+  const targetPrc = parseInt(document.getElementById('ab-target-price')?.value) || 0;
+  const qtyType   = document.querySelector('input[name="ab-qty-type"]:checked')?.value || 'qty';
+  const qtyVal    = parseInt(document.getElementById('ab-qty-val')?.value) || 0;
+  const msg       = document.getElementById('ab-msg');
+
+  if (!ticker) { msg.style.color='var(--down)'; msg.textContent='종목을 선택하세요'; return; }
+  if (cond === 'limit' && !targetPrc) { msg.style.color='var(--down)'; msg.textContent='목표 매수가를 입력하세요'; return; }
+  if (!qtyVal) { msg.style.color='var(--down)'; msg.textContent='수량 또는 금액을 입력하세요'; return; }
+
+  const job = {
+    ticker,
+    name,
+    condition_type: cond,
+    target_price: cond === 'limit' ? targetPrc : 0,
+    qty:    qtyType === 'qty'    ? qtyVal : 0,
+    amount: qtyType === 'amount' ? qtyVal : 0,
+  };
+
+  msg.style.color = 'var(--muted)';
+  msg.textContent = '등록 중...';
+
+  try {
+    const r = await fetch('/api/profit-buy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(job),
+    });
+    if (r.ok) {
+      const condLabel = cond === 'market' ? '즉시 시장가' : `${targetPrc.toLocaleString()}원 이하 시`;
+      msg.style.color = 'var(--up)';
+      msg.textContent = `✅ ${name}(${ticker}) 매수 잡 등록 — ${condLabel}`;
+      await atLoadAll();
+    } else {
+      msg.style.color = 'var(--down)';
+      msg.textContent = '등록 실패';
+    }
+  } catch (e) {
+    msg.style.color = 'var(--down)';
+    msg.textContent = `오류: ${e.message}`;
+  }
+}
+
+// ── 잡 취소 ──────────────────────────────────────────────
+async function abCancel(ticker) {
+  if (!confirm(`${ticker} 매수 잡을 취소하시겠습니까?`)) return;
+  try {
+    const r = await fetch(`/api/profit-buy?ticker=${ticker}`, { method: 'DELETE' });
+    if (r.ok) await atLoadAll();
+  } catch (e) { alert('취소 실패: ' + e.message); }
+}
+
+// ── 매수 잡 목록 렌더링 + 현재가 ────────────────────────
+function abRenderJobs() {
+  const active  = _abJobs.filter(j => j.status === 'active');
+  const elActive = document.getElementById('ab-active-list');
+  if (!elActive) return;
+
+  if (!active.length) {
+    elActive.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">등록된 매수 잡 없음</div>';
+    return;
+  }
+
+  elActive.innerHTML = active.map(j => {
+    const condLabel = j.condition_type === 'market'
+      ? '<span style="color:var(--primary)">즉시 시장가</span>'
+      : `현재가 ≤ <span style="color:var(--primary);font-weight:700">${Number(j.target_price).toLocaleString()}원</span>`;
+    const qtyLabel = j.qty > 0
+      ? `${j.qty}주`
+      : `${Number(j.amount).toLocaleString()}원어치`;
+
+    return `
+      <div style="background:var(--surface);border:1px solid #2563eb33;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:var(--text)">${j.name}
+              <span style="font-size:12px;color:var(--muted);font-weight:400">${j.ticker}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">
+              ${qtyLabel} 매수 · 조건: ${condLabel}
+            </div>
+          </div>
+          <button onclick="abCancel('${j.ticker}')"
+            style="flex-shrink:0;background:none;border:1px solid var(--down);color:var(--down);
+                   border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+            ✕ 취소
+          </button>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;color:var(--muted)">현재가</div>
+            <div id="ab-price-${j.ticker}" style="font-size:13px;font-weight:600;color:var(--text)">조회 중...</div>
+          </div>
+          ${j.condition_type === 'limit' ? `
+          <div>
+            <div style="font-size:10px;color:var(--muted)">목표 대비</div>
+            <div id="ab-diff-${j.ticker}" style="font-size:13px">—</div>
+          </div>` : ''}
+          <div style="margin-left:auto;text-align:right">
+            <div id="ab-status-${j.ticker}" style="font-size:12px;color:var(--muted)">대기 중</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px">등록: ${j.created_at||''}</div>
+          </div>
+        </div>
+        ${j.condition_type === 'limit' ? `
+        <div style="margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div id="ab-bar-${j.ticker}" style="height:100%;width:0%;background:#2563eb;transition:width .4s;border-radius:2px"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+          <span>목표 ${Number(j.target_price).toLocaleString()}원</span>
+          <span id="ab-bar-label-${j.ticker}"></span>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+
+  // 렌더 직후 현재가 반영
+  abRefreshPrices();
+
+  // 완료/취소 내역도 합산
+  abRenderHistory();
+}
+
+function abRenderHistory() {
+  const sellHistory = _atJobs.filter(j => j.status !== 'active');
+  const buyHistory  = _abJobs.filter(j => j.status !== 'active');
+  const all = [
+    ...buyHistory.map(j => ({ ...j, _side: 'buy' })),
+    ...sellHistory.map(j => ({ ...j, _side: 'sell' })),
+  ].sort((a, b) => (b.executed_at || b.cancelled_at || b.created_at || '').localeCompare(
+                    a.executed_at || a.cancelled_at || a.created_at || ''));
+
+  const el = document.getElementById('at-history-list');
+  if (!el) return;
+  if (!all.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">내역 없음</div>'; return; }
+
+  el.innerHTML = all.slice(0, 30).map(j => {
+    const isDone = j.status === 'done';
+    const isBuy  = j._side === 'buy';
+    const sideLabel = isBuy
+      ? `<span style="color:#2563eb;font-size:11px">🛒 매수</span>`
+      : `<span style="color:var(--primary);font-size:11px">🎯 매도</span>`;
+    const badge = isDone
+      ? '<span style="background:#1a7a3a22;color:var(--up);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
+      : '<span style="background:#7a1a1a22;color:var(--down);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
+    const detail = isDone
+      ? (isBuy
+          ? `매수 ${(j.buy_price||0).toLocaleString()}원 × ${j.buy_qty||j.qty||'?'}주 · ${j.executed_at||''}`
+          : `매도 ${(j.sell_price||0).toLocaleString()}원 · ${j.executed_at||''}`)
+      : `취소일 ${j.cancelled_at||''}`;
+
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
+                  padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">
+            ${sideLabel} ${j.name} <span style="font-size:11px;color:var(--muted)">${j.ticker}</span> ${badge}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${detail}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function abRefreshPrices() {
+  const active = _abJobs.filter(j => j.status === 'active');
+  for (const job of active) {
+    try {
+      const r = await fetch(`/api/stock?ticker=${job.ticker}`);
+      const d = await r.json();
+      if (!d.price) continue;
+      const cur = d.price;
+      const priceEl  = document.getElementById(`ab-price-${job.ticker}`);
+      const diffEl   = document.getElementById(`ab-diff-${job.ticker}`);
+      const statusEl = document.getElementById(`ab-status-${job.ticker}`);
+      const barEl    = document.getElementById(`ab-bar-${job.ticker}`);
+      const barLabel = document.getElementById(`ab-bar-label-${job.ticker}`);
+
+      if (priceEl) priceEl.textContent = `${cur.toLocaleString()}원  (${d.chgPct >= 0 ? '+' : ''}${d.chgPct}%)`;
+
+      if (job.condition_type === 'limit' && job.target_price) {
+        const tp   = Number(job.target_price);
+        const diff = cur - tp;
+        const reached = cur <= tp;
+        if (diffEl) {
+          diffEl.innerHTML = reached
+            ? `<span style="color:var(--up);font-weight:700">🎯 조건 달성!</span>`
+            : `<span style="color:var(--muted)">목표까지 ${diff.toLocaleString()}원 남음</span>`;
+        }
+        if (statusEl) {
+          statusEl.textContent = reached ? '✅ 다음 실행 시 매수 예정' : '대기 중';
+          statusEl.style.color = reached ? 'var(--up)' : 'var(--muted)';
+        }
+        // 진행률 바: 현재가가 목표가에 가까울수록 100%
+        if (barEl) {
+          const ref   = Math.max(cur, tp) * 1.05;
+          const pct   = Math.min(100, Math.max(0, (1 - (cur - tp) / (ref - tp)) * 100));
+          barEl.style.width = `${pct}%`;
+          barEl.style.background = reached ? 'var(--up)' : '#2563eb';
+        }
+        if (barLabel) barLabel.textContent = `현재가 ${cur.toLocaleString()}원`;
+      } else if (job.condition_type === 'market') {
+        if (statusEl) { statusEl.textContent = '⏳ 다음 실행 대기 중'; statusEl.style.color = 'var(--primary)'; }
+      }
+    } catch (_) {}
   }
 }
 
