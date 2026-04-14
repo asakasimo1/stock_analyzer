@@ -32,7 +32,8 @@
     { "src": "/api/stocks(.*)", "dest": "/api/stocks.js" },
     { "src": "/api/stock(.*)", "dest": "/api/stock.js" },
     { "src": "/api/investor(.*)", "dest": "/api/investor.js" },
-    { "src": "/api/profit-sell(.*)", "dest": "/api/profit-jobs.js" },
-    { "src": "/api/profit-buy(.*)",  "dest": "/api/profit-jobs.js" }
+    { "src": "/api/profit-sell(.*)",  "dest": "/api/profit-jobs.js" },
+    { "src": "/api/profit-buy(.*)",   "dest": "/api/profit-jobs.js" },
+    { "src": "/api/profit-cycle(.*)", "dest": "/api/profit-jobs.js" }
   ]
 }

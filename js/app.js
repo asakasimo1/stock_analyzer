@@ -4570,6 +4570,7 @@ const AT_SELL_FEE = 0.00015 + 0.0018;
 
 let _atJobs  = [];
 let _abJobs  = [];
+let _acJobs  = [];   // cycle jobs
 let _atAccount = null;
 let _atRefreshTimer = null;
 let _atPriceTimer = null;
@@ -4591,9 +4592,11 @@ async function initAutoTrade() {
   // 현재가·수익률 30초마다 갱신
   clearInterval(_atPriceTimer);
   atRefreshPrices();
+  acRefreshPrices();
   _atPriceTimer = setInterval(() => {
     if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
       atRefreshPrices();
+      acRefreshPrices();
     }
   }, 30000);
 }
@@ -4640,20 +4643,23 @@ async function atRefreshPrices() {
 
 async function atLoadAll() {
   try {
-    const [rSell, rBuy, rData] = await Promise.all([
+    const [rSell, rBuy, rCycle, rData] = await Promise.all([
       fetch('/api/profit-sell'),
       fetch('/api/profit-buy'),
+      fetch('/api/profit-cycle'),
       fetch('/api/data'),
     ]);
-    _atJobs    = rSell.ok ? await rSell.json() : [];
-    _abJobs    = rBuy.ok  ? await rBuy.json()  : [];
-    const data = rData.ok ? await rData.json() : {};
+    _atJobs    = rSell.ok  ? await rSell.json()  : [];
+    _abJobs    = rBuy.ok   ? await rBuy.json()   : [];
+    _acJobs    = rCycle.ok ? await rCycle.json() : [];
+    const data = rData.ok  ? await rData.json()  : {};
     _atAccount = data.account_balance || null;
   } catch (e) {
     console.warn('자동매매 데이터 로드 실패:', e);
   }
   atRenderAccount();
   abRenderJobs();
+  acRenderJobs();
   atRenderJobs();
 }
 
@@ -5225,6 +5231,223 @@ function abRenderHistory() {
         </div>
       </div>`;
   }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  사이클 트레이딩 (ac*)
+// ════════════════════════════════════════════════════════════
+
+// ── 자동완성 ──────────────────────────────────────────────
+let _acAcTimer = null;
+function onAcNameInput(v) {
+  clearTimeout(_acAcTimer);
+  if (v.trim().length < 1) { hideAcAc(); return; }
+  _acAcTimer = setTimeout(() => fetchAcAc(v.trim()), 280);
+}
+async function fetchAcAc(q) {
+  try {
+    const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    showAcAc(d.results || []);
+  } catch { hideAcAc(); }
+}
+function showAcAc(items) {
+  const box = document.getElementById('ac-ac-list');
+  if (!box) return;
+  if (!items.length) { hideAcAc(); return; }
+  box.innerHTML = items.slice(0, 8).map(it =>
+    `<div onmousedown="selectAcAcItem('${it.ticker}','${it.name.replace(/'/g,"\\'")}',event)"
+      style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''"
+    >${it.name} <span style="color:var(--muted)">${it.ticker}</span></div>`
+  ).join('');
+  box.style.display = 'block';
+}
+function hideAcAc() {
+  const b = document.getElementById('ac-ac-list');
+  if (b) b.style.display = 'none';
+}
+function selectAcAcItem(ticker, name, e) {
+  if (e) e.preventDefault();
+  document.getElementById('ac-name').value = name;
+  document.getElementById('ac-ticker').value = ticker;
+  document.getElementById('ac-ticker-display').textContent = ticker;
+  hideAcAc();
+}
+
+// ── 폼 UI ─────────────────────────────────────────────────
+function acCondChange() {
+  const v = document.querySelector('input[name="ac-cond"]:checked')?.value;
+  const row = document.getElementById('ac-limit-row');
+  if (row) row.style.display = v === 'limit' ? 'block' : 'none';
+}
+function acQtyTypeChange() {
+  const v = document.querySelector('input[name="ac-qty-type"]:checked')?.value;
+  const hint = document.getElementById('ac-qty-hint');
+  if (hint) hint.textContent = v === 'amount' ? '매수 금액 (원)' : '매수할 수량 (주)';
+}
+
+// ── 잡 등록 ───────────────────────────────────────────────
+async function acRegister() {
+  const ticker = document.getElementById('ac-ticker').value.trim();
+  const name   = document.getElementById('ac-name').value.trim();
+  if (!ticker) { document.getElementById('ac-msg').textContent = '종목을 선택해주세요'; return; }
+
+  const condType  = document.querySelector('input[name="ac-cond"]:checked')?.value || 'market';
+  const buyPrice  = parseInt(document.getElementById('ac-buy-price')?.value || '0') || 0;
+  const qtyType   = document.querySelector('input[name="ac-qty-type"]:checked')?.value || 'qty';
+  const qtyVal    = parseInt(document.getElementById('ac-qty-val').value) || 0;
+  const takePct   = parseFloat(document.getElementById('ac-take-pct').value) / 100 || 0.03;
+  const rebuyDrop = parseFloat(document.getElementById('ac-rebuy-drop').value) / 100 || 0.02;
+  const repeatTake= parseFloat(document.getElementById('ac-repeat-take').value) / 100 || 0.02;
+  const maxCycles = parseInt(document.getElementById('ac-max-cycles').value) || 0;
+
+  if (condType === 'limit' && !buyPrice) { document.getElementById('ac-msg').textContent = '목표 매수가를 입력해주세요'; return; }
+  if (qtyVal <= 0) { document.getElementById('ac-msg').textContent = '수량/금액을 입력해주세요'; return; }
+
+  const job = {
+    ticker, name,
+    condition_type: condType,
+    buy_price: condType === 'limit' ? buyPrice : 0,
+    qty:      qtyType === 'qty' ? qtyVal : 0,
+    amount:   qtyType === 'amount' ? qtyVal : 0,
+    take_pct:    takePct,
+    rebuy_drop:  rebuyDrop,
+    repeat_take: repeatTake,
+    max_cycles:  maxCycles,
+    phase:  'waiting_buy',
+    status: 'active',
+    cycle_no: 0,
+  };
+
+  document.getElementById('ac-msg').textContent = '등록 중...';
+  try {
+    const r = await fetch('/api/profit-cycle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(job),
+    });
+    if (r.ok) {
+      document.getElementById('ac-msg').textContent = '✅ 등록 완료';
+      document.getElementById('ac-name').value = '';
+      document.getElementById('ac-ticker').value = '';
+      document.getElementById('ac-ticker-display').textContent = '—';
+      document.getElementById('ac-qty-val').value = '';
+      await atLoadAll();
+    } else {
+      document.getElementById('ac-msg').textContent = '❌ 등록 실패';
+    }
+  } catch { document.getElementById('ac-msg').textContent = '❌ 네트워크 오류'; }
+}
+
+// ── 잡 취소 ───────────────────────────────────────────────
+async function acCancel(ticker) {
+  if (!confirm(`사이클 잡 취소: ${ticker}`)) return;
+  try {
+    const r = await fetch(`/api/profit-cycle?ticker=${ticker}`, { method: 'DELETE' });
+    if (r.ok) await atLoadAll();
+  } catch { alert('취소 실패'); }
+}
+
+// ── 활성 잡 렌더링 ────────────────────────────────────────
+const AC_PHASE_LABEL = {
+  waiting_buy:   '매수 대기',
+  holding:       '보유 중',
+  waiting_rebuy: '재매수 대기',
+  done:          '완료',
+  cancelled:     '취소',
+  stopped:       '중단',
+};
+function acRenderJobs() {
+  const el = document.getElementById('ac-active-list');
+  if (!el) return;
+  const active = _acJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
+  if (!active.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div>';
+    return;
+  }
+  el.innerHTML = active.map(j => {
+    const phaseLabel = AC_PHASE_LABEL[j.phase] || j.phase;
+    const phaseColor = j.phase === 'holding' ? 'var(--up)' : j.phase === 'waiting_rebuy' ? '#f59e0b' : '#2563eb';
+    const cycleInfo  = j.cycle_no > 0 ? ` (사이클 ${j.cycle_no}회)` : '';
+    const sellTarget = j.sell_price ? `목표매도 ${Number(j.sell_price).toLocaleString()}원` : '';
+    const rebuyTarget= j.rebuy_price ? `재매수 목표 ${Number(j.rebuy_price).toLocaleString()}원` : '';
+    const targetInfo = j.phase === 'holding' ? sellTarget : j.phase === 'waiting_rebuy' ? rebuyTarget : '';
+    const qtyInfo    = j.qty > 0 ? `${j.qty}주` : j.amount > 0 ? `${Number(j.amount).toLocaleString()}원` : '';
+
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">
+            ${j.name} <span style="font-size:11px;color:var(--muted)">${j.ticker}</span>
+            <span style="margin-left:6px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;
+              background:${phaseColor}22;color:${phaseColor}">${phaseLabel}${cycleInfo}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">
+            ${qtyInfo}
+            ${j.buy_price ? ` | 매수가 ${Number(j.buy_price).toLocaleString()}원` : ''}
+            ${targetInfo ? ` | ${targetInfo}` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            첫수익 ${((j.take_pct||0.03)*100).toFixed(1)}% → 하락${((j.rebuy_drop||0.02)*100).toFixed(1)}% 재매수 → 반복수익 ${((j.repeat_take||0.02)*100).toFixed(1)}%
+            ${j.max_cycles > 0 ? ` | 최대 ${j.max_cycles}회` : ' | 무제한'}
+          </div>
+          <div id="ac-price-${j.ticker}" style="font-size:12px;color:var(--muted);margin-top:4px">—</div>
+          <div id="ac-pnl-${j.ticker}" style="font-size:12px;margin-top:2px"></div>
+          <div style="margin-top:6px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+            <div id="ac-bar-${j.ticker}" style="height:100%;width:0%;background:#16a34a;transition:width .4s"></div>
+          </div>
+        </div>
+        <button onclick="acCancel('${j.ticker}')"
+          style="margin-left:10px;padding:4px 10px;background:var(--down)22;color:var(--down);
+            border:1px solid var(--down)44;border-radius:6px;font-size:11px;cursor:pointer">✕중단</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 30초 가격 갱신 ────────────────────────────────────────
+async function acRefreshPrices() {
+  const active = _acJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
+  for (const job of active) {
+    try {
+      const r = await fetch(`/api/stock?ticker=${job.ticker}`);
+      const d = await r.json();
+      if (!d.price) continue;
+      const cur      = d.price;
+      const priceEl  = document.getElementById(`ac-price-${job.ticker}`);
+      const pnlEl    = document.getElementById(`ac-pnl-${job.ticker}`);
+      const barEl    = document.getElementById(`ac-bar-${job.ticker}`);
+
+      if (priceEl) priceEl.textContent = `현재가: ${cur.toLocaleString()}원  (${d.chgPct >= 0 ? '+' : ''}${d.chgPct}%)`;
+
+      if (job.phase === 'holding' && job.buy_price && job.sell_price) {
+        const buyTotal = job.buy_price * job.qty * (1 + AT_BUY_FEE);
+        const sellNet  = cur * job.qty * (1 - AT_SELL_FEE);
+        const netPnl   = sellNet - buyTotal;
+        const netPct   = netPnl / buyTotal * 100;
+        if (pnlEl) pnlEl.innerHTML = `<span style="color:${netPnl>=0?'var(--up)':'var(--down)'};font-weight:700">${netPnl>=0?'+':''}${Math.round(netPnl).toLocaleString()}원 (${netPct>=0?'+':''}${netPct.toFixed(2)}%)</span>`;
+        const range = job.sell_price - job.buy_price;
+        if (barEl && range > 0) {
+          const pct = Math.min(100, Math.max(0, (cur - job.buy_price) / range * 100));
+          barEl.style.width = `${pct}%`;
+          barEl.style.background = cur >= job.sell_price ? 'var(--up)' : '#16a34a';
+        }
+      } else if (job.phase === 'waiting_rebuy' && job.rebuy_price) {
+        const diff = cur - job.rebuy_price;
+        if (pnlEl) pnlEl.innerHTML = diff <= 0
+          ? `<span style="color:var(--up);font-weight:700">🎯 재매수 조건 달성!</span>`
+          : `<span style="color:var(--muted)">재매수까지 -${diff.toLocaleString()}원 남음</span>`;
+        if (barEl) {
+          const ref = job.last_sell || cur * 1.05;
+          const pct = Math.min(100, Math.max(0, (1 - (cur - job.rebuy_price) / (ref - job.rebuy_price)) * 100));
+          barEl.style.width = `${pct}%`;
+          barEl.style.background = diff <= 0 ? 'var(--up)' : '#f59e0b';
+        }
+      }
+    } catch (_) {}
+  }
 }
 
 async function abRefreshPrices() {

@@ -1,14 +1,18 @@
 /**
- * Vercel API — 매수/매도 잡 통합 관리
- * URL에 'profit-sell' 포함 → profit_sell_jobs.json
- * URL에 'profit-buy'  포함 → profit_buy_jobs.json
+ * Vercel API — 매수/매도/사이클 잡 통합 관리
+ * URL에 'profit-sell'  포함 → profit_sell_jobs.json
+ * URL에 'profit-buy'   포함 → profit_buy_jobs.json
+ * URL에 'profit-cycle' 포함 → profit_cycle_jobs.json
  *
- * GET    /api/profit-sell           → 매도 잡 목록
- * POST   /api/profit-sell  body:job → 매도 잡 등록/교체
- * DELETE /api/profit-sell?ticker=xx → 매도 잡 취소
- * GET    /api/profit-buy            → 매수 잡 목록
- * POST   /api/profit-buy   body:job → 매수 잡 등록/교체
- * DELETE /api/profit-buy?ticker=xx  → 매수 잡 취소
+ * GET    /api/profit-sell            → 매도 잡 목록
+ * POST   /api/profit-sell   body:job → 매도 잡 등록/교체
+ * DELETE /api/profit-sell?ticker=xx  → 매도 잡 취소
+ * GET    /api/profit-buy             → 매수 잡 목록
+ * POST   /api/profit-buy    body:job → 매수 잡 등록/교체
+ * DELETE /api/profit-buy?ticker=xx   → 매수 잡 취소
+ * GET    /api/profit-cycle           → 사이클 잡 목록
+ * POST   /api/profit-cycle  body:job → 사이클 잡 등록/교체
+ * DELETE /api/profit-cycle?ticker=xx → 사이클 잡 취소/중단
  */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,8 +25,9 @@ export default async function handler(req, res) {
   if (!gistId || !ghToken) return res.status(500).json({ error: '환경변수 미설정' });
 
   const url = req.url || '';
-  const isSell = url.includes('profit-sell');
-  const FILENAME = isSell ? 'profit_sell_jobs.json' : 'profit_buy_jobs.json';
+  const FILENAME = url.includes('profit-sell')  ? 'profit_sell_jobs.json'
+                 : url.includes('profit-cycle') ? 'profit_cycle_jobs.json'
+                 :                                'profit_buy_jobs.json';
 
   const ghHeaders = {
     Accept: 'application/vnd.github+json',
