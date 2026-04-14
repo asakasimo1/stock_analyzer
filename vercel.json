@@ -10,13 +10,11 @@
     { "src": "api/quote.js", "use": "@vercel/node" },
     { "src": "api/dividend.js", "use": "@vercel/node" },
     { "src": "api/transactions.js", "use": "@vercel/node" },
-    { "src": "api/dividend-schedule.js", "use": "@vercel/node" },
     { "src": "api/market.js", "use": "@vercel/node" },
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
     { "src": "api/investor.js", "use": "@vercel/node" },
-    { "src": "api/profit-sell.js", "use": "@vercel/node" },
-    { "src": "api/profit-buy.js",  "use": "@vercel/node" }
+    { "src": "api/profit-jobs.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -27,14 +25,14 @@
     { "src": "/api/ipo(.*)", "dest": "/api/ipo.js" },
     { "src": "/api/etf(.*)", "dest": "/api/etf.js" },
     { "src": "/api/quote(.*)", "dest": "/api/quote.js" },
-    { "src": "/api/dividend-schedule(.*)", "dest": "/api/dividend-schedule.js" },
+    { "src": "/api/dividend-schedule(.*)", "dest": "/api/dividend.js" },
     { "src": "/api/dividend(.*)", "dest": "/api/dividend.js" },
     { "src": "/api/transactions(.*)", "dest": "/api/transactions.js" },
     { "src": "/api/market(.*)", "dest": "/api/market.js" },
     { "src": "/api/stocks(.*)", "dest": "/api/stocks.js" },
     { "src": "/api/stock(.*)", "dest": "/api/stock.js" },
     { "src": "/api/investor(.*)", "dest": "/api/investor.js" },
-    { "src": "/api/profit-sell(.*)", "dest": "/api/profit-sell.js" },
-    { "src": "/api/profit-buy(.*)",  "dest": "/api/profit-buy.js" }
+    { "src": "/api/profit-sell(.*)", "dest": "/api/profit-jobs.js" },
+    { "src": "/api/profit-buy(.*)",  "dest": "/api/profit-jobs.js" }
   ]
 }
