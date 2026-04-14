@@ -4705,6 +4705,28 @@ function atRenderAccount() {
       </table>
       <div style="font-size:11px;color:var(--muted);margin-top:6px">코드 클릭 시 아래 폼에 자동입력</div>` : '<div style="color:var(--muted);font-size:12px">보유 종목 없음</div>'}
     </div>`;
+
+  // 수익매도 폼 위에 보유종목 칩 렌더링
+  atRenderHoldingChips();
+}
+
+function atRenderHoldingChips() {
+  const wrap  = document.getElementById('at-holding-chips');
+  const inner = document.getElementById('at-holding-chips-inner');
+  if (!wrap || !inner) return;
+  const holdings = _atAccount?.holdings || [];
+  if (!holdings.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  inner.innerHTML = holdings.map(h => {
+    const safeN = h.name.replace(/'/g, "\\'");
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
+    return `<button onmousedown="atFillFromHolding('${h.ticker}','${safeN}',${h.qty},${h.avg_price})"
+      style="padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg);
+        color:var(--text);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
+      ${h.name}
+      <span style="color:${pnlColor};font-size:10px;font-weight:700">${h.pnl_pct>=0?'+':''}${h.pnl_pct.toFixed(1)}%</span>
+    </button>`;
+  }).join('');
 }
 
 // ── 종목명 자동완성 ──────────────────────────────────────

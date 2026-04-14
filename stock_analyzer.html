@@ -780,6 +780,73 @@
   <!-- 구분선 -->
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
+  <!-- ── 매도 섹션 ─────────────────────────────────────── -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- 보유종목 칩 -->
+      <div id="at-holding-chips" style="display:none">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">보유종목</div>
+        <div id="at-holding-chips-inner" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+      <!-- 종목명 검색 -->
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
+        <div style="position:relative">
+          <input id="at-name" type="text" placeholder="예: 케이티알파" autocomplete="off"
+            oninput="onAtNameInput(this.value)" onblur="hideAtAc()"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          <div id="at-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
+            background:var(--surface);border:1.5px solid var(--primary);border-radius:8px;overflow:hidden;
+            box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+          종목코드: <span id="at-ticker-display" style="color:var(--primary);font-weight:600">—</span>
+          <input id="at-ticker" type="hidden" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">수량</div>
+          <input id="at-qty" type="number" min="1" placeholder="자동입력"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균매수단가 (원)</div>
+          <input id="at-buyprice" type="number" min="0" placeholder="자동입력"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="atUpdateHint()" />
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">목표 유형</div>
+      <div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:nowrap">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+          <input type="radio" name="at-type" value="amount" checked onchange="atTypeChange()" /> 수익금액 (원)
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+          <input type="radio" name="at-type" value="pct" onchange="atTypeChange()" /> 수익률 (%)
+        </label>
+      </div>
+      <input id="at-target" type="number" min="0" step="1" placeholder="예: 50"
+        style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      <div id="at-target-hint" style="font-size:11px;color:var(--muted);margin-top:5px">수수료 차감 후 순이익 50원 이상 시 매도</div>
+    </div>
+    <button onclick="atRegister()"
+      style="margin-top:14px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      등록
+    </button>
+    <div id="at-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+  </div>
+
+  <!-- 활성 잡 -->
+  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ 활성 잡</div>
+  <div id="at-active-list" style="margin-bottom:20px"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
+
+  <!-- 구분선 -->
+  <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
+
   <!-- ── 사이클 트레이딩 섹션 ─────────────────────────── -->
   <div style="background:var(--surface);border:1.5px solid #16a34a44;border-radius:14px;padding:18px 20px;margin-bottom:10px">
     <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">🔄 사이클 트레이딩 등록</div>
@@ -875,66 +942,6 @@
 
   <!-- 구분선 -->
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
-
-  <!-- ── 매도 섹션 ─────────────────────────────────────── -->
-  <!-- 잡 등록 폼 -->
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <!-- 종목명 검색 (개별주 탭과 동일한 자동완성) -->
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
-        <div style="position:relative">
-          <input id="at-name" type="text" placeholder="예: 케이티알파" autocomplete="off"
-            oninput="onAtNameInput(this.value)" onblur="hideAtAc()"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-          <div id="at-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
-            background:var(--surface);border:1.5px solid var(--primary);border-radius:8px;overflow:hidden;
-            box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">
-          종목코드: <span id="at-ticker-display" style="color:var(--primary);font-weight:600">—</span>
-          <input id="at-ticker" type="hidden" />
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">수량</div>
-          <input id="at-qty" type="number" min="1" placeholder="자동입력"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균매수단가 (원)</div>
-          <input id="at-buyprice" type="number" min="0" placeholder="자동입력"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
-            oninput="atUpdateHint()" />
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:12px">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">목표 유형</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
-          <input type="radio" name="at-type" value="amount" checked onchange="atTypeChange()" /> 수익금액 (원)
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
-          <input type="radio" name="at-type" value="pct" onchange="atTypeChange()" /> 수익률 (%)
-        </label>
-      </div>
-      <input id="at-target" type="number" min="0" step="1" placeholder="예: 50"
-        style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-      <div id="at-target-hint" style="font-size:11px;color:var(--muted);margin-top:5px">수수료 차감 후 순이익 50원 이상 시 매도</div>
-    </div>
-    <button onclick="atRegister()"
-      style="margin-top:14px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
-      등록
-    </button>
-    <div id="at-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
-  </div>
-
-  <!-- 활성 잡 -->
-  <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ 활성 잡</div>
-  <div id="at-active-list" style="margin-bottom:20px"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
 
   <!-- 완료/취소 내역 (매수+매도 통합) -->
   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 완료 / 취소 내역</div>
