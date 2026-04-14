@@ -4929,6 +4929,32 @@ async function atCancel(ticker) {
   }
 }
 
+// ── 즉시 매도 ─────────────────────────────────────────────
+async function atSellNow(ticker, name, qty) {
+  if (!confirm(`${name}(${ticker}) ${qty}주를 지금 즉시 시장가 매도하시겠습니까?\n\n목표 미달성이어도 즉시 체결 요청됩니다.`)) return;
+  const job = _atJobs.find(j => j.ticker === ticker && j.status === 'active');
+  if (!job) { alert('활성 잡을 찾을 수 없습니다.'); return; }
+  const btn = document.getElementById(`at-sell-btn-${ticker}`);
+  if (btn) { btn.disabled = true; btn.textContent = '요청 중...'; }
+  try {
+    const r = await fetch('/api/profit-sell', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...job, force_sell: true }),
+    });
+    if (r.ok) {
+      if (btn) { btn.textContent = '✓ 요청완료'; btn.style.background = '#16a34a'; btn.style.color = '#fff'; }
+      setTimeout(() => atLoadAll(), 2000);
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '즉시 매도'; }
+      alert('요청 실패');
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '즉시 매도'; }
+    alert('요청 실패: ' + e.message);
+  }
+}
+
 // ── 잡 목록 렌더링 ───────────────────────────────────────
 function atRenderJobs() {
   const active  = _atJobs.filter(j => j.status === 'active');
@@ -4955,11 +4981,19 @@ function atRenderJobs() {
                   ${j.qty}주 · 매수 ${Number(j.buy_price).toLocaleString()}원 · 목표 ${typeLabel}
                 </div>
               </div>
-              <button onclick="atCancel('${j.ticker}')"
-                style="flex-shrink:0;background:none;border:1px solid var(--down);color:var(--down);
-                       border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
-                ✕ 취소
-              </button>
+              <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+                <button id="at-sell-btn-${j.ticker}"
+                  onclick="atSellNow('${j.ticker}','${j.name.replace(/'/g,"\\'")}',${j.qty})"
+                  style="background:var(--down);border:none;color:#fff;
+                         border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600">
+                  즉시 매도
+                </button>
+                <button onclick="atCancel('${j.ticker}')"
+                  style="background:none;border:1px solid var(--border);color:var(--muted);
+                         border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+                  ✕ 취소
+                </button>
+              </div>
             </div>
 
             <!-- 현재가·수익 행 -->
