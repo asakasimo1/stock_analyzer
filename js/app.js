@@ -4918,6 +4918,24 @@ async function atRegister() {
   }
 }
 
+// ── 잡 수정 ──────────────────────────────────────────────
+function atEdit(ticker) {
+  const j = _atJobs.find(j => j.ticker === ticker && j.status === 'active');
+  if (!j) return;
+  switchTab('autotrade');
+  document.getElementById('at-name').value     = j.name || '';
+  document.getElementById('at-ticker').value   = j.ticker;
+  document.getElementById('at-ticker-display').textContent = j.ticker;
+  document.getElementById('at-qty').value      = j.qty || '';
+  document.getElementById('at-buyprice').value = j.buy_price || '';
+  const type = j.target_type || 'amount';
+  document.querySelectorAll('input[name="at-type"]').forEach(r => { r.checked = r.value === type; });
+  document.getElementById('at-target').value   = j.target_value || '';
+  atUpdateHint();
+  document.getElementById('at-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('at-name').focus();
+}
+
 // ── 잡 취소 ──────────────────────────────────────────────
 async function atCancel(ticker) {
   if (!confirm(`${ticker} 잡을 취소하시겠습니까?`)) return;
@@ -4987,6 +5005,11 @@ function atRenderJobs() {
                   style="background:var(--down);border:none;color:#fff;
                          border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600">
                   즉시 매도
+                </button>
+                <button onclick="atEdit('${j.ticker}')"
+                  style="background:none;border:1px solid var(--primary);color:var(--primary);
+                         border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+                  ✎ 수정
                 </button>
                 <button onclick="atCancel('${j.ticker}')"
                   style="background:none;border:1px solid var(--border);color:var(--muted);
@@ -5210,6 +5233,28 @@ async function abCancel(ticker) {
   } catch (e) { alert('취소 실패: ' + e.message); }
 }
 
+// ── 잡 수정 (폼에 기존 값 채우기) ────────────────────────
+function abEdit(ticker) {
+  const j = _abJobs.find(j => j.ticker === ticker && j.status === 'active');
+  if (!j) return;
+  switchTab('autotrade');
+  document.getElementById('ab-name').value  = j.name || '';
+  document.getElementById('ab-ticker').value = j.ticker;
+  document.getElementById('ab-ticker-display').textContent = j.ticker;
+  // 매수 조건
+  const cond = j.condition_type || 'limit';
+  document.querySelectorAll('input[name="ab-cond"]').forEach(r => { r.checked = r.value === cond; });
+  document.getElementById('ab-limit-row').style.display = cond === 'limit' ? 'block' : 'none';
+  if (cond === 'limit') document.getElementById('ab-target-price').value = j.target_price || '';
+  // 수량/금액
+  const qtyType = j.amount > 0 ? 'amount' : 'qty';
+  document.querySelectorAll('input[name="ab-qty-type"]').forEach(r => { r.checked = r.value === qtyType; });
+  document.getElementById('ab-qty-val').value = qtyType === 'amount' ? j.amount : j.qty;
+  abQtyTypeChange(); abUpdateHint();
+  document.getElementById('ab-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('ab-name').focus();
+}
+
 // ── 매수 잡 목록 렌더링 + 현재가 ────────────────────────
 function abRenderJobs() {
   const active  = _abJobs.filter(j => j.status === 'active');
@@ -5240,11 +5285,18 @@ function abRenderJobs() {
               ${qtyLabel} 매수 · 조건: ${condLabel}
             </div>
           </div>
-          <button onclick="abCancel('${j.ticker}')"
-            style="flex-shrink:0;background:none;border:1px solid var(--down);color:var(--down);
-                   border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
-            ✕ 취소
-          </button>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+            <button onclick="abEdit('${j.ticker}')"
+              style="background:none;border:1px solid var(--primary);color:var(--primary);
+                     border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+              ✎ 수정
+            </button>
+            <button onclick="abCancel('${j.ticker}')"
+              style="background:none;border:1px solid var(--border);color:var(--muted);
+                     border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
+              ✕ 취소
+            </button>
+          </div>
         </div>
         <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
           <div>
@@ -5488,6 +5540,35 @@ async function acRegister() {
   } catch { document.getElementById('ac-msg').textContent = '❌ 네트워크 오류'; }
 }
 
+// ── 잡 수정 ───────────────────────────────────────────────
+function acEdit(ticker) {
+  const j = _acJobs.find(j => j.ticker === ticker && !['done','cancelled','stopped'].includes(j.status));
+  if (!j) return;
+  switchTab('autotrade');
+  document.getElementById('ac-name').value  = j.name || '';
+  document.getElementById('ac-ticker').value = j.ticker;
+  document.getElementById('ac-ticker-display').textContent = j.ticker;
+  // 최초 매수 방식
+  const cond = j.condition_type || 'market';
+  document.querySelectorAll('input[name="ac-cond"]').forEach(r => { r.checked = r.value === cond; });
+  if (document.getElementById('ac-limit-row'))
+    document.getElementById('ac-limit-row').style.display = cond === 'limit' ? 'block' : 'none';
+  if (cond === 'limit' && j.buy_price)
+    document.getElementById('ac-buy-price').value = j.buy_price;
+  // 수량/금액
+  const qtyType = j.amount > 0 ? 'amount' : 'qty';
+  document.querySelectorAll('input[name="ac-qty-type"]').forEach(r => { r.checked = r.value === qtyType; });
+  document.getElementById('ac-qty-val').value = qtyType === 'amount' ? j.amount : (j.qty || '');
+  acQtyTypeChange();
+  // 수익률 파라미터
+  if (j.take_pct    !== undefined) document.getElementById('ac-take-pct').value    = ((j.take_pct    || 0.03) * 100).toFixed(1);
+  if (j.rebuy_drop  !== undefined) document.getElementById('ac-rebuy-drop').value  = ((j.rebuy_drop  || 0.02) * 100).toFixed(1);
+  if (j.repeat_take !== undefined) document.getElementById('ac-repeat-take').value = ((j.repeat_take || 0.02) * 100).toFixed(1);
+  document.getElementById('ac-max-cycles').value = j.max_cycles || 0;
+  document.getElementById('ac-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('ac-name').focus();
+}
+
 // ── 잡 취소 ───────────────────────────────────────────────
 async function acCancel(ticker) {
   if (!confirm(`사이클 잡 취소: ${ticker}`)) return;
@@ -5547,9 +5628,14 @@ function acRenderJobs() {
             <div id="ac-bar-${j.ticker}" style="height:100%;width:0%;background:#16a34a;transition:width .4s"></div>
           </div>
         </div>
-        <button onclick="acCancel('${j.ticker}')"
-          style="margin-left:10px;padding:4px 10px;background:var(--down)22;color:var(--down);
-            border:1px solid var(--down)44;border-radius:6px;font-size:11px;cursor:pointer">✕중단</button>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-left:10px">
+          <button onclick="acEdit('${j.ticker}')"
+            style="padding:4px 10px;background:none;color:var(--primary);
+              border:1px solid var(--primary)88;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">✎수정</button>
+          <button onclick="acCancel('${j.ticker}')"
+            style="padding:4px 10px;background:var(--down)22;color:var(--down);
+              border:1px solid var(--down)44;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">✕중단</button>
+        </div>
       </div>
     </div>`;
   }).join('');
