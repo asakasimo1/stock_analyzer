@@ -4961,7 +4961,18 @@ async function atSellNow(ticker, name, qty) {
       body: JSON.stringify({ ...job, force_sell: true }),
     });
     if (r.ok) {
-      if (btn) { btn.textContent = '✓ 요청완료'; btn.style.background = '#16a34a'; btn.style.color = '#fff'; }
+      const d = await r.json();
+      if (d.triggered === false) {
+        if (btn) { btn.textContent = '✓ 등록됨'; btn.style.background = '#f59e0b'; btn.style.color = '#fff'; }
+        const proceed = confirm(
+          '⚠️ 즉시 트리거 실패 (GH_TOKEN에 workflow 권한 필요)\n\n' +
+          'GitHub Actions에서 수동 실행이 필요합니다.\n' +
+          '지금 GitHub Actions 페이지를 여시겠습니까?'
+        );
+        if (proceed) window.open('https://github.com/asakasimo1/stock-trader/actions', '_blank');
+      } else {
+        if (btn) { btn.textContent = '✓ 요청완료'; btn.style.background = '#16a34a'; btn.style.color = '#fff'; }
+      }
       setTimeout(() => atLoadAll(), 2000);
     } else {
       if (btn) { btn.disabled = false; btn.textContent = '즉시 매도'; }
@@ -5210,9 +5221,16 @@ async function abRegister() {
       body: JSON.stringify(job),
     });
     if (r.ok) {
+      const d = await r.json();
       const condLabel = cond === 'market' ? '즉시 시장가' : `${targetPrc.toLocaleString()}원 이하 시`;
       msg.style.color = 'var(--up)';
-      msg.textContent = `✅ ${name}(${ticker}) 매수 잡 등록 — ${condLabel}`;
+      if (cond === 'market' && d.triggered === false) {
+        msg.innerHTML = `✅ 등록 완료 — <span style="color:var(--down)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
+          <a href="https://github.com/asakasimo1/stock-trader/actions" target="_blank"
+             style="color:var(--primary);margin-left:6px;font-size:11px">수동 실행 →</a>`;
+      } else {
+        msg.textContent = `✅ ${name}(${ticker}) 매수 잡 등록 — ${condLabel}${cond==='market'?' (즉시 실행 요청됨)':''}`;
+      }
       await atLoadAll();
     } else {
       msg.style.color = 'var(--down)';
@@ -5528,7 +5546,15 @@ async function acRegister() {
       body: JSON.stringify(job),
     });
     if (r.ok) {
-      document.getElementById('ac-msg').textContent = '✅ 등록 완료';
+      const d = await r.json();
+      const msgEl = document.getElementById('ac-msg');
+      if (condType === 'market' && d.triggered === false) {
+        msgEl.innerHTML = `✅ 등록 완료 — <span style="color:var(--down)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
+          <a href="https://github.com/asakasimo1/stock-trader/actions" target="_blank"
+             style="color:var(--primary);margin-left:6px;font-size:11px">수동 실행 →</a>`;
+      } else {
+        msgEl.textContent = `✅ 등록 완료${condType==='market'?' — 즉시 실행 요청됨':''}`;
+      }
       document.getElementById('ac-name').value = '';
       document.getElementById('ac-ticker').value = '';
       document.getElementById('ac-ticker-display').textContent = '—';

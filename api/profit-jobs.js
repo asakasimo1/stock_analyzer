@@ -72,20 +72,24 @@ export default async function handler(req, res) {
     if (!ok) return res.status(500).json({ error: '저장 실패' });
 
     // 즉시 시장가 매수 or 사이클 첫 매수(market) → GitHub Actions 즉시 트리거
-    const isBuyUrl  = url.includes('profit-buy');
-    const isCycleUrl= url.includes('profit-cycle');
-    const isSellUrl = url.includes('profit-sell');
-    const isMarket  = job.condition_type === 'market';
+    const isBuyUrl    = url.includes('profit-buy');
+    const isCycleUrl  = url.includes('profit-cycle');
+    const isSellUrl   = url.includes('profit-sell');
+    const isMarket    = job.condition_type === 'market';
     const isForceSell = job.force_sell === true;
-    if ((isBuyUrl || isCycleUrl) && isMarket) {
-      await triggerWorkflow(ghToken).catch(() => {});
-    }
-    // 즉시 매도 요청 → GitHub Actions 즉시 트리거
-    if (isSellUrl && isForceSell) {
-      await triggerWorkflow(ghToken).catch(() => {});
+
+    let triggered = false;
+    let triggerError = null;
+    if ((isBuyUrl || isCycleUrl) && isMarket || isSellUrl && isForceSell) {
+      try {
+        triggered = await triggerWorkflow(ghToken);
+        if (!triggered) triggerError = 'workflow_dispatch 실패 (GH_TOKEN에 workflow 권한 필요)';
+      } catch (e) {
+        triggerError = e.message;
+      }
     }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, triggered, triggerError });
   }
 
   if (req.method === 'DELETE') {
