@@ -4734,7 +4734,15 @@ let _atAcTimer = null;
 
 function onAtNameFocus() {
   const holdings = _atAccount?.holdings || [];
-  if (holdings.length) showAtAcLocal(holdings);
+  if (holdings.length) {
+    showAtAcLocal(holdings);
+  } else {
+    const box = document.getElementById('at-ac-list');
+    if (box) {
+      box.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--muted)">종목명을 입력하면 검색됩니다</div>`;
+      box.style.display = 'block';
+    }
+  }
 }
 
 function onAtNameInput(val) {
@@ -5287,7 +5295,16 @@ let _acAcTimer = null;
 
 function onAcNameFocus() {
   const holdings = _atAccount?.holdings || [];
-  if (holdings.length) showAcAcLocal(holdings);
+  if (holdings.length) {
+    showAcAcLocal(holdings);
+  } else {
+    // 계좌 정보 없으면 힌트 표시
+    const box = document.getElementById('ac-ac-list');
+    if (box) {
+      box.innerHTML = `<div style="padding:10px 14px;font-size:12px;color:var(--muted)">종목명을 입력하면 검색됩니다</div>`;
+      box.style.display = 'block';
+    }
+  }
 }
 
 function onAcNameInput(v) {
