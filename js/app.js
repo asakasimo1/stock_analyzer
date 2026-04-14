@@ -5504,6 +5504,18 @@ function acQtyTypeChange() {
   const hint = document.getElementById('ac-qty-hint');
   if (hint) hint.textContent = v === 'amount' ? '매수 금액 (원)' : '매수할 수량 (주)';
 }
+function acOrderDvsnChange() {
+  const v = document.querySelector('input[name="ac-order-dvsn"]:checked')?.value;
+  const hint = document.getElementById('ac-order-dvsn-hint');
+  if (!hint) return;
+  if (v === 'limit') {
+    hint.textContent = '지정가 — 매수·매도·재매수 모두 현재가로 지정가 주문 (NXT 포함)';
+    hint.style.color = '#16a34a';
+  } else {
+    hint.textContent = 'NXT 시간대(장전 08:00~09:00 / 장후 15:30~20:00)에는 지정가만 허용됩니다';
+    hint.style.color = 'var(--muted)';
+  }
+}
 
 // ── 잡 등록 ───────────────────────────────────────────────
 async function acRegister() {
@@ -5513,6 +5525,7 @@ async function acRegister() {
 
   const condType  = document.querySelector('input[name="ac-cond"]:checked')?.value || 'market';
   const buyPrice  = parseInt(document.getElementById('ac-buy-price')?.value || '0') || 0;
+  const orderDvsn = document.querySelector('input[name="ac-order-dvsn"]:checked')?.value || 'market';
   const qtyType   = document.querySelector('input[name="ac-qty-type"]:checked')?.value || 'qty';
   const qtyVal    = parseInt(document.getElementById('ac-qty-val').value) || 0;
   const takePct   = parseFloat(document.getElementById('ac-take-pct').value) / 100 || 0.03;
@@ -5527,6 +5540,7 @@ async function acRegister() {
     ticker, name,
     condition_type: condType,
     buy_price: condType === 'limit' ? buyPrice : 0,
+    order_dvsn: orderDvsn,
     qty:      qtyType === 'qty' ? qtyVal : 0,
     amount:   qtyType === 'amount' ? qtyVal : 0,
     take_pct:    takePct,
@@ -5581,6 +5595,10 @@ function acEdit(ticker) {
     document.getElementById('ac-limit-row').style.display = cond === 'limit' ? 'block' : 'none';
   if (cond === 'limit' && j.buy_price)
     document.getElementById('ac-buy-price').value = j.buy_price;
+  // 주문 방식
+  const orderDvsn = j.order_dvsn || 'market';
+  document.querySelectorAll('input[name="ac-order-dvsn"]').forEach(r => { r.checked = r.value === orderDvsn; });
+  acOrderDvsnChange();
   // 수량/금액
   const qtyType = j.amount > 0 ? 'amount' : 'qty';
   document.querySelectorAll('input[name="ac-qty-type"]').forEach(r => { r.checked = r.value === qtyType; });

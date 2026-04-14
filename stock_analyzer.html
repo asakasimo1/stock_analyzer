@@ -888,6 +888,20 @@
         </div>
       </div>
 
+      <!-- 주문 방식 -->
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">주문 방식</div>
+        <div style="display:flex;gap:14px;margin-bottom:4px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+            <input type="radio" name="ac-order-dvsn" value="market" checked onchange="acOrderDvsnChange()" /> 시장가
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+            <input type="radio" name="ac-order-dvsn" value="limit" onchange="acOrderDvsnChange()" /> 지정가
+          </label>
+        </div>
+        <div id="ac-order-dvsn-hint" style="font-size:11px;color:var(--muted)">NXT 시간대(장전 08:00~09:00 / 장후 15:30~20:00)에는 지정가만 허용됩니다</div>
+      </div>
+
       <!-- 수량 / 금액 -->
       <div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 기준</div>
