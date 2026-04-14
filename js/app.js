@@ -5376,8 +5376,10 @@ async function fetchAcAc(q) {
   } catch { hideAcAc(); }
 }
 function hideAcAc() {
-  const b = document.getElementById('ac-ac-list');
-  if (b) b.style.display = 'none';
+  setTimeout(() => {
+    const b = document.getElementById('ac-ac-list');
+    if (b) b.style.display = 'none';
+  }, 150);
 }
 function selectAcAcItem(ticker, name, e) {
   if (e) e.preventDefault();
