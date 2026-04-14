@@ -4645,20 +4645,88 @@ function atRenderAccount() {
     </div>`;
 }
 
-// ── 폼 자동입력 ──────────────────────────────────────────
-function atFillFromHolding(ticker, name, qty, buyPrice) {
-  document.getElementById('at-ticker').value    = ticker;
-  document.getElementById('at-name').value      = name;
-  document.getElementById('at-qty').value       = qty;
-  document.getElementById('at-buyprice').value  = buyPrice;
+// ── 종목명 자동완성 ──────────────────────────────────────
+let _atAcTimer = null;
+
+function onAtNameInput(val) {
+  clearTimeout(_atAcTimer);
+  // 보유종목 먼저 로컬 필터
+  if (_atAccount) {
+    const matched = (_atAccount.holdings || []).filter(h =>
+      h.name.includes(val.trim()) || h.ticker.startsWith(val.trim())
+    );
+    if (matched.length) { showAtAcLocal(matched); return; }
+  }
+  if (!val.trim()) { hideAtAc(); return; }
+  _atAcTimer = setTimeout(() => fetchAtAc(val.trim()), 220);
+}
+
+function showAtAcLocal(holdings) {
+  const list = document.getElementById('at-ac-list');
+  if (!list) return;
+  list.innerHTML = holdings.map(h => {
+    const safeN = h.name.replace(/'/g, "\\'");
+    return `<div onmousedown="selectAtAcItem('${safeN}','${h.ticker}',${h.qty},${h.avg_price})"
+      style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
+             align-items:center;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
+      <span>${h.name} <span style="font-size:11px;color:var(--up)">★보유</span></span>
+      <span style="font-size:11px;color:var(--primary);font-weight:600">${h.ticker}</span>
+    </div>`;
+  }).join('');
+  list.style.display = 'block';
+}
+
+async function fetchAtAc(q) {
+  try {
+    const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    showAtAc(d.items || []);
+  } catch { hideAtAc(); }
+}
+
+function showAtAc(items) {
+  const list = document.getElementById('at-ac-list');
+  if (!list || !items.length) { hideAtAc(); return; }
+  list.innerHTML = items.map(it => {
+    const safeN = it.name.replace(/'/g, "\\'");
+    const mkt = it.market ? `<span style="font-size:10px;color:var(--muted);margin-left:4px">${it.market}</span>` : '';
+    return `<div onmousedown="selectAtAcItem('${safeN}','${it.ticker}')"
+      style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
+             align-items:center;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
+      <span>${it.name}${mkt}</span>
+      <span style="font-size:11px;color:var(--primary);font-weight:600">${it.ticker}</span>
+    </div>`;
+  }).join('');
+  list.style.display = 'block';
+}
+
+function hideAtAc() {
+  setTimeout(() => {
+    const list = document.getElementById('at-ac-list');
+    if (list) list.style.display = 'none';
+  }, 150);
+}
+
+function selectAtAcItem(name, ticker, qty, buyPrice) {
+  document.getElementById('at-name').value = name;
+  document.getElementById('at-ticker').value = ticker;
+  document.getElementById('at-ticker-display').textContent = ticker;
+  hideAtAc();
+  if (qty !== undefined)      document.getElementById('at-qty').value      = qty;
+  if (buyPrice !== undefined) document.getElementById('at-buyprice').value = buyPrice;
   atUpdateHint();
 }
 
-function atAutoFill() {
-  const ticker = document.getElementById('at-ticker').value.trim();
-  if (!_atAccount) return;
-  const h = (_atAccount.holdings || []).find(h => h.ticker === ticker);
-  if (h) atFillFromHolding(h.ticker, h.name, h.qty, h.avg_price);
+// ── 계좌 보유종목에서 폼 자동입력 ───────────────────────
+function atFillFromHolding(ticker, name, qty, buyPrice) {
+  document.getElementById('at-name').value          = name;
+  document.getElementById('at-ticker').value        = ticker;
+  document.getElementById('at-ticker-display').textContent = ticker;
+  document.getElementById('at-qty').value           = qty;
+  document.getElementById('at-buyprice').value      = buyPrice;
+  atUpdateHint();
 }
 
 function atTypeChange() {

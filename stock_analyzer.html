@@ -710,27 +710,35 @@
   <!-- 잡 등록 폼 -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px">
     <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- 종목명 검색 (개별주 탭과 동일한 자동완성) -->
       <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목코드</div>
-        <input id="at-ticker" placeholder="예: 036030" maxlength="6"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
-          oninput="atAutoFill()" />
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명 *</div>
+        <div style="position:relative">
+          <input id="at-name" type="text" placeholder="예: 케이티알파" autocomplete="off"
+            oninput="onAtNameInput(this.value)" onblur="hideAtAc()"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          <div id="at-ac-list" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:400;
+            background:var(--surface);border:1.5px solid var(--primary);border-radius:8px;overflow:hidden;
+            box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+          종목코드: <span id="at-ticker-display" style="color:var(--primary);font-weight:600">—</span>
+          <input id="at-ticker" type="hidden" />
+        </div>
       </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">종목명</div>
-        <input id="at-name" placeholder="자동입력"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">수량</div>
-        <input id="at-qty" type="number" min="1" placeholder="자동입력"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균매수단가 (원)</div>
-        <input id="at-buyprice" type="number" min="0" placeholder="자동입력"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">수량</div>
+          <input id="at-qty" type="number" min="1" placeholder="자동입력"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균매수단가 (원)</div>
+          <input id="at-buyprice" type="number" min="0" placeholder="자동입력"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="atUpdateHint()" />
+        </div>
       </div>
     </div>
     <div style="margin-top:12px">
