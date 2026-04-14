@@ -69,7 +69,17 @@ export default async function handler(req, res) {
     const idx = jobs.findIndex(j => j.ticker === job.ticker && j.status === 'active');
     if (idx >= 0) jobs[idx] = newJob; else jobs.unshift(newJob);
     const ok = await writeJobs(jobs);
-    return res.status(ok ? 200 : 500).json(ok ? { ok: true } : { error: '저장 실패' });
+    if (!ok) return res.status(500).json({ error: '저장 실패' });
+
+    // 즉시 시장가 매수 or 사이클 첫 매수(market) → GitHub Actions 즉시 트리거
+    const isBuyUrl  = url.includes('profit-buy');
+    const isCycleUrl= url.includes('profit-cycle');
+    const isMarket  = job.condition_type === 'market';
+    if ((isBuyUrl || isCycleUrl) && isMarket) {
+      await triggerWorkflow(ghToken).catch(() => {});  // 실패해도 응답은 OK
+    }
+
+    return res.status(200).json({ ok: true });
   }
 
   if (req.method === 'DELETE') {
@@ -86,4 +96,25 @@ export default async function handler(req, res) {
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+}
+
+/**
+ * GitHub Actions workflow_dispatch 트리거
+ * profit_sell job을 즉시 실행 → job_profit_buy_cloud.py가 시장가 매수 처리
+ */
+async function triggerWorkflow(ghToken) {
+  const r = await fetch(
+    'https://api.github.com/repos/asakasimo1/stock-trader/actions/workflows/trader.yml/dispatches',
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'stock-analyzer',
+        Authorization: `Bearer ${ghToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { job: 'profit_sell' } }),
+    }
+  );
+  return r.ok;
 }
