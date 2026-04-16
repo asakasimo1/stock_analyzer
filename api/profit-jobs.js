@@ -71,18 +71,18 @@ export default async function handler(req, res) {
     const ok = await writeJobs(jobs);
     if (!ok) return res.status(500).json({ error: '저장 실패' });
 
-    // 즉시 시장가 매수 or 사이클 첫 매수(market) → GitHub Actions 즉시 트리거
-    const isBuyUrl    = url.includes('profit-buy');
-    const isCycleUrl  = url.includes('profit-cycle');
-    const isSellUrl   = url.includes('profit-sell');
-    const isMarket    = job.condition_type === 'market';
-    const isForceSell = job.force_sell === true;
+    // 즉시 트리거: 매수/사이클(market) → cycle job, 매도(등록 즉시 체크) → profit_sell job
+    const isBuyUrl   = url.includes('profit-buy');
+    const isCycleUrl = url.includes('profit-cycle');
+    const isSellUrl  = url.includes('profit-sell');
+    const isMarket   = job.condition_type === 'market';
 
     let triggered = false;
     let triggerError = null;
-    if ((isBuyUrl || isCycleUrl) && isMarket || isSellUrl && isForceSell) {
+    const jobName = isSellUrl ? 'profit_sell' : 'cycle';
+    if (isSellUrl || (isBuyUrl || isCycleUrl) && isMarket) {
       try {
-        triggered = await triggerWorkflow(ghToken);
+        triggered = await triggerWorkflow(ghToken, jobName);
         if (!triggered) triggerError = 'workflow_dispatch 실패 (GH_TOKEN에 workflow 권한 필요)';
       } catch (e) {
         triggerError = e.message;
@@ -110,9 +110,9 @@ export default async function handler(req, res) {
 
 /**
  * GitHub Actions workflow_dispatch 트리거
- * profit_sell job을 즉시 실행 → job_profit_buy_cloud.py가 시장가 매수 처리
+ * jobName: 'cycle' | 'profit_sell'
  */
-async function triggerWorkflow(ghToken) {
+async function triggerWorkflow(ghToken, jobName = 'cycle') {
   const r = await fetch(
     'https://api.github.com/repos/asakasimo1/stock-trader/actions/workflows/trader.yml/dispatches',
     {
@@ -123,7 +123,7 @@ async function triggerWorkflow(ghToken) {
         Authorization: `Bearer ${ghToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ref: 'main', inputs: { job: 'profit_sell' } }),
+      body: JSON.stringify({ ref: 'main', inputs: { job: jobName } }),
     }
   );
   return r.ok;

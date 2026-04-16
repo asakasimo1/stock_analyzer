@@ -219,12 +219,12 @@
 <div class="etf-wrap">
 
   <!-- 목록 헤더 -->
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-    <div style="font-size:14px;font-weight:700;color:var(--text)">💹 ETF 보유 목록</div>
-    <div style="display:flex;gap:8px">
-      <button id="etf-refresh-btn" onclick="refreshAllEtfPrices()" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap"><span class="etf-btn-full">⟳ 현재가 업데이트</span><span class="etf-btn-short" style="display:none">⟳ 업데이트</span></button>
-      <button onclick="openDivModal()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">💰 배당금 입력</button>
-      <button onclick="openEtfModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">+ ETF 추가</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap">💹 ETF 보유 목록</div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button id="etf-refresh-btn" onclick="refreshAllEtfPrices()" style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap"><span class="etf-btn-full">⟳ 현재가 업데이트</span><span class="etf-btn-short" style="display:none">⟳</span></button>
+      <button onclick="openDivModal()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap"><span class="etf-btn-full">💰 배당금 입력</span><span class="etf-btn-short" style="display:none">💰</span></button>
+      <button onclick="openEtfModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap"><span class="etf-btn-full">+ ETF 추가</span><span class="etf-btn-short" style="display:none">+</span></button>
     </div>
   </div>
 
@@ -310,7 +310,7 @@
     </div>
   </div>
 
-  <div id="stk-card-list" style="margin-top:12px"><div style="text-align:center;color:var(--muted);padding:48px 20px">로딩 중...</div></div>
+  <div id="stk-card-list"><div style="text-align:center;color:var(--muted);padding:48px 20px">로딩 중...</div></div>
 
   <div class="etf-kpi-row" style="margin-top:8px">
     <div class="etf-kpi"><div class="etf-kpi-label">종목 수</div><div class="etf-kpi-val" id="stk-k-count">-</div></div>
@@ -666,9 +666,9 @@
     </div>
   </div>
 
-  <!-- 거래 내역 -->
+  <!-- 시스템 트레이딩 내역 -->
   <div class="card">
-    <div class="card-title">📋 거래 내역</div>
+    <div class="card-title">🤖 시스템 트레이딩 내역</div>
     <div class="result-list" id="list-trader-trades">
       <div class="empty-msg">로딩 중...</div>
     </div>
@@ -705,6 +705,12 @@
 <div class="etf-wrap" style="max-width:800px">
 
   <!-- 계좌 현황 -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button id="at-balance-refresh-btn" onclick="atRefreshBalance()"
+      style="background:var(--bg);color:var(--primary);border:1.5px solid var(--primary);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">
+      ⟳ 잔고 새로고침
+    </button>
+  </div>
   <div id="at-account" style="margin-bottom:20px"></div>
 
   <!-- ── 매수 섹션 ─────────────────────────────────────── -->
@@ -782,7 +788,7 @@
 
   <!-- ── 매도 섹션 ─────────────────────────────────────── -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:10px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">💰 매도 등록</div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <!-- 보유종목 칩 -->
       <div id="at-holding-chips" style="display:none">
@@ -900,6 +906,11 @@
           </label>
         </div>
         <div id="ac-order-dvsn-hint" style="font-size:11px;color:var(--muted)">NXT 시간대(장전 08:00~09:00 / 장후 15:30~20:00)에는 지정가만 허용됩니다</div>
+        <div id="ac-limit-price-row" style="display:none;margin-top:8px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">지정 매수가 (원) — 비우면 현재가 자동 적용</div>
+          <input id="ac-limit-price" type="number" min="0" placeholder="예: 4800 (비우면 현재가)"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        </div>
       </div>
 
       <!-- 수량 / 금액 -->
@@ -943,9 +954,13 @@
       </div>
     </div>
 
-    <button onclick="acRegister()"
+    <button id="ac-register-btn" onclick="acRegister()"
       style="margin-top:14px;width:100%;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
       사이클 잡 등록
+    </button>
+    <button id="ac-cancel-edit-btn" onclick="acCancelEdit()"
+      style="display:none;margin-top:6px;width:100%;padding:8px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">
+      수정 취소
     </button>
     <div id="ac-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
   </div>
@@ -1291,6 +1306,31 @@
   </div>
 </div>
 
+<!-- 차트 모달 -->
+<div id="price-chart-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:none;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--surface);border-radius:16px;width:100%;max-width:760px;padding:20px;border:1px solid var(--border);position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <span id="chart-modal-title" style="font-size:15px;font-weight:700;color:var(--text)"></span>
+        <span id="chart-modal-ticker" style="font-size:12px;color:var(--muted);margin-left:8px"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <button id="chart-btn-line" onclick="setChartType('line')"
+            style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--primary);color:#fff">선형</button>
+          <button id="chart-btn-bar" onclick="setChartType('bar')"
+            style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--surface);color:var(--muted)">막대</button>
+        </div>
+        <button onclick="closePriceChart()" style="background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1">✕</button>
+      </div>
+    </div>
+    <div id="price-chart-container" style="height:320px;border-radius:8px;overflow:hidden"></div>
+    <div id="chart-loading" style="display:none;text-align:center;color:var(--muted);padding:60px 0;font-size:13px">차트 로딩 중...</div>
+    <div id="chart-error" style="display:none;text-align:center;color:#dc2626;padding:60px 0;font-size:13px"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

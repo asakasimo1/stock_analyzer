@@ -81,6 +81,7 @@ async function initDashboard() {
     console.warn('대시보드 데이터 로드 실패:', e.message);
   }
   renderDashboard(_dashData);
+  startAccountPolling();
 }
 
 function renderDashboard(data) {
@@ -88,6 +89,31 @@ function renderDashboard(data) {
   renderTraderSummary(data.trader_trades || [], data.account_balance || null);
   renderIpoList(data.ipo || []);
   renderCalendar(data);
+}
+
+// ── KIS 계좌 실시간 폴링 ─────────────────────────────────
+let _accountPollTimer = null;
+async function _pollAccount() {
+  try {
+    const r = await fetch('/api/data?mode=account');
+    if (!r.ok) return;
+    const { account_balance } = await r.json();
+    if (!account_balance) return;
+    if (_dashData) _dashData.account_balance = account_balance;
+    renderTraderSummary(_dashData?.trader_trades || [], account_balance);
+    // 자동매매 탭 계좌 현황도 갱신
+    if (typeof atRenderAccount === 'function') {
+      _atAccount = account_balance;
+      atRenderAccount();
+    }
+  } catch (e) {
+    console.warn('KIS 계좌 폴링 실패:', e.message);
+  }
+}
+function startAccountPolling() {
+  if (_accountPollTimer) return;
+  _pollAccount(); // 페이지 로드 즉시 1회 실행
+  _accountPollTimer = setInterval(_pollAccount, 30000); // 이후 30초마다
 }
 
 // ── 브리핑 목록 ─────────────────────────────────────────
@@ -419,11 +445,11 @@ function renderTraderSummary(trades, account) {
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">
         <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">총 평가금액</div>
-          <div style="font-size:16px;font-weight:700">${Number(account.total_eval).toLocaleString()}<span style="font-size:11px;color:var(--muted)">원</span></div>
+          <div style="font-size:16px;font-weight:700;color:#ffffff">${Number(account.total_eval).toLocaleString()}<span style="font-size:11px;color:var(--muted)">원</span></div>
         </div>
         <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">예수금 (현금)</div>
-          <div style="font-size:16px;font-weight:700">${Number(account.cash).toLocaleString()}<span style="font-size:11px;color:var(--muted)">원</span></div>
+          <div style="font-size:16px;font-weight:700;color:#ffffff">${Number(account.cash).toLocaleString()}<span style="font-size:11px;color:var(--muted)">원</span></div>
         </div>
         <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px">당일 손익</div>
@@ -488,11 +514,11 @@ function renderTraderSummary(trades, account) {
 
   // ── 거래 통계 카드 ─────────────────────────────────────
   const statsHtml = `
-    <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:8px">📊 거래 통계</div>
+    <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:8px">📊 시스템 트레이딩 통계</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">
       <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">총 거래</div>
-        <div style="font-size:22px;font-weight:700">${closed.length}<span style="font-size:13px;color:var(--muted)">건</span></div>
+        <div style="font-size:22px;font-weight:700;color:#ffffff">${closed.length}<span style="font-size:13px;color:var(--muted)">건</span></div>
       </div>
       <div style="background:var(--surface2,#1e2d45);border-radius:10px;padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">누적 실현손익</div>
@@ -1842,6 +1868,7 @@ async function loadStockRecords() {
     _stkTransactions = all.filter(t => t.stock_id);
   } catch { _stkTransactions = []; }
   renderStockCards();
+  refreshAllStockPrices(true); // 탭 진입 시 즉시 현재가 업데이트
 }
 
 function renderStockCards() {
@@ -1903,6 +1930,7 @@ function renderStockCards() {
             </div>
           </div>
           <div class="etf-head-actions" onclick="event.stopPropagation()">
+            ${r.ticker ? `<button onclick="openPriceChart('${r.ticker}','${r.name}')" title="차트">📈</button>` : ''}
             <button onclick="openStockModal(${r.id})" title="편집">✏️</button>
             <button class="del" onclick="deleteStockRecord(${r.id})">🗑️</button>
           </div>
@@ -1929,7 +1957,7 @@ function renderStockCards() {
             <div class="etf2-metric-val">${eval_ ? eval_.toLocaleString() + '원' : '-'}</div>
           </div>
         </div>
-        <div class="etf2-chart-wrap">${genSparkline(r)}</div>
+        <div class="etf2-chart-wrap" id="inline-chart-wrap-${r.ticker}"></div>
         <div class="etf2-footer">
           <div class="etf2-footer-item">
             <span class="etf2-footer-label">평가손익</span>
@@ -1973,6 +2001,7 @@ function renderStockCards() {
       </div>
     </div>`;
   }).join('');
+  renderInlineCharts(_stockRecords);
 }
 
 function toggleStkExpand(id) {
@@ -1981,12 +2010,12 @@ function toggleStkExpand(id) {
   el.classList.toggle('open');
 }
 
-async function refreshAllStockPrices() {
+async function refreshAllStockPrices(silent = false) {
   if (!_stockRecords.length) return;
   if (_stkRefreshing) return;
   _stkRefreshing = true;
   const btn = document.getElementById('stk-refresh-btn');
-  if (btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
+  if (!silent && btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
 
   let updated = 0;
   await Promise.all(_stockRecords.map(async r => {
@@ -1998,7 +2027,7 @@ async function refreshAllStockPrices() {
   }));
 
   renderStockCards();
-  if (btn) {
+  if (!silent && btn) {
     btn.textContent = updated ? `✔ ${updated}개 업데이트됨` : '⟳ 현재가 업데이트';
     btn.disabled = false;
     if (updated) setTimeout(() => { if (btn) btn.textContent = '⟳ 현재가 업데이트'; }, 2500);
@@ -2738,6 +2767,7 @@ async function loadEtfRecords() {
 
   renderEtfCards();
   loadDivRecords();
+  refreshAllEtfPrices(true); // 탭 진입 시 즉시 현재가 업데이트
 
   // 20분 자동 현재가 업데이트 — 탭이 ETF일 때만 반복
   clearInterval(_etfAutoRefreshTimer);
@@ -2785,6 +2815,65 @@ function genSparkline(r, W=300, H=52) {
     <path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
     <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3" fill="${color}"/>
   </svg>`;
+}
+
+// ── 인라인 카드 차트 ──────────────────────────────────────
+const _inlineChartInstances = {}; // ticker → LightweightCharts instance
+
+function _destroyInlineCharts(tickers) {
+  tickers.forEach(t => {
+    if (_inlineChartInstances[t]) {
+      try { _inlineChartInstances[t].remove(); } catch (_) {}
+      delete _inlineChartInstances[t];
+    }
+  });
+}
+
+async function renderInlineCharts(records) {
+  if (typeof LightweightCharts === 'undefined') return;
+  const tickers = records.map(r => r.ticker).filter(Boolean);
+  _destroyInlineCharts(tickers);
+
+  await Promise.all(records.map(async r => {
+    if (!r.ticker) return;
+    const wrap = document.getElementById(`inline-chart-wrap-${r.ticker}`);
+    if (!wrap) return;
+
+    try {
+      const res = await fetch(`/api/quote?ticker=${r.ticker}&chart=1&count=30`);
+      if (!res.ok) return;
+      const { candles } = await res.json();
+      if (!candles || candles.length < 2) return;
+
+      // 수익 여부로 색상 결정
+      const isUp = r.current_price && r.avg_price ? r.current_price >= r.avg_price : true;
+      const lineColor = isUp ? '#34d399' : '#f87171';
+      const topColor  = isUp ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
+
+      const chart = LightweightCharts.createChart(wrap, {
+        width:  wrap.clientWidth || 200,
+        height: 80,
+        layout: { background: { type: LightweightCharts.ColorType.Solid, color: 'transparent' }, textColor: 'transparent' },
+        grid:   { vertLines: { visible: false }, horzLines: { visible: false } },
+        rightPriceScale: { visible: false },
+        leftPriceScale:  { visible: false },
+        timeScale:       { visible: false, borderVisible: false },
+        crosshair:       { mode: LightweightCharts.CrosshairMode.Hidden },
+        handleScroll:    false,
+        handleScale:     false,
+        kineticScroll:   { touch: false, mouse: false },
+      });
+
+      const series = chart.addAreaSeries({
+        lineColor, topColor, bottomColor: 'transparent',
+        lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+      });
+      series.setData(candles.map(c => ({ time: c.time, value: c.close })));
+      chart.timeScale().fitContent();
+
+      _inlineChartInstances[r.ticker] = chart;
+    } catch (_) {}
+  }));
 }
 
 function renderEtfCards() {
@@ -2885,6 +2974,7 @@ function renderEtfCards() {
             </div>
           </div>
           <div class="etf-head-actions" onclick="event.stopPropagation()">
+            ${r.ticker ? `<button onclick="openPriceChart('${r.ticker}','${r.name}')" title="차트">📈</button>` : ''}
             <button onclick="openDivScheduleModal(${r.id})" title="배당 일정">📅</button>
             <button onclick="openDivModal(${r.id})" title="배당 입력">💰</button>
             <button onclick="editEtf(${r.id})">✏️</button>
@@ -2913,7 +3003,7 @@ function renderEtfCards() {
             <div class="etf2-metric-val">${(r.qty || 0).toLocaleString()}주</div>
           </div>
         </div>
-        <div class="etf2-chart-wrap">${genSparkline(r)}</div>
+        <div class="etf2-chart-wrap" id="inline-chart-wrap-${r.ticker}"></div>
         <div class="etf2-footer">
           <div class="etf2-footer-item">
             <span class="etf2-footer-label">보유금액</span>
@@ -2984,6 +3074,114 @@ function renderEtfCards() {
       </div>
     </div>`;
   }).join('');
+  renderInlineCharts(_etfRecords);
+}
+
+// ── 주가 차트 모달 ────────────────────────────────────────
+let _priceChart = null;
+let _priceSeries = null;
+let _chartType = 'line'; // 'line' | 'bar'
+let _chartCandles = [];
+let _chartTicker = '';
+let _chartName = '';
+
+function openPriceChart(ticker, name) {
+  if (!ticker) return;
+  _chartTicker = ticker;
+  _chartName = name;
+  const modal = document.getElementById('price-chart-modal');
+  modal.style.display = 'flex';
+  document.getElementById('chart-modal-title').textContent = name || ticker;
+  document.getElementById('chart-modal-ticker').textContent = ticker;
+  _loadChartData();
+}
+
+function closePriceChart() {
+  document.getElementById('price-chart-modal').style.display = 'none';
+  if (_priceChart) { _priceChart.remove(); _priceChart = null; _priceSeries = null; }
+}
+
+async function _loadChartData() {
+  const container = document.getElementById('price-chart-container');
+  const loading   = document.getElementById('chart-loading');
+  const errorEl   = document.getElementById('chart-error');
+  container.style.display = 'none';
+  loading.style.display   = 'block';
+  errorEl.style.display   = 'none';
+  if (_priceChart) { _priceChart.remove(); _priceChart = null; _priceSeries = null; }
+
+  try {
+    const r = await fetch(`/api/quote?ticker=${_chartTicker}&chart=1&count=60`);
+    const d = await r.json();
+    if (!r.ok || !d.candles?.length) throw new Error(d.error || '데이터 없음');
+    _chartCandles = d.candles;
+    loading.style.display   = 'none';
+    container.style.display = 'block';
+    _renderChart();
+  } catch (e) {
+    loading.style.display  = 'none';
+    errorEl.style.display  = 'block';
+    errorEl.textContent    = '차트 데이터를 불러오지 못했습니다: ' + e.message;
+  }
+}
+
+function _renderChart() {
+  const container = document.getElementById('price-chart-container');
+  if (_priceChart) { _priceChart.remove(); _priceChart = null; _priceSeries = null; }
+
+  _priceChart = LightweightCharts.createChart(container, {
+    layout:     { background: { color: 'var(--surface, #ffffff)' === 'var(--surface, #ffffff)' ? getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#ffffff' : '#ffffff', type: LightweightCharts.ColorType.Solid }, textColor: '#9EA3B0' },
+    grid:       { vertLines: { color: '#ebebeb' }, horzLines: { color: '#ebebeb' } },
+    timeScale:  { borderColor: '#ebebeb', timeVisible: true },
+    rightPriceScale: { borderColor: '#ebebeb' },
+    crosshair:  { mode: LightweightCharts.CrosshairMode.Normal },
+    width:  container.clientWidth,
+    height: 320,
+  });
+
+  if (_chartType === 'bar') {
+    _priceSeries = _priceChart.addCandlestickSeries({
+      upColor:   '#16a34a', downColor: '#dc2626',
+      borderUpColor: '#16a34a', borderDownColor: '#dc2626',
+      wickUpColor:   '#16a34a', wickDownColor:   '#dc2626',
+    });
+    _priceSeries.setData(_chartCandles);
+  } else {
+    _priceSeries = _priceChart.addAreaSeries({
+      lineColor:   '#3D5AFE',
+      topColor:    'rgba(61,90,254,0.18)',
+      bottomColor: 'rgba(61,90,254,0)',
+      lineWidth: 2,
+    });
+    _priceSeries.setData(_chartCandles.map(c => ({ time: c.time, value: c.close })));
+  }
+
+  _priceChart.timeScale().fitContent();
+  _updateChartToggleUI();
+
+  window.addEventListener('resize', _onChartResize);
+}
+
+function _onChartResize() {
+  const container = document.getElementById('price-chart-container');
+  if (_priceChart && container) _priceChart.applyOptions({ width: container.clientWidth });
+}
+
+function setChartType(type) {
+  if (_chartType === type) return;
+  _chartType = type;
+  if (_chartCandles.length) _renderChart();
+}
+
+function _updateChartToggleUI() {
+  const lineBtn = document.getElementById('chart-btn-line');
+  const barBtn  = document.getElementById('chart-btn-bar');
+  if (!lineBtn || !barBtn) return;
+  [lineBtn, barBtn].forEach((btn, i) => {
+    const isActive = (i === 0 && _chartType === 'line') || (i === 1 && _chartType === 'bar');
+    btn.style.background = isActive ? '#3D5AFE' : '';
+    btn.style.color = isActive ? '#fff' : '';
+  });
 }
 
 function toggleEtfExpand(id) {
@@ -4571,6 +4769,7 @@ const AT_SELL_FEE = 0.00015 + 0.0018;
 let _atJobs  = [];
 let _abJobs  = [];
 let _acJobs  = [];   // cycle jobs
+let _acEditTicker = null; // 수정 모드 중인 ticker (null = 신규 등록)
 let _atAccount = null;
 let _atRefreshTimer = null;
 let _atPriceTimer = null;
@@ -4615,7 +4814,7 @@ async function atRefreshPrices() {
       const netPnl   = sellNet - buyTotal;
       const netPct   = netPnl / buyTotal * 100;
       const toTarget = (job.target_price || 0) - cur;
-      const pnlColor = netPnl >= 0 ? 'var(--up)' : 'var(--down)';
+      const pnlColor = netPnl >= 0 ? 'var(--green)' : 'var(--red)';
 
       const priceEl  = document.getElementById(`at-price-${job.ticker}`);
       const pnlEl    = document.getElementById(`at-pnl-${job.ticker}`);
@@ -4628,14 +4827,14 @@ async function atRefreshPrices() {
         ttEl.textContent = toTarget > 0
           ? `목표까지 +${toTarget.toLocaleString()}원`
           : `🎯 목표 초과! +${Math.abs(toTarget).toLocaleString()}원`;
-        ttEl.style.color = toTarget <= 0 ? 'var(--up)' : 'var(--muted)';
+        ttEl.style.color = toTarget <= 0 ? 'var(--green)' : 'var(--muted)';
       }
       // 진행률 바: 매수가 → 목표가 기준
       if (barEl && job.target_price && job.buy_price) {
         const range    = job.target_price - job.buy_price;
         const progress = range > 0 ? Math.min(100, Math.max(0, (cur - job.buy_price) / range * 100)) : 0;
         barEl.style.width = `${progress}%`;
-        barEl.style.background = toTarget <= 0 ? 'var(--up)' : 'var(--primary)';
+        barEl.style.background = toTarget <= 0 ? 'var(--green)' : 'var(--primary)';
       }
     } catch (_) {}
   }
@@ -4663,6 +4862,37 @@ async function atLoadAll() {
   atRenderJobs();
 }
 
+// ── 잔고 새로고침 (GitHub Actions balance job 트리거 → 30초 후 Gist 재조회) ──
+async function atRefreshBalance() {
+  const btn = document.getElementById('at-balance-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ 요청중...'; }
+  try {
+    const r = await fetch('/api/data?mode=trigger_balance');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    // 30초 카운트다운 후 Gist 재조회
+    let sec = 30;
+    const tick = setInterval(() => {
+      if (btn) btn.textContent = `⟳ 조회중... (${--sec}초)`;
+      if (sec <= 0) {
+        clearInterval(tick);
+        fetch('/api/data').then(res => res.json()).then(d => {
+          _atAccount = d.account_balance || null;
+          atRenderAccount();
+          if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+        }).catch(() => {
+          if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+        });
+      }
+    }, 1000);
+  } catch (e) {
+    alert('잔고 조회 실패: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+  }
+}
+
 // ── 계좌 현황 ────────────────────────────────────────────
 function atRenderAccount() {
   const el = document.getElementById('at-account');
@@ -4673,37 +4903,74 @@ function atRenderAccount() {
     return;
   }
   const a = _atAccount;
-  const pnlColor = a.day_pnl >= 0 ? 'var(--up)' : 'var(--down)';
-  const holdings = (a.holdings || []).map(h => `
+  const BUY_FEE  = 0.00015;   // 매수 수수료 0.015%
+  const SELL_FEE = 0.00195;   // 매도 수수료 0.015% + 증권거래세 0.18%
+  const pnlColor   = a.day_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // 평가손익 합계 (수수료제외)
+  const totalNetAmt = Math.round((a.holdings || []).reduce((sum, h) => {
+    return sum + (h.eval_price * (1 - SELL_FEE) * h.qty) - (h.avg_price * (1 + BUY_FEE) * h.qty);
+  }, 0));
+  const totalNetColor = totalNetAmt >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const holdings = (a.holdings || []).map(h => {
+    // 평가손익(수수료제외): 실제 매도 시 수수료+거래세 차감 후 손익금액
+    const costBasis = h.avg_price * (1 + BUY_FEE) * h.qty;
+    const netProc   = h.eval_price * (1 - SELL_FEE) * h.qty;
+    const netAmt    = Math.round(netProc - costBasis);
+    const netPct    = (netProc - costBasis) / costBasis * 100;
+    const netColor  = netAmt >= 0 ? 'var(--green)' : 'var(--red)';
+    return `
     <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:6px 8px;cursor:pointer;color:var(--primary)" onclick="atFillFromHolding('${h.ticker}','${h.name}',${h.qty},${h.avg_price})">${h.ticker}</td>
-      <td style="padding:6px 8px">${h.name}</td>
-      <td style="padding:6px 8px;text-align:right">${h.qty}주</td>
-      <td style="padding:6px 8px;text-align:right">${h.avg_price.toLocaleString()}원</td>
-      <td style="padding:6px 8px;text-align:right">${h.eval_price.toLocaleString()}원</td>
-      <td style="padding:6px 8px;text-align:right;color:${h.pnl_pct>=0?'var(--up)':'var(--down)'}">${h.pnl_pct>=0?'+':''}${h.pnl_pct.toFixed(2)}%</td>
-    </tr>`).join('');
+      <td style="padding:5px 6px;white-space:nowrap">
+        <div style="cursor:pointer;color:var(--primary);font-size:11px" onclick="atFillFromHolding('${h.ticker}','${h.name}',${h.qty},${h.avg_price})">${h.ticker}</div>
+        <div style="color:var(--text);font-size:11px">${h.name}</div>
+      </td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap;color:var(--text);font-size:11px">${h.qty}주</td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap;font-size:11px">
+        <div style="color:var(--muted)">${h.avg_price.toLocaleString()}</div>
+        <div style="color:var(--text)">${h.eval_price.toLocaleString()}</div>
+      </td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap">
+        <div style="color:${netColor};font-weight:600;font-size:12px">${netAmt>=0?'+':''}${netAmt.toLocaleString()}원</div>
+        <div style="color:${netColor};font-size:10px">${netPct>=0?'+':''}${netPct.toFixed(2)}%</div>
+      </td>
+    </tr>`;
+  }).join('');
 
   el.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px">
       <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">🏦 한국투자증권 계좌 <span style="font-size:11px;color:var(--muted);font-weight:400">기준: ${a.updated_at}</span></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
-        <div><div style="font-size:11px;color:var(--muted)">총평가금액</div><div style="font-size:16px;font-weight:700">${a.total_eval.toLocaleString()}원</div></div>
-        <div><div style="font-size:11px;color:var(--muted)">예수금</div><div style="font-size:16px;font-weight:700">${a.cash.toLocaleString()}원</div></div>
-        <div><div style="font-size:11px;color:var(--muted)">당일 손익</div><div style="font-size:16px;font-weight:700;color:${pnlColor}">${a.day_pnl>=0?'+':''}${a.day_pnl.toLocaleString()}원 (${a.day_ret>=0?'+':''}${a.day_ret.toFixed(2)}%)</div></div>
+      <div style="display:flex;gap:0;flex-wrap:nowrap;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">총평가금액</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${a.total_eval.toLocaleString()}원</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">예수금</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${a.cash.toLocaleString()}원</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">당일손익</div>
+          <div style="font-size:11px;font-weight:700;color:${pnlColor};white-space:nowrap">${a.day_pnl>=0?'+':''}${a.day_pnl.toLocaleString()}원</div>
+          <div style="font-size:9px;color:${pnlColor};font-weight:600">${a.day_ret>=0?'+':''}${(a.day_ret||0).toFixed(2)}%</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">평가손익</div>
+          <div style="font-size:11px;font-weight:700;color:${totalNetColor};white-space:nowrap">${totalNetAmt>=0?'+':''}${totalNetAmt.toLocaleString()}원</div>
+          <div style="font-size:9px;color:var(--muted)">수수료제외</div>
+        </div>
       </div>
-      ${holdings ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
-          <th style="padding:4px 8px;text-align:left;font-weight:500">코드</th>
-          <th style="padding:4px 8px;text-align:left;font-weight:500">종목명</th>
-          <th style="padding:4px 8px;text-align:right;font-weight:500">수량</th>
-          <th style="padding:4px 8px;text-align:right;font-weight:500">평균단가</th>
-          <th style="padding:4px 8px;text-align:right;font-weight:500">현재가</th>
-          <th style="padding:4px 8px;text-align:right;font-weight:500">수익률</th>
+      ${holdings ? `<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border);font-size:11px">
+          <th style="padding:4px 6px;text-align:left;font-weight:500">코드 / 종목명</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">수량</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">평균→현재(원)</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">평가손익<span style="font-size:9px;font-weight:400;margin-left:2px">(수수료제외)</span></th>
         </tr></thead>
         <tbody>${holdings}</tbody>
       </table>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">코드 클릭 시 아래 폼에 자동입력</div>` : '<div style="color:var(--muted);font-size:12px">보유 종목 없음</div>'}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">수수료(0.015%)+거래세(0.18%) 차감 기준 · 코드 클릭 시 폼 자동입력</div>` : '<div style="color:var(--muted);font-size:12px">보유 종목 없음</div>'}
     </div>`;
 
   // 수익매도 폼 위에 보유종목 칩 렌더링
@@ -4719,7 +4986,7 @@ function atRenderHoldingChips() {
   wrap.style.display = 'block';
   inner.innerHTML = holdings.map(h => {
     const safeN = h.name.replace(/'/g, "\\'");
-    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
     return `<button onmousedown="atFillFromHolding('${h.ticker}','${safeN}',${h.qty},${h.avg_price})"
       style="padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg);
         color:var(--text);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
@@ -4768,12 +5035,12 @@ async function showAtAcLocal(holdings) {
   if (!holdings.length) { hideAtAc(); return; }
   list.innerHTML = holdings.map(h => {
     const safeN = h.name.replace(/'/g, "\\'");
-    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
     return `<div onmousedown="selectAtAcItem('${safeN}','${h.ticker}',${h.qty},${h.avg_price})"
       style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;
              align-items:center;border-bottom:1px solid var(--border)"
       onmouseover="this.style.background='var(--secondary)'" onmouseout="this.style.background=''">
-      <span>${h.name} <span style="font-size:11px;color:var(--up)">★보유</span></span>
+      <span>${h.name} <span style="font-size:11px;color:var(--green)">★보유</span></span>
       <span style="text-align:right;font-size:11px">
         <span id="at-lp-${h.ticker}" style="color:var(--text);font-weight:600">조회중</span>
         <span style="color:${pnlColor};margin-left:4px">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct.toFixed(1)}%</span>
@@ -4884,7 +5151,7 @@ async function atRegister() {
   const msg      = document.getElementById('at-msg');
 
   if (!ticker || !qty || !buyPrice || isNaN(target) || target <= 0) {
-    msg.style.color = 'var(--down)';
+    msg.style.color = 'var(--red)';
     msg.textContent = '모든 항목을 올바르게 입력하세요';
     return;
   }
@@ -4905,15 +5172,15 @@ async function atRegister() {
       body: JSON.stringify(job),
     });
     if (r.ok) {
-      msg.style.color = 'var(--up)';
+      msg.style.color = 'var(--green)';
       msg.textContent = `✅ ${name}(${ticker}) 잡 등록 완료 — 목표단가 ${targetPrice.toLocaleString()}원`;
       await atLoadAll();
     } else {
-      msg.style.color = 'var(--down)';
+      msg.style.color = 'var(--red)';
       msg.textContent = '등록 실패 — 다시 시도하세요';
     }
   } catch (e) {
-    msg.style.color = 'var(--down)';
+    msg.style.color = 'var(--red)';
     msg.textContent = `오류: ${e.message}`;
   }
 }
@@ -5013,7 +5280,7 @@ function atRenderJobs() {
               <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
                 <button id="at-sell-btn-${j.ticker}"
                   onclick="atSellNow('${j.ticker}','${j.name.replace(/'/g,"\\'")}',${j.qty})"
-                  style="background:var(--down);border:none;color:#fff;
+                  style="background:var(--red);border:none;color:#fff;
                          border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600">
                   즉시 매도
                 </button>
@@ -5073,8 +5340,8 @@ function atRenderJobs() {
       elHistory.innerHTML = history.slice(0, 20).map(j => {
         const isDone = j.status === 'done';
         const badge  = isDone
-          ? '<span style="background:#1a7a3a22;color:var(--up);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
-          : '<span style="background:#7a1a1a22;color:var(--down);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
+          ? '<span style="background:#1a7a3a22;color:var(--green);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
+          : '<span style="background:#7a1a1a22;color:var(--red);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
         const detail = isDone
           ? `매도 ${(j.sell_price||0).toLocaleString()}원 · ${j.executed_at || ''}`
           : `취소일 ${j.cancelled_at || ''}`;
@@ -5198,9 +5465,9 @@ async function abRegister() {
   const qtyVal    = parseInt(document.getElementById('ab-qty-val')?.value) || 0;
   const msg       = document.getElementById('ab-msg');
 
-  if (!ticker) { msg.style.color='var(--down)'; msg.textContent='종목을 선택하세요'; return; }
-  if (cond === 'limit' && !targetPrc) { msg.style.color='var(--down)'; msg.textContent='목표 매수가를 입력하세요'; return; }
-  if (!qtyVal) { msg.style.color='var(--down)'; msg.textContent='수량 또는 금액을 입력하세요'; return; }
+  if (!ticker) { msg.style.color='var(--red)'; msg.textContent='종목을 선택하세요'; return; }
+  if (cond === 'limit' && !targetPrc) { msg.style.color='var(--red)'; msg.textContent='목표 매수가를 입력하세요'; return; }
+  if (!qtyVal) { msg.style.color='var(--red)'; msg.textContent='수량 또는 금액을 입력하세요'; return; }
 
   const job = {
     ticker,
@@ -5223,9 +5490,9 @@ async function abRegister() {
     if (r.ok) {
       const d = await r.json();
       const condLabel = cond === 'market' ? '즉시 시장가' : `${targetPrc.toLocaleString()}원 이하 시`;
-      msg.style.color = 'var(--up)';
+      msg.style.color = 'var(--green)';
       if (cond === 'market' && d.triggered === false) {
-        msg.innerHTML = `✅ 등록 완료 — <span style="color:var(--down)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
+        msg.innerHTML = `✅ 등록 완료 — <span style="color:var(--red)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
           <a href="https://github.com/asakasimo1/stock-trader/actions" target="_blank"
              style="color:var(--primary);margin-left:6px;font-size:11px">수동 실행 →</a>`;
       } else {
@@ -5233,11 +5500,11 @@ async function abRegister() {
       }
       await atLoadAll();
     } else {
-      msg.style.color = 'var(--down)';
+      msg.style.color = 'var(--red)';
       msg.textContent = '등록 실패';
     }
   } catch (e) {
-    msg.style.color = 'var(--down)';
+    msg.style.color = 'var(--red)';
     msg.textContent = `오류: ${e.message}`;
   }
 }
@@ -5369,8 +5636,8 @@ function abRenderHistory() {
       ? `<span style="color:#2563eb;font-size:11px">🛒 매수</span>`
       : `<span style="color:var(--primary);font-size:11px">🎯 매도</span>`;
     const badge = isDone
-      ? '<span style="background:#1a7a3a22;color:var(--up);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
-      : '<span style="background:#7a1a1a22;color:var(--down);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
+      ? '<span style="background:#1a7a3a22;color:var(--green);border-radius:5px;padding:2px 7px;font-size:11px">완료</span>'
+      : '<span style="background:#7a1a1a22;color:var(--red);border-radius:5px;padding:2px 7px;font-size:11px">취소</span>';
     const detail = isDone
       ? (isBuy
           ? `매수 ${(j.buy_price||0).toLocaleString()}원 × ${j.buy_qty||j.qty||'?'}주 · ${j.executed_at||''}`
@@ -5434,12 +5701,12 @@ async function showAcAcLocal(holdings) {
   // 현재가 비동기 조회 (순서대로 렌더 후 업데이트)
   box.innerHTML = holdings.map(h => {
     const safeN = h.name.replace(/'/g, "\\'");
-    const pnlColor = h.pnl_pct >= 0 ? 'var(--up)' : 'var(--down)';
+    const pnlColor = h.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
     return `<div onmousedown="selectAcAcItem('${h.ticker}','${safeN}',event)"
       style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);
              display:flex;justify-content:space-between;align-items:center"
       onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''">
-      <span>${h.name} <span style="font-size:11px;color:var(--up)">★보유</span></span>
+      <span>${h.name} <span style="font-size:11px;color:var(--green)">★보유</span></span>
       <span style="text-align:right;font-size:11px">
         <span id="ac-lp-${h.ticker}" style="color:var(--text);font-weight:600">조회중</span>
         <span style="color:${pnlColor};margin-left:4px">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct.toFixed(1)}%</span>
@@ -5507,13 +5774,16 @@ function acQtyTypeChange() {
 function acOrderDvsnChange() {
   const v = document.querySelector('input[name="ac-order-dvsn"]:checked')?.value;
   const hint = document.getElementById('ac-order-dvsn-hint');
+  const priceRow = document.getElementById('ac-limit-price-row');
   if (!hint) return;
   if (v === 'limit') {
-    hint.textContent = '지정가 — 매수·매도·재매수 모두 현재가로 지정가 주문 (NXT 포함)';
+    hint.textContent = '지정가 — 가격 미입력 시 현재가로 자동 적용 (NXT 포함)';
     hint.style.color = '#16a34a';
+    if (priceRow) priceRow.style.display = 'block';
   } else {
     hint.textContent = 'NXT 시간대(장전 08:00~09:00 / 장후 15:30~20:00)에는 지정가만 허용됩니다';
     hint.style.color = 'var(--muted)';
+    if (priceRow) priceRow.style.display = 'none';
   }
 }
 
@@ -5523,9 +5793,10 @@ async function acRegister() {
   const name   = document.getElementById('ac-name').value.trim();
   if (!ticker) { document.getElementById('ac-msg').textContent = '종목을 선택해주세요'; return; }
 
-  const condType  = document.querySelector('input[name="ac-cond"]:checked')?.value || 'market';
-  const buyPrice  = parseInt(document.getElementById('ac-buy-price')?.value || '0') || 0;
-  const orderDvsn = document.querySelector('input[name="ac-order-dvsn"]:checked')?.value || 'market';
+  const condType   = document.querySelector('input[name="ac-cond"]:checked')?.value || 'market';
+  const buyPrice   = parseInt(document.getElementById('ac-buy-price')?.value || '0') || 0;
+  const orderDvsn  = document.querySelector('input[name="ac-order-dvsn"]:checked')?.value || 'market';
+  const limitPrice = parseInt(document.getElementById('ac-limit-price')?.value || '0') || 0;
   const qtyType   = document.querySelector('input[name="ac-qty-type"]:checked')?.value || 'qty';
   const qtyVal    = parseInt(document.getElementById('ac-qty-val').value) || 0;
   const takePct   = parseFloat(document.getElementById('ac-take-pct').value) / 100 || 0.03;
@@ -5536,23 +5807,44 @@ async function acRegister() {
   if (condType === 'limit' && !buyPrice) { document.getElementById('ac-msg').textContent = '목표 매수가를 입력해주세요'; return; }
   if (qtyVal <= 0) { document.getElementById('ac-msg').textContent = '수량/금액을 입력해주세요'; return; }
 
-  const job = {
-    ticker, name,
-    condition_type: condType,
-    buy_price: condType === 'limit' ? buyPrice : 0,
-    order_dvsn: orderDvsn,
-    qty:      qtyType === 'qty' ? qtyVal : 0,
-    amount:   qtyType === 'amount' ? qtyVal : 0,
-    take_pct:    takePct,
-    rebuy_drop:  rebuyDrop,
-    repeat_take: repeatTake,
-    max_cycles:  maxCycles,
-    phase:  'waiting_buy',
-    status: 'active',
-    cycle_no: 0,
-  };
+  let job;
+  if (_acEditTicker) {
+    // ── 수정 모드: 기존 잡 상태(phase/cycle_no/sell_price 등) 보존, 파라미터만 교체
+    const existing = _acJobs.find(j => j.ticker === _acEditTicker && !['done','cancelled','stopped'].includes(j.status));
+    if (!existing) { document.getElementById('ac-msg').textContent = '❌ 수정할 잡을 찾을 수 없음'; return; }
+    job = {
+      ...existing,
+      name,
+      order_dvsn:  orderDvsn,
+      take_pct:    takePct,
+      rebuy_drop:  rebuyDrop,
+      repeat_take: repeatTake,
+      max_cycles:  maxCycles,
+    };
+    // phase가 holding이면 새 take_pct로 sell_price 재계산 (프론트 예측치, 실제는 백엔드 계산)
+    // → 단순히 파라미터만 저장; 백엔드가 다음 체크 시 반영
+  } else {
+    // ── 신규 등록
+    job = {
+      ticker, name,
+      condition_type: condType,
+      buy_price:   condType === 'limit' ? buyPrice : 0,
+      order_dvsn:  orderDvsn,
+      limit_price: orderDvsn === 'limit' && limitPrice > 0 ? limitPrice : 0,
+      qty:      qtyType === 'qty' ? qtyVal : 0,
+      amount:   qtyType === 'amount' ? qtyVal : 0,
+      take_pct:    takePct,
+      rebuy_drop:  rebuyDrop,
+      repeat_take: repeatTake,
+      max_cycles:  maxCycles,
+      phase:  'waiting_buy',
+      status: 'active',
+      cycle_no: 0,
+    };
+  }
 
-  document.getElementById('ac-msg').textContent = '등록 중...';
+  const isEditMode = !!_acEditTicker;
+  document.getElementById('ac-msg').textContent = isEditMode ? '수정 중...' : '등록 중...';
   try {
     const r = await fetch('/api/profit-cycle', {
       method: 'POST',
@@ -5562,20 +5854,23 @@ async function acRegister() {
     if (r.ok) {
       const d = await r.json();
       const msgEl = document.getElementById('ac-msg');
-      if (condType === 'market' && d.triggered === false) {
-        msgEl.innerHTML = `✅ 등록 완료 — <span style="color:var(--down)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
+      if (!isEditMode && condType === 'market' && d.triggered === false) {
+        msgEl.innerHTML = `✅ 등록 완료 — <span style="color:var(--red)">즉시 트리거 실패 (GH_TOKEN workflow 권한 확인)</span>
           <a href="https://github.com/asakasimo1/stock-trader/actions" target="_blank"
              style="color:var(--primary);margin-left:6px;font-size:11px">수동 실행 →</a>`;
       } else {
-        msgEl.textContent = `✅ 등록 완료${condType==='market'?' — 즉시 실행 요청됨':''}`;
+        msgEl.textContent = isEditMode ? `✅ 수정 완료` : `✅ 등록 완료${condType==='market'?' — 즉시 실행 요청됨':''}`;
       }
+      // 폼 초기화
+      _acEditTicker = null;
+      acResetEditMode();
       document.getElementById('ac-name').value = '';
       document.getElementById('ac-ticker').value = '';
       document.getElementById('ac-ticker-display').textContent = '—';
       document.getElementById('ac-qty-val').value = '';
       await atLoadAll();
     } else {
-      document.getElementById('ac-msg').textContent = '❌ 등록 실패';
+      document.getElementById('ac-msg').textContent = isEditMode ? '❌ 수정 실패' : '❌ 등록 실패';
     }
   } catch { document.getElementById('ac-msg').textContent = '❌ 네트워크 오류'; }
 }
@@ -5599,6 +5894,8 @@ function acEdit(ticker) {
   const orderDvsn = j.order_dvsn || 'market';
   document.querySelectorAll('input[name="ac-order-dvsn"]').forEach(r => { r.checked = r.value === orderDvsn; });
   acOrderDvsnChange();
+  if (orderDvsn === 'limit' && j.limit_price)
+    document.getElementById('ac-limit-price').value = j.limit_price;
   // 수량/금액
   const qtyType = j.amount > 0 ? 'amount' : 'qty';
   document.querySelectorAll('input[name="ac-qty-type"]').forEach(r => { r.checked = r.value === qtyType; });
@@ -5609,8 +5906,33 @@ function acEdit(ticker) {
   if (j.rebuy_drop  !== undefined) document.getElementById('ac-rebuy-drop').value  = ((j.rebuy_drop  || 0.02) * 100).toFixed(1);
   if (j.repeat_take !== undefined) document.getElementById('ac-repeat-take').value = ((j.repeat_take || 0.02) * 100).toFixed(1);
   document.getElementById('ac-max-cycles').value = j.max_cycles || 0;
+  // 수정 모드 활성화
+  _acEditTicker = ticker;
+  const btn = document.getElementById('ac-register-btn');
+  if (btn) btn.textContent = '수정 완료';
+  const cancelBtn = document.getElementById('ac-cancel-edit-btn');
+  if (cancelBtn) cancelBtn.style.display = 'block';
   document.getElementById('ac-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
   document.getElementById('ac-name').focus();
+}
+
+// ── 수정 모드 UI 초기화 ────────────────────────────────────
+function acResetEditMode() {
+  const btn = document.getElementById('ac-register-btn');
+  if (btn) btn.textContent = '사이클 잡 등록';
+  const cancelBtn = document.getElementById('ac-cancel-edit-btn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+// ── 수정 취소 ─────────────────────────────────────────────
+function acCancelEdit() {
+  _acEditTicker = null;
+  acResetEditMode();
+  document.getElementById('ac-msg').textContent = '';
+  document.getElementById('ac-name').value = '';
+  document.getElementById('ac-ticker').value = '';
+  document.getElementById('ac-ticker-display').textContent = '—';
+  document.getElementById('ac-qty-val').value = '';
 }
 
 // ── 잡 취소 ───────────────────────────────────────────────
@@ -5641,7 +5963,7 @@ function acRenderJobs() {
   }
   el.innerHTML = active.map(j => {
     const phaseLabel = AC_PHASE_LABEL[j.phase] || j.phase;
-    const phaseColor = j.phase === 'holding' ? 'var(--up)' : j.phase === 'waiting_rebuy' ? '#f59e0b' : '#2563eb';
+    const phaseColor = j.phase === 'holding' ? 'var(--green)' : j.phase === 'waiting_rebuy' ? '#f59e0b' : '#2563eb';
     const cycleInfo  = j.cycle_no > 0 ? ` (사이클 ${j.cycle_no}회)` : '';
     const sellTarget = j.sell_price ? `목표매도 ${Number(j.sell_price).toLocaleString()}원` : '';
     const rebuyTarget= j.rebuy_price ? `재매수 목표 ${Number(j.rebuy_price).toLocaleString()}원` : '';
@@ -5677,8 +5999,8 @@ function acRenderJobs() {
             style="padding:4px 10px;background:none;color:var(--primary);
               border:1px solid var(--primary)88;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">✎수정</button>
           <button onclick="acCancel('${j.ticker}')"
-            style="padding:4px 10px;background:var(--down)22;color:var(--down);
-              border:1px solid var(--down)44;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">✕중단</button>
+            style="padding:4px 10px;background:var(--red)22;color:var(--red);
+              border:1px solid var(--red)44;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">✕중단</button>
         </div>
       </div>
     </div>`;
@@ -5705,23 +6027,23 @@ async function acRefreshPrices() {
         const sellNet  = cur * job.qty * (1 - AT_SELL_FEE);
         const netPnl   = sellNet - buyTotal;
         const netPct   = netPnl / buyTotal * 100;
-        if (pnlEl) pnlEl.innerHTML = `<span style="color:${netPnl>=0?'var(--up)':'var(--down)'};font-weight:700">${netPnl>=0?'+':''}${Math.round(netPnl).toLocaleString()}원 (${netPct>=0?'+':''}${netPct.toFixed(2)}%)</span>`;
+        if (pnlEl) pnlEl.innerHTML = `<span style="color:${netPnl>=0?'var(--green)':'var(--red)'};font-weight:700">${netPnl>=0?'+':''}${Math.round(netPnl).toLocaleString()}원 (${netPct>=0?'+':''}${netPct.toFixed(2)}%)</span>`;
         const range = job.sell_price - job.buy_price;
         if (barEl && range > 0) {
           const pct = Math.min(100, Math.max(0, (cur - job.buy_price) / range * 100));
           barEl.style.width = `${pct}%`;
-          barEl.style.background = cur >= job.sell_price ? 'var(--up)' : '#16a34a';
+          barEl.style.background = cur >= job.sell_price ? 'var(--green)' : '#16a34a';
         }
       } else if (job.phase === 'waiting_rebuy' && job.rebuy_price) {
         const diff = cur - job.rebuy_price;
         if (pnlEl) pnlEl.innerHTML = diff <= 0
-          ? `<span style="color:var(--up);font-weight:700">🎯 재매수 조건 달성!</span>`
+          ? `<span style="color:var(--green);font-weight:700">🎯 재매수 조건 달성!</span>`
           : `<span style="color:var(--muted)">재매수까지 -${diff.toLocaleString()}원 남음</span>`;
         if (barEl) {
           const ref = job.last_sell || cur * 1.05;
           const pct = Math.min(100, Math.max(0, (1 - (cur - job.rebuy_price) / (ref - job.rebuy_price)) * 100));
           barEl.style.width = `${pct}%`;
-          barEl.style.background = diff <= 0 ? 'var(--up)' : '#f59e0b';
+          barEl.style.background = diff <= 0 ? 'var(--green)' : '#f59e0b';
         }
       }
     } catch (_) {}
@@ -5750,19 +6072,19 @@ async function abRefreshPrices() {
         const reached = cur <= tp;
         if (diffEl) {
           diffEl.innerHTML = reached
-            ? `<span style="color:var(--up);font-weight:700">🎯 조건 달성!</span>`
+            ? `<span style="color:var(--green);font-weight:700">🎯 조건 달성!</span>`
             : `<span style="color:var(--muted)">목표까지 ${diff.toLocaleString()}원 남음</span>`;
         }
         if (statusEl) {
           statusEl.textContent = reached ? '✅ 다음 실행 시 매수 예정' : '대기 중';
-          statusEl.style.color = reached ? 'var(--up)' : 'var(--muted)';
+          statusEl.style.color = reached ? 'var(--green)' : 'var(--muted)';
         }
         // 진행률 바: 현재가가 목표가에 가까울수록 100%
         if (barEl) {
           const ref   = Math.max(cur, tp) * 1.05;
           const pct   = Math.min(100, Math.max(0, (1 - (cur - tp) / (ref - tp)) * 100));
           barEl.style.width = `${pct}%`;
-          barEl.style.background = reached ? 'var(--up)' : '#2563eb';
+          barEl.style.background = reached ? 'var(--green)' : '#2563eb';
         }
         if (barLabel) barLabel.textContent = `현재가 ${cur.toLocaleString()}원`;
       } else if (job.condition_type === 'market') {
