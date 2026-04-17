@@ -1434,38 +1434,50 @@ function _renderPortEtf() {
 
   let totalBuy = 0, totalEval = 0, totalProfit = 0, totalDayPnl = 0, hasDayPnl = false;
   const rows = _portEtf.map(r => {
-    const avg    = r.avg_price || 0;
-    const cur    = r.current_price || 0;
-    const qty    = r.qty || 0;
-    const buy    = avg * qty;
-    const eval_  = cur * qty;
-    const profit = eval_ - buy;
-    const rate   = buy > 0 ? profit / buy * 100 : null;
-    const rc     = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
-    const dayPnl = r.chg != null ? r.chg * qty : null;
-    const drc    = dayPnl === null ? '' : dayPnl >= 0 ? 'up' : 'dn';
+    const avg     = r.avg_price || 0;
+    const cur     = r.current_price || 0;
+    const qty     = r.qty || 0;
+    const buy     = avg * qty;
+    const eval_   = cur * qty;
+    const profit  = eval_ - buy;
+    const rate    = buy > 0 ? profit / buy * 100 : null;
+    const rc      = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    const dayPnl  = r.chg != null ? r.chg * qty : null;
+    const prev    = cur - (r.chg || 0);
+    const dayRate = (r.chg != null && prev > 0) ? r.chg / prev * 100 : null;
+    const drc     = dayPnl === null ? '' : dayPnl >= 0 ? 'up' : 'dn';
     totalBuy += buy; totalEval += eval_; totalProfit += profit;
     if (dayPnl !== null) { totalDayPnl += dayPnl; hasDayPnl = true; }
+    const rateStr   = rate    !== null ? `${profit>=0?'+':''}${Math.round(profit).toLocaleString()}원(${rate>=0?'+':''}${rate.toFixed(2)}%)`       : '-';
+    const dayStr    = dayPnl  !== null
+      ? (dayRate !== null
+          ? `${dayPnl>=0?'+':''}${Math.round(dayPnl).toLocaleString()}원(${dayRate>=0?'+':''}${dayRate.toFixed(2)}%)`
+          : `${dayPnl>=0?'+':''}${Math.round(dayPnl).toLocaleString()}원`)
+      : '-';
     return `<tr>
       <td>${r.name||r.ticker||'-'}</td>
-      <td class="${rc}" style="line-height:1.4">
-        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
-        ${cur ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
-      </td>
-      <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
+      <td class="${rc}">${rateStr}</td>
+      <td class="${drc}">${dayStr}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
     </tr>`;
   }).join('');
-  const totalRate = totalBuy > 0 ? (totalProfit / totalBuy * 100) : null;
+  const totalRate    = totalBuy > 0 ? (totalProfit / totalBuy * 100) : null;
+  const prevEval     = totalEval - totalDayPnl;
+  const totalDayRate = hasDayPnl && prevEval > 0 ? totalDayPnl / prevEval * 100 : null;
   const trc  = totalProfit >= 0 ? 'up' : 'dn';
   const dtrc = totalDayPnl >= 0 ? 'up' : 'dn';
+  const totalRateStr = totalRate !== null
+    ? `${totalProfit>=0?'+':''}${Math.round(totalProfit).toLocaleString()}원(${totalRate>=0?'+':''}${totalRate.toFixed(2)}%)`
+    : '-';
+  const totalDayStr  = hasDayPnl
+    ? (totalDayRate !== null
+        ? `${totalDayPnl>=0?'+':''}${Math.round(totalDayPnl).toLocaleString()}원(${totalDayRate>=0?'+':''}${totalDayRate.toFixed(2)}%)`
+        : `${totalDayPnl>=0?'+':''}${Math.round(totalDayPnl).toLocaleString()}원`)
+    : '-';
   tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${trc}" style="line-height:1.4">
-      ${totalRate !== null ? `<div>${totalRate>=0?'+':''}${totalRate.toFixed(2)}%</div>` : '-'}
-      ${totalBuy ? `<div style="font-size:10px;opacity:.75">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</div>` : ''}
-    </td>
-    <td class="${dtrc}">${hasDayPnl ? `${totalDayPnl>=0?'+':''}${totalDayPnl.toLocaleString()}원` : '-'}</td>
+    <td class="${trc}">${totalRateStr}</td>
+    <td class="${dtrc}">${totalDayStr}</td>
     <td>${totalEval ? totalEval.toLocaleString()+'원' : '-'}</td>
   </tr>`;
 }
@@ -1482,12 +1494,10 @@ function _renderPortIpo() {
     const profit = (r.price_open - r.price_ipo) * qty - 2000;
     const rate   = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
     const pc     = profit >= 0 ? 'up' : 'dn';
+    const rateStr = `${profit>=0?'+':''}${profit.toLocaleString()}원(${rate>=0?'+':''}${rate}%)`;
     return `<tr>
       <td>${r.name||'-'}</td>
-      <td class="${pc}" style="line-height:1.4">
-        <div>${rate>=0?'+':''}${rate}%</div>
-        <div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>
-      </td>
+      <td class="${pc}">${rateStr}</td>
       <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
     </tr>`;
   }).join('');
@@ -1517,36 +1527,48 @@ function _renderPortStock() {
   if (!_stockRecords.length) { tbody.innerHTML = '<tr><td colspan="4" class="port-loading">개별주 없음 · 개별주 탭에서 추가하세요</td></tr>'; return; }
   let sTotalBuy = 0, sTotalEval = 0, sTotalProfit = 0, sHasCur = false, sTotalDayPnl = 0, sHasDayPnl = false;
   const sRows = _stockRecords.map(r => {
-    const buy    = (r.qty||0) * (r.avg_price||0);
-    const eval_  = (r.qty||0) * (r.current_price||0);
-    const profit = eval_ - buy;
-    const rate   = buy > 0 && r.current_price ? profit / buy * 100 : null;
-    const rc     = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
-    const dayPnl = r.chg != null ? r.chg * (r.qty||0) : null;
-    const drc    = dayPnl === null ? '' : dayPnl >= 0 ? 'up' : 'dn';
+    const buy     = (r.qty||0) * (r.avg_price||0);
+    const eval_   = (r.qty||0) * (r.current_price||0);
+    const profit  = eval_ - buy;
+    const rate    = buy > 0 && r.current_price ? profit / buy * 100 : null;
+    const rc      = rate === null ? '' : rate >= 0 ? 'up' : 'dn';
+    const dayPnl  = r.chg != null ? r.chg * (r.qty||0) : null;
+    const prev    = (r.current_price||0) - (r.chg||0);
+    const dayRate = (r.chg != null && prev > 0) ? r.chg / prev * 100 : null;
+    const drc     = dayPnl === null ? '' : dayPnl >= 0 ? 'up' : 'dn';
     sTotalBuy += buy;
     if (r.current_price) { sTotalEval += eval_; sTotalProfit += profit; sHasCur = true; }
     if (dayPnl !== null) { sTotalDayPnl += dayPnl; sHasDayPnl = true; }
+    const rateStr  = rate   !== null ? `${profit>=0?'+':''}${Math.round(profit).toLocaleString()}원(${rate>=0?'+':''}${rate.toFixed(2)}%)`      : '-';
+    const dayStr   = dayPnl !== null
+      ? (dayRate !== null
+          ? `${dayPnl>=0?'+':''}${Math.round(dayPnl).toLocaleString()}원(${dayRate>=0?'+':''}${dayRate.toFixed(2)}%)`
+          : `${dayPnl>=0?'+':''}${Math.round(dayPnl).toLocaleString()}원`)
+      : '-';
     return `<tr>
       <td>${r.name||'-'}${r.ticker ? `<div style="font-size:10px;color:var(--muted)">${r.ticker}</div>` : ''}</td>
-      <td class="${rc}" style="line-height:1.4">
-        ${rate !== null ? `<div>${rate>=0?'+':''}${rate.toFixed(2)}%</div>` : '-'}
-        ${r.current_price ? `<div style="font-size:10px;opacity:.75">${profit>=0?'+':''}${profit.toLocaleString()}원</div>` : ''}
-      </td>
-      <td class="${drc}">${dayPnl !== null ? `${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원` : '-'}</td>
+      <td class="${rc}">${rateStr}</td>
+      <td class="${drc}">${dayStr}</td>
       <td>${eval_ ? eval_.toLocaleString()+'원' : '-'}</td>
     </tr>`;
   }).join('');
-  const sTotalRate = sTotalBuy > 0 && sHasCur ? (sTotalProfit / sTotalBuy * 100) : null;
+  const sTotalRate    = sTotalBuy > 0 && sHasCur ? (sTotalProfit / sTotalBuy * 100) : null;
+  const sPrevEval     = sTotalEval - sTotalDayPnl;
+  const sTotalDayRate = sHasDayPnl && sPrevEval > 0 ? sTotalDayPnl / sPrevEval * 100 : null;
   const strc  = sTotalProfit >= 0 ? 'up' : 'dn';
   const sdtrc = sTotalDayPnl >= 0 ? 'up' : 'dn';
+  const sTotalRateStr = sTotalRate !== null
+    ? `${sTotalProfit>=0?'+':''}${Math.round(sTotalProfit).toLocaleString()}원(${sTotalRate>=0?'+':''}${sTotalRate.toFixed(2)}%)`
+    : '-';
+  const sTotalDayStr  = sHasDayPnl
+    ? (sTotalDayRate !== null
+        ? `${sTotalDayPnl>=0?'+':''}${Math.round(sTotalDayPnl).toLocaleString()}원(${sTotalDayRate>=0?'+':''}${sTotalDayRate.toFixed(2)}%)`
+        : `${sTotalDayPnl>=0?'+':''}${Math.round(sTotalDayPnl).toLocaleString()}원`)
+    : '-';
   tbody.innerHTML = sRows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
     <td>합계</td>
-    <td class="${strc}" style="line-height:1.4">
-      ${sTotalRate !== null ? `<div>${sTotalRate>=0?'+':''}${sTotalRate.toFixed(2)}%</div>` : '-'}
-      ${sHasCur ? `<div style="font-size:10px;opacity:.75">${sTotalProfit>=0?'+':''}${sTotalProfit.toLocaleString()}원</div>` : ''}
-    </td>
-    <td class="${sdtrc}">${sHasDayPnl ? `${sTotalDayPnl>=0?'+':''}${sTotalDayPnl.toLocaleString()}원` : '-'}</td>
+    <td class="${strc}">${sTotalRateStr}</td>
+    <td class="${sdtrc}">${sTotalDayStr}</td>
     <td>${sTotalEval ? sTotalEval.toLocaleString()+'원' : '-'}</td>
   </tr>`;
 }
