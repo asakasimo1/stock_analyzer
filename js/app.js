@@ -1435,12 +1435,15 @@ function _renderPortKpi() {
   etfEl.textContent = _portEtf.some(r => r.current_price) ? signFmt(etfProfit) : '-';
   colorVal(etfEl, etfProfit);
 
-  // 공모주 누적 수익 (매도 완료된 것만)
+  // 공모주 누적 수익 (매도 완료된 것만 — direct_profit 우선)
   const ipoProfit = _portIpo
-    .filter(r => r.price_open > 0 && r.price_ipo > 0)
-    .reduce((s, r) => s + (r.price_open - r.price_ipo) * (r.sell_qty || r.shares_alloc || 0) - 2000, 0);
+    .filter(r => r.direct_profit != null || (r.price_open > 0 && r.price_ipo > 0))
+    .reduce((s, r) => s + (r.direct_profit != null
+      ? r.direct_profit
+      : (r.price_open - r.price_ipo) * (r.sell_qty || r.shares_alloc || 0) - 2000), 0);
   const ipoEl = document.getElementById('pk-ipo-profit');
-  ipoEl.textContent = _portIpo.some(r => r.price_open > 0) ? signFmt(ipoProfit) : '-';
+  const hasIpoData = _portIpo.some(r => r.direct_profit != null || r.price_open > 0);
+  ipoEl.textContent = hasIpoData ? signFmt(ipoProfit) : '-';
   colorVal(ipoEl, ipoProfit);
 
   // 세후 배당 누적
