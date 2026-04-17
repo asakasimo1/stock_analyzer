@@ -1542,10 +1542,16 @@ function _renderPortIpo() {
     </tr>`;
   }).join('');
   const tc = totalProfit >= 0 ? 'up' : 'dn';
-  tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
-    <td>합계 (${sold.length}건)</td>
-    <td class="${tc}" colspan="2">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</td>
-  </tr>`;
+  tbody.innerHTML = rows;
+
+  // 합계 — 접힌 상태에서도 항상 보이도록 tbody 밖 별도 요소에 렌더링
+  const summary = document.getElementById('port-ipo-summary');
+  if (summary) {
+    summary.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);font-weight:700;font-size:13px">
+      <span>합계 <span style="font-weight:400;color:var(--muted);font-size:11px">(${sold.length}건)</span></span>
+      <span class="${tc}">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</span>
+    </div>`;
+  }
 }
 
 async function clearIpoSale(id) {
