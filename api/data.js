@@ -6,6 +6,11 @@
  * POST /api/data  body: { portfolio_meta: { cash: 1000000 } }
  */
 
+// ── Gist 전체 읽기 캐시 (warm 인스턴스 간 재사용, 30초 TTL) ──
+let _gistCache   = null;
+let _gistCacheAt = 0;
+const GIST_TTL   = 30_000;
+
 // ── KIS 토큰 캐시 (warm 인스턴스 간 재사용) ─────────────────
 let _tokenCache = null;
 
@@ -158,9 +163,17 @@ export default async function handler(req, res) {
 
   // ── GET: 전체 데이터 읽기 ─────────────────────────────────
   try {
-    const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
-    if (!r.ok) return res.status(r.status).json({ error: `GitHub API error: ${r.status}` });
-    const gist = await r.json();
+    let gist;
+    const now = Date.now();
+    if (_gistCache && now - _gistCacheAt < GIST_TTL) {
+      gist = _gistCache;
+    } else {
+      const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
+      if (!r.ok) return res.status(r.status).json({ error: `GitHub API error: ${r.status}` });
+      gist = await r.json();
+      _gistCache   = gist;
+      _gistCacheAt = now;
+    }
     const files = gist.files || {};
     const result = { briefing: [], picks: [], signals: [], ipo: [], portfolio_meta: {}, trader_trades: [], account_balance: null };
     for (const [key, fileObj] of Object.entries(files)) {

@@ -205,7 +205,7 @@ export default async function handler(req, res) {
       ? Number((annualDiv / price * 100).toFixed(2))
       : Number(d.dividendYieldTtm ?? 0);
 
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
     return res.status(200).json({
       ticker, name, price, chg, chgPct,
       divCycle, divMonths, annualDiv, annualDivRate, recentDiv, recentDivRate,

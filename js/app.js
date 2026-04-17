@@ -52,6 +52,41 @@ function switchTab(name) {
 })();
 
 // ══════════════════════════════════════════════════════════
+// /api/data 전역 공유 캐시 (5분 TTL) — 탭 전환 시 중복 Gist 호출 방지
+// ══════════════════════════════════════════════════════════
+let _sharedGistData = null;
+let _sharedGistAt   = 0;
+const GIST_CACHE_MS = 5 * 60 * 1000;
+let _gistFetchPromise = null; // 동시 호출 dedup
+
+async function _fetchGistData(force = false) {
+  const now = Date.now();
+  if (!force && _sharedGistData && now - _sharedGistAt < GIST_CACHE_MS) {
+    return _sharedGistData;
+  }
+  if (_gistFetchPromise) return _gistFetchPromise; // 진행 중인 요청 재사용
+  _gistFetchPromise = fetch('/api/data')
+    .then(r => r.ok ? r.json() : { briefing: [], picks: [], signals: [] })
+    .then(d => { _sharedGistData = d; _sharedGistAt = Date.now(); return d; })
+    .catch(() => _sharedGistData || { briefing: [], picks: [], signals: [] })
+    .finally(() => { _gistFetchPromise = null; });
+  return _gistFetchPromise;
+}
+
+// 동시 현재가 요청 개수 제한 (semaphore)
+function _makeSemaphore(limit) {
+  let running = 0;
+  const queue = [];
+  return function acquire() {
+    return new Promise(resolve => {
+      const run = () => { running++; resolve(() => { running--; if (queue.length) queue.shift()(); }); };
+      running < limit ? run() : queue.push(run);
+    });
+  };
+}
+const _priceSem = _makeSemaphore(5); // 동시 최대 5개 현재가 API 요청
+
+// ══════════════════════════════════════════════════════════
 // 대시보드 데이터 로드
 // ══════════════════════════════════════════════════════════
 let _dashData = null;
@@ -62,12 +97,14 @@ async function initDashboard() {
   try {
     // 대시보드 데이터와 IPO 레코드를 동시에 로드
     // (_ipoRecords가 없으면 캘린더 모달의 청약완료·배정입력 버튼이 동작하지 않음)
-    const [rDash, rIpo] = await Promise.all([
-      fetch('/api/data'),
-      fetch('/api/ipo'),
+    const ipoPromise = _ipoRecords.length > 0
+      ? Promise.resolve({ records: _ipoRecords })
+      : fetch('/api/ipo').then(r => r.ok ? r.json() : {});
+    const [dashData, ipoData] = await Promise.all([
+      _fetchGistData(),
+      ipoPromise,
     ]);
-    _dashData = rDash.ok ? await rDash.json() : { briefing: [], picks: [], signals: [] };
-    const ipoData = rIpo.ok ? await rIpo.json() : {};
+    _dashData = dashData;
     // /api/ipo 실패 시 /api/data의 ipo 배열로 폴백 (GH_TOKEN 미설정 등)
     _ipoRecords = (ipoData.records && ipoData.records.length)
       ? ipoData.records
@@ -112,8 +149,9 @@ async function _pollAccount() {
 }
 function startAccountPolling() {
   if (_accountPollTimer) return;
-  _pollAccount(); // 페이지 로드 즉시 1회 실행
-  _accountPollTimer = setInterval(_pollAccount, 30000); // 이후 30초마다
+  // initDashboard에서 이미 account_balance를 로드했으면 즉시 실행 건너뜀
+  if (!(_sharedGistData && _sharedGistData.account_balance)) _pollAccount();
+  _accountPollTimer = setInterval(_pollAccount, 30000); // 30초마다
 }
 
 // ── 브리핑 목록 ─────────────────────────────────────────
@@ -1266,12 +1304,16 @@ const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 async function initPortfolio() {
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
+    // /api/ipo · /api/data는 전역 캐시(_ipoRecords, _sharedGistData) 재사용해 중복 호출 방지
+    const ipoPromise = _ipoRecords.length > 0
+      ? Promise.resolve({ records: _ipoRecords })
+      : fetch('/api/ipo').then(r => r.json());
     const [etfRes, ipoRes, divRes, stkRes, metaRes] = await Promise.all([
       fetch('/api/etf').then(r=>r.json()),
-      fetch('/api/ipo').then(r=>r.json()),
+      ipoPromise,
       fetch('/api/dividend').then(r=>r.json()),
       fetch('/api/stocks').then(r=>r.json()),
-      fetch('/api/data').then(r=>r.json()),
+      _fetchGistData(),
     ]);
     _portEtf      = etfRes.records || [];
     _portIpo      = ipoRes.records || [];
@@ -1298,19 +1340,21 @@ async function _refreshPortfolioRealtime() {
     const etfFetches = _portEtf
       .filter(r => r.ticker)
       .map(async r => {
+        const release = await _priceSem();
         try {
           const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
           if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; }
-        } catch {}
+        } catch {} finally { release(); }
       });
 
     const stkFetches = _stockRecords
       .filter(r => r.ticker)
       .map(async r => {
+        const release = await _priceSem();
         try {
           const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
           if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; }
-        } catch {}
+        } catch {} finally { release(); }
       });
 
     await Promise.all([...etfFetches, ...stkFetches]);
@@ -2020,10 +2064,11 @@ async function refreshAllStockPrices(silent = false) {
   let updated = 0;
   await Promise.all(_stockRecords.map(async r => {
     if (!r.ticker) return;
+    const release = await _priceSem();
     try {
       const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
       if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; updated++; }
-    } catch {}
+    } catch {} finally { release(); }
   }));
 
   renderStockCards();
@@ -4186,6 +4231,7 @@ async function refreshAllEtfPrices(silent = false) {
   let updated = 0;
   await Promise.all(_etfRecords.map(async r => {
     if (!r.ticker) return;
+    const release = await _priceSem();
     try {
       const res = await fetch(`/api/quote?ticker=${r.ticker}`);
       const d   = await res.json();
@@ -4203,7 +4249,7 @@ async function refreshAllEtfPrices(silent = false) {
         if (d.annualDivRate) r.annual_div_rate  = d.annualDivRate;
         updated++;
       }
-    } catch {}
+    } catch {} finally { release(); }
   }));
 
   if (updated) {
@@ -4840,17 +4886,17 @@ async function atRefreshPrices() {
 
 async function atLoadAll() {
   try {
-    const [rSell, rBuy, rCycle, rData] = await Promise.all([
+    // /api/data는 전역 캐시 재사용 (dashboard/portfolio 탭이 이미 로드했으면 네트워크 불필요)
+    const [rSell, rBuy, rCycle, gistData] = await Promise.all([
       fetch('/api/profit-sell'),
       fetch('/api/profit-buy'),
       fetch('/api/profit-cycle'),
-      fetch('/api/data'),
+      _fetchGistData(),
     ]);
     _atJobs    = rSell.ok  ? await rSell.json()  : [];
     _abJobs    = rBuy.ok   ? await rBuy.json()   : [];
     _acJobs    = rCycle.ok ? await rCycle.json() : [];
-    const data = rData.ok  ? await rData.json()  : {};
-    _atAccount = data.account_balance || null;
+    _atAccount = gistData.account_balance || null;
   } catch (e) {
     console.warn('자동매매 데이터 로드 실패:', e);
   }

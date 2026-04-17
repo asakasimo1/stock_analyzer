@@ -3,7 +3,7 @@
  * 환경변수: JSONBIN_KEY, JSONBIN_BIN_ID
  */
 const BASE = 'https://api.jsonbin.io/v3/b';
-const TTL_MS = 30_000;
+const TTL_MS = 300_000; // 5분
 
 let _cache = null;
 let _cacheAt = 0;
