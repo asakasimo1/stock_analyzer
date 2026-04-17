@@ -1486,21 +1486,32 @@ function _renderPortEtf() {
 function _renderPortIpo() {
   const card  = document.getElementById('port-ipo-card');
   const tbody = document.getElementById('port-ipo-tbody');
-  const sold  = _portIpo.filter(r => r.price_open > 0 && r.price_ipo > 0);
+  // direct_profit(직접 입력) 또는 price_open+price_ipo 계산 둘 다 표시
+  const sold  = _portIpo.filter(r => r.direct_profit != null || (r.price_open > 0 && r.price_ipo > 0));
   if (!sold.length) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
-  tbody.innerHTML = sold.map(r => {
-    const qty    = r.sell_qty || r.shares_alloc || 0;
-    const profit = (r.price_open - r.price_ipo) * qty - 2000;
-    const rate   = ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
-    const pc     = profit >= 0 ? 'up' : 'dn';
-    const rateStr = `${profit>=0?'+':''}${profit.toLocaleString()}원<br>(${rate>=0?'+':''}${rate}%)`;
+  let totalProfit = 0;
+  const rows = sold.map(r => {
+    const profit = r.direct_profit != null
+      ? r.direct_profit
+      : (r.price_open - r.price_ipo) * (r.sell_qty || r.shares_alloc || 0) - 2000;
+    const rate = r.direct_rate != null
+      ? Number(r.direct_rate).toFixed(2)
+      : ((r.price_open - r.price_ipo) / r.price_ipo * 100).toFixed(2);
+    totalProfit += profit;
+    const pc      = profit >= 0 ? 'up' : 'dn';
+    const rateStr = `${profit>=0?'+':''}${profit.toLocaleString()}원<br>(${Number(rate)>=0?'+':''}${rate}%)`;
     return `<tr>
       <td>${r.name||'-'}</td>
       <td class="${pc}">${rateStr}</td>
       <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
     </tr>`;
   }).join('');
+  const tc = totalProfit >= 0 ? 'up' : 'dn';
+  tbody.innerHTML = rows + `<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg)">
+    <td>합계 (${sold.length}건)</td>
+    <td class="${tc}" colspan="2">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</td>
+  </tr>`;
 }
 
 async function clearIpoSale(id) {
