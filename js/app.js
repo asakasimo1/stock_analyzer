@@ -1307,24 +1307,23 @@ function togglePortSection(key) {
   if (!body || !toggle) return;
   const isCollapsed = body.classList.toggle('collapsed');
   toggle.classList.toggle('collapsed', isCollapsed);
-  try { localStorage.setItem(`port-collapse-${key}`, isCollapsed ? '1' : '0'); } catch(_) {}
+  // 'ipo'는 항상 접힘 시작이므로 localStorage 저장 안 함
+  if (key !== 'ipo') {
+    try { localStorage.setItem(`port-collapse-${key}`, isCollapsed ? '1' : '0'); } catch(_) {}
+  }
 }
 
-const _PORT_COLLAPSE_DEFAULTS = { 'etf-div': false, 'ipo': true };
-
 function _initPortCollapse() {
-  ['etf-div', 'ipo'].forEach(key => {
-    try {
-      const saved = localStorage.getItem(`port-collapse-${key}`);
-      const collapse = saved !== null ? saved === '1' : _PORT_COLLAPSE_DEFAULTS[key];
-      if (collapse) {
-        const body   = document.getElementById(`port-${key}-body`);
-        const toggle = document.getElementById(`port-${key}-toggle`);
-        if (body)   body.classList.add('collapsed');
-        if (toggle) toggle.classList.add('collapsed');
-      }
-    } catch(_) {}
-  });
+  // etf-div: localStorage 상태 복원
+  try {
+    if (localStorage.getItem('port-collapse-etf-div') === '1') {
+      document.getElementById('port-etf-div-body')?.classList.add('collapsed');
+      document.getElementById('port-etf-div-toggle')?.classList.add('collapsed');
+    }
+  } catch(_) {}
+  // ipo: 항상 접힘 (localStorage 무시)
+  document.getElementById('port-ipo-body')?.classList.add('collapsed');
+  document.getElementById('port-ipo-toggle')?.classList.add('collapsed');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1535,15 +1534,12 @@ function _renderPortIpo() {
     totalProfit += profit;
     const pc      = profit >= 0 ? 'up' : 'dn';
     const rateStr = `${profit>=0?'+':''}${profit.toLocaleString()}원<br>(${Number(rate)>=0?'+':''}${rate}%)`;
-    const nm      = (r.name || '').replace(/'/g, "\\'");
-    const dateVal = r.sell_date || '';
+    const dateStr = r.sell_date ? r.sell_date.slice(2).replace(/-/g, '.') : '-';
     return `<tr>
       <td>${r.name||'-'}</td>
       <td class="${pc}">${rateStr}</td>
       <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
-      <td><input type="date" class="ipo-date-input" value="${dateVal}"
-            onchange="saveIpoSellDate('${nm}', this.value)"
-            style="border:none;background:transparent;color:var(--fg);font-size:11px;width:100px;cursor:pointer"></td>
+      <td style="color:var(--muted);font-size:11px">${dateStr}</td>
     </tr>`;
   }).join('');
   const tc = totalProfit >= 0 ? 'up' : 'dn';
@@ -1557,20 +1553,6 @@ function _renderPortIpo() {
       <span class="${tc}">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</span>
     </div>`;
   }
-}
-
-async function saveIpoSellDate(name, dateVal) {
-  const rec = _portIpo.find(r => r.name === name);
-  if (!rec) return;
-  rec.sell_date = dateVal || null;
-  try {
-    const res = await fetch('/api/ipo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ records: _portIpo }),
-    });
-    if (!(await res.json()).ok) throw new Error('저장 실패');
-  } catch(e) { alert('저장 오류: ' + e.message); }
 }
 
 async function clearIpoSale(id) {
