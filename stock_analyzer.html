@@ -782,7 +782,12 @@
 
   <!-- ── 매도 섹션 ─────────────────────────────────────── -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:10px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🎯 수익매도 잡 등록</div>
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">🎯 수익매도 잡 등록</div>
+    <!-- 자동매도 규칙 안내 -->
+    <div style="background:#16a34a18;border:1px solid #16a34a44;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:11px;color:#16a34a;line-height:1.6">
+      <b>🤖 자동매도 규칙 (항상 적용)</b><br>
+      보유 종목 수익률 <b>+20% 초과</b> 시 전량 즉시 매도 — 매 5분마다 자동 체크
+    </div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <!-- 보유종목 칩 -->
       <div id="at-holding-chips" style="display:none">
