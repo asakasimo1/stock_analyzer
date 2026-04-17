@@ -3714,7 +3714,6 @@ function fillDivDefaults(etfId) {
 
   if (!etfId) {
     document.getElementById('dv-qty').value = '';
-    document.getElementById('dv-qty-display').textContent = '-';
     document.getElementById('dv-per-share').value = '';
     document.getElementById('dv-per-share-display').textContent = '-';
     document.getElementById('dv-gross-input').value = '';
@@ -3725,9 +3724,8 @@ function fillDivDefaults(etfId) {
   const etfRec = _etfRecords.find(x => String(x.id) === String(etfId));
   const qty = etfRec?.qty || 0;
 
-  document.getElementById('dv-qty').value = qty;
-  document.getElementById('dv-qty-display').textContent = qty ? qty.toLocaleString() + '주' : '-';
-  document.getElementById('dv-qty-display').style.color = qty ? 'var(--text)' : 'var(--muted)';
+  // 현재 보유수량을 기본값으로 채우되, 사용자가 배당기준일 수량으로 직접 수정 가능
+  document.getElementById('dv-qty').value = qty || '';
 
   calcDivPreview();
 }

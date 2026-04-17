@@ -1281,9 +1281,10 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:12px;color:var(--muted)">보유 수량 (주)</label>
-          <div id="dv-qty-display" style="margin-top:4px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:14px">-</div>
-          <input id="dv-qty" type="hidden">
+          <label style="font-size:12px;color:var(--muted)">배당기준일 보유수량 (주)</label>
+          <input id="dv-qty" type="number" min="1" placeholder="기준일 보유 주수 입력"
+            style="margin-top:4px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;width:100%;box-sizing:border-box"
+            oninput="calcDivPreview()">
         </div>
         <div>
           <label style="font-size:12px;color:var(--muted)">주당 배당금 (자동계산)</label>
