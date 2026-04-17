@@ -5091,6 +5091,30 @@ function hideAtAc() {
   }, 150);
 }
 
+async function atShowCurrentPrice(ticker) {
+  const wrap = document.getElementById('at-cur-price-wrap');
+  const el   = document.getElementById('at-cur-price');
+  const pct  = document.getElementById('at-cur-pct');
+  if (!wrap || !el) return;
+  wrap.style.display = 'inline';
+  el.textContent = '조회 중...';
+  if (pct) pct.textContent = '';
+  try {
+    const r = await fetch(`/api/stock?ticker=${ticker}`);
+    const d = await r.json();
+    if (d.price) {
+      el.textContent = `${d.price.toLocaleString()}원`;
+      if (pct && d.chgPct !== undefined) {
+        const c = parseFloat(d.chgPct) || 0;
+        pct.textContent = `${c >= 0 ? '+' : ''}${c.toFixed(2)}%`;
+        pct.style.color = c >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+    } else {
+      el.textContent = '—';
+    }
+  } catch { el.textContent = '—'; }
+}
+
 function selectAtAcItem(name, ticker, qty, buyPrice) {
   document.getElementById('at-name').value = name;
   document.getElementById('at-ticker').value = ticker;
@@ -5098,6 +5122,7 @@ function selectAtAcItem(name, ticker, qty, buyPrice) {
   hideAtAc();
   if (qty !== undefined)      document.getElementById('at-qty').value      = qty;
   if (buyPrice !== undefined) document.getElementById('at-buyprice').value = buyPrice;
+  atShowCurrentPrice(ticker);
   atUpdateHint();
 }
 
@@ -5108,6 +5133,7 @@ function atFillFromHolding(ticker, name, qty, buyPrice) {
   document.getElementById('at-ticker-display').textContent = ticker;
   document.getElementById('at-qty').value           = qty;
   document.getElementById('at-buyprice').value      = buyPrice;
+  atShowCurrentPrice(ticker);
   atUpdateHint();
 }
 
