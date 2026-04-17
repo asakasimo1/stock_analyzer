@@ -73,7 +73,7 @@ export default async function handler(req, res) {
 
     const jobs = await readJobs();
     const updated = jobs.map(j =>
-      j.ticker === ticker && j.status === 'active'
+      j.ticker === ticker && (j.status === 'active' || j.status === 'submitted')
         ? { ...j, status: 'cancelled', cancelled_at: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }).slice(0, 16) }
         : j
     );

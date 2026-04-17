@@ -5347,8 +5347,8 @@ async function atSellNow(ticker, name, qty) {
 
 // ── 잡 목록 렌더링 ───────────────────────────────────────
 function atRenderJobs() {
-  const active  = _atJobs.filter(j => j.status === 'active');
-  const history = _atJobs.filter(j => j.status !== 'active');
+  const active  = _atJobs.filter(j => j.status === 'active' || j.status === 'submitted');
+  const history = _atJobs.filter(j => j.status !== 'active' && j.status !== 'submitted');
 
   const elActive = document.getElementById('at-active-list');
   if (elActive) {
@@ -5356,25 +5356,34 @@ function atRenderJobs() {
       elActive.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">등록된 활성 잡 없음</div>';
     } else {
       elActive.innerHTML = active.map(j => {
+        const isSubmitted = j.status === 'submitted';
         const typeLabel = j.target_type === 'price'
           ? `지정가 ${Number(j.target_price).toLocaleString()}원`
           : j.target_type === 'amount'
           ? `순이익 +${Number(j.target_value).toLocaleString()}원`
           : `수익률 +${j.target_value}%`;
+        const submittedBadge = isSubmitted
+          ? `<span style="font-size:11px;background:#1a3a7a33;color:var(--primary);border-radius:5px;padding:2px 7px;margin-left:6px;font-weight:500">📋 MTS 주문 대기중</span>`
+          : '';
+        const orderNoHint = isSubmitted && j.order_no
+          ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">주문번호: ${j.order_no} · ${j.submitted_at||''}</div>`
+          : '';
         return `
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px">
+          <div style="background:var(--surface);border:1px solid ${isSubmitted ? 'var(--primary)44' : 'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:8px">
             <!-- 헤더 행 -->
             <div style="display:flex;align-items:flex-start;gap:10px">
               <div style="flex:1">
                 <div style="font-size:14px;font-weight:700;color:var(--text)">${j.name}
                   <span style="font-size:12px;color:var(--muted);font-weight:400">${j.ticker}</span>
+                  ${submittedBadge}
                 </div>
                 <div style="font-size:12px;color:var(--muted);margin-top:3px">
                   ${j.qty}주 · 매수 ${Number(j.buy_price).toLocaleString()}원 · 목표 ${typeLabel}
                 </div>
+                ${orderNoHint}
               </div>
               <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-                <button id="at-sell-btn-${j.ticker}"
+                ${isSubmitted ? '' : `<button id="at-sell-btn-${j.ticker}"
                   onclick="atSellNow('${j.ticker}','${j.name.replace(/'/g,"\\'")}',${j.qty})"
                   style="background:var(--red);border:none;color:#fff;
                          border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600">
@@ -5384,7 +5393,7 @@ function atRenderJobs() {
                   style="background:none;border:1px solid var(--primary);color:var(--primary);
                          border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
                   ✎ 수정
-                </button>
+                </button>`}
                 <button onclick="atCancel('${j.ticker}')"
                   style="background:none;border:1px solid var(--border);color:var(--muted);
                          border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap">
