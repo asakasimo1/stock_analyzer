@@ -5112,6 +5112,20 @@ function atFillFromHolding(ticker, name, qty, buyPrice) {
 }
 
 function atTypeChange() {
+  const type      = document.querySelector('input[name="at-type"]:checked')?.value || 'amount';
+  const buyRow    = document.getElementById('at-buyprice')?.closest('div')?.parentElement;
+  const targetEl  = document.getElementById('at-target');
+  const bpEl      = document.getElementById('at-buyprice');
+  const bpWrap    = bpEl?.closest('div[style*="grid"]') || bpEl?.parentElement;
+
+  // 지정가 선택 시 매수단가 불필요 → 흐리게 표시, placeholder 변경
+  if (type === 'price') {
+    if (targetEl) targetEl.placeholder = '예: 85000';
+    if (bpEl) { bpEl.style.opacity = '0.4'; bpEl.readOnly = true; }
+  } else {
+    if (targetEl) targetEl.placeholder = type === 'amount' ? '예: 50' : '예: 3';
+    if (bpEl) { bpEl.style.opacity = '1'; bpEl.readOnly = false; }
+  }
   atUpdateHint();
 }
 
@@ -5123,7 +5137,11 @@ function atUpdateHint() {
   const hint   = document.getElementById('at-target-hint');
   if (!hint) return;
 
-  if (type === 'amount') {
+  if (type === 'price') {
+    hint.textContent = target
+      ? `현재가 ≥ ${target.toLocaleString()}원 도달 시 즉시 매도`
+      : '매도를 원하는 지정 가격 (원) 입력';
+  } else if (type === 'amount') {
     if (bp && target) {
       const tp = Math.ceil((bp * (1 + AT_BUY_FEE) * qty + target) / qty / (1 - AT_SELL_FEE));
       hint.textContent = `수수료 차감 후 순이익 ${target.toLocaleString()}원 → 목표 매도단가 ${tp.toLocaleString()}원`;
@@ -5150,17 +5168,23 @@ async function atRegister() {
   const target   = parseFloat(document.getElementById('at-target').value);
   const msg      = document.getElementById('at-msg');
 
-  if (!ticker || !qty || !buyPrice || isNaN(target) || target <= 0) {
+  const needBuyPrice = type !== 'price';
+  if (!ticker || !qty || (needBuyPrice && !buyPrice) || isNaN(target) || target <= 0) {
     msg.style.color = 'var(--red)';
     msg.textContent = '모든 항목을 올바르게 입력하세요';
     return;
   }
 
-  const targetPrice = type === 'amount'
-    ? Math.ceil((buyPrice * (1 + AT_BUY_FEE) * qty + target) / qty / (1 - AT_SELL_FEE))
-    : Math.ceil(buyPrice * (1 + target / 100) / (1 - AT_SELL_FEE));
+  let targetPrice;
+  if (type === 'price') {
+    targetPrice = parseInt(target);
+  } else if (type === 'amount') {
+    targetPrice = Math.ceil((buyPrice * (1 + AT_BUY_FEE) * qty + target) / qty / (1 - AT_SELL_FEE));
+  } else {
+    targetPrice = Math.ceil(buyPrice * (1 + target / 100) / (1 - AT_SELL_FEE));
+  }
 
-  const job = { ticker, name, qty, buy_price: buyPrice, target_type: type, target_value: target, target_price: targetPrice };
+  const job = { ticker, name, qty, buy_price: buyPrice || 0, target_type: type, target_value: target, target_price: targetPrice };
 
   msg.style.color = 'var(--muted)';
   msg.textContent = '등록 중...';
@@ -5262,7 +5286,9 @@ function atRenderJobs() {
       elActive.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">등록된 활성 잡 없음</div>';
     } else {
       elActive.innerHTML = active.map(j => {
-        const typeLabel = j.target_type === 'amount'
+        const typeLabel = j.target_type === 'price'
+          ? `지정가 ${Number(j.target_price).toLocaleString()}원`
+          : j.target_type === 'amount'
           ? `순이익 +${Number(j.target_value).toLocaleString()}원`
           : `수익률 +${j.target_value}%`;
         return `
