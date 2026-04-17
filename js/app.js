@@ -1298,10 +1298,37 @@ async function saveCash() {
 const PORT_REFRESH_MS = 20 * 60 * 1000; // 20분
 
 // ══════════════════════════════════════════════════════════
+// 포트폴리오 섹션 접기/펼치기
+// ══════════════════════════════════════════════════════════
+
+function togglePortSection(key) {
+  const body   = document.getElementById(`port-${key}-body`);
+  const toggle = document.getElementById(`port-${key}-toggle`);
+  if (!body || !toggle) return;
+  const isCollapsed = body.classList.toggle('collapsed');
+  toggle.classList.toggle('collapsed', isCollapsed);
+  try { localStorage.setItem(`port-collapse-${key}`, isCollapsed ? '1' : '0'); } catch(_) {}
+}
+
+function _initPortCollapse() {
+  ['etf-div', 'ipo'].forEach(key => {
+    try {
+      if (localStorage.getItem(`port-collapse-${key}`) === '1') {
+        const body   = document.getElementById(`port-${key}-body`);
+        const toggle = document.getElementById(`port-${key}-toggle`);
+        if (body)   body.classList.add('collapsed');
+        if (toggle) toggle.classList.add('collapsed');
+      }
+    } catch(_) {}
+  });
+}
+
+// ══════════════════════════════════════════════════════════
 // 포트폴리오 (ETF Gist + IPO Gist + 개별주 Gist 기반)
 // ══════════════════════════════════════════════════════════
 
 async function initPortfolio() {
+  _initPortCollapse();
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
     // /api/ipo · /api/data는 전역 캐시(_ipoRecords, _sharedGistData) 재사용해 중복 호출 방지

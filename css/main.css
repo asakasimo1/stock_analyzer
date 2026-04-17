@@ -490,6 +490,19 @@
     letter-spacing: .06em; text-transform: uppercase;
     margin-bottom: 18px;
   }
+  .port-card-title.collapsible {
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    user-select: none;
+  }
+  .port-card-title.collapsible:hover { color: var(--fg); }
+  .port-collapse-icon {
+    font-style: normal; font-size: 12px;
+    transition: transform .25s;
+    display: inline-block;
+  }
+  .port-card-body.collapsed { display: none; }
+  .port-card-title.collapsible.collapsed .port-collapse-icon { transform: rotate(-90deg); }
 
   /* SVG 차트 */
   .port-chart-svg { width: 100%; overflow: visible; }
