@@ -1519,8 +1519,10 @@ function _renderPortEtf() {
 function _renderPortIpo() {
   const card  = document.getElementById('port-ipo-card');
   const tbody = document.getElementById('port-ipo-tbody');
-  // direct_profit(직접 입력) 또는 price_open+price_ipo 계산 둘 다 표시
-  const sold  = _portIpo.filter(r => r.direct_profit != null || (r.price_open > 0 && r.price_ipo > 0));
+  // direct_profit(직접 입력) 또는 price_open+price_ipo 계산 둘 다 표시, 매도일 최신순 정렬
+  const sold  = _portIpo
+    .filter(r => r.direct_profit != null || (r.price_open > 0 && r.price_ipo > 0))
+    .sort((a, b) => (b.sell_date || '').localeCompare(a.sell_date || ''));
   if (!sold.length) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
   let totalProfit = 0;
