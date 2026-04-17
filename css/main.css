@@ -549,6 +549,9 @@
   .port-table .up  { color: var(--green); font-weight: 700; }
   .port-table .dn  { color: var(--red);   font-weight: 700; }
   .port-table .neu { color: var(--muted); }
+  .ipo-date-input { border:none; background:transparent; color:var(--muted); font-size:11px; width:100px; cursor:pointer; outline:none; }
+  .ipo-date-input:focus { color:var(--fg); }
+  .ipo-date-input::-webkit-calendar-picker-indicator { opacity:.5; cursor:pointer; }
 
   /* 로딩 / 에러 상태 */
   .port-loading {

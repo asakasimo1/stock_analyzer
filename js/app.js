@@ -1535,10 +1535,15 @@ function _renderPortIpo() {
     totalProfit += profit;
     const pc      = profit >= 0 ? 'up' : 'dn';
     const rateStr = `${profit>=0?'+':''}${profit.toLocaleString()}원<br>(${Number(rate)>=0?'+':''}${rate}%)`;
+    const nm      = (r.name || '').replace(/'/g, "\\'");
+    const dateVal = r.sell_date || '';
     return `<tr>
       <td>${r.name||'-'}</td>
       <td class="${pc}">${rateStr}</td>
       <td>${profit>=0?'+':''}${profit.toLocaleString()}원</td>
+      <td><input type="date" class="ipo-date-input" value="${dateVal}"
+            onchange="saveIpoSellDate('${nm}', this.value)"
+            style="border:none;background:transparent;color:var(--fg);font-size:11px;width:100px;cursor:pointer"></td>
     </tr>`;
   }).join('');
   const tc = totalProfit >= 0 ? 'up' : 'dn';
@@ -1552,6 +1557,20 @@ function _renderPortIpo() {
       <span class="${tc}">${totalProfit>=0?'+':''}${totalProfit.toLocaleString()}원</span>
     </div>`;
   }
+}
+
+async function saveIpoSellDate(name, dateVal) {
+  const rec = _portIpo.find(r => r.name === name);
+  if (!rec) return;
+  rec.sell_date = dateVal || null;
+  try {
+    const res = await fetch('/api/ipo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: _portIpo }),
+    });
+    if (!(await res.json()).ok) throw new Error('저장 실패');
+  } catch(e) { alert('저장 오류: ' + e.message); }
 }
 
 async function clearIpoSale(id) {
