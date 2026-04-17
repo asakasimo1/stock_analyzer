@@ -1310,10 +1310,14 @@ function togglePortSection(key) {
   try { localStorage.setItem(`port-collapse-${key}`, isCollapsed ? '1' : '0'); } catch(_) {}
 }
 
+const _PORT_COLLAPSE_DEFAULTS = { 'etf-div': false, 'ipo': true };
+
 function _initPortCollapse() {
   ['etf-div', 'ipo'].forEach(key => {
     try {
-      if (localStorage.getItem(`port-collapse-${key}`) === '1') {
+      const saved = localStorage.getItem(`port-collapse-${key}`);
+      const collapse = saved !== null ? saved === '1' : _PORT_COLLAPSE_DEFAULTS[key];
+      if (collapse) {
         const body   = document.getElementById(`port-${key}-body`);
         const toggle = document.getElementById(`port-${key}-toggle`);
         if (body)   body.classList.add('collapsed');
