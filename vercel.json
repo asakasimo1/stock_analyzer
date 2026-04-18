@@ -14,7 +14,7 @@
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
     { "src": "api/investor.js", "use": "@vercel/node" },
-    { "src": "api/profit-jobs.js", "use": "@vercel/node" }
+    { "src": "api/coin.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -32,8 +32,14 @@
     { "src": "/api/stocks(.*)", "dest": "/api/stocks.js" },
     { "src": "/api/stock(.*)", "dest": "/api/stock.js" },
     { "src": "/api/investor(.*)", "dest": "/api/investor.js" },
-    { "src": "/api/profit-sell(.*)",  "dest": "/api/profit-jobs.js" },
-    { "src": "/api/profit-buy(.*)",   "dest": "/api/profit-jobs.js" },
-    { "src": "/api/profit-cycle(.*)", "dest": "/api/profit-jobs.js" }
+    { "src": "/api/profit-sell(.*)",  "dest": "/api/coin.js" },
+    { "src": "/api/profit-buy(.*)",   "dest": "/api/coin.js" },
+    { "src": "/api/profit-cycle(.*)", "dest": "/api/coin.js" },
+    { "src": "/api/coin-buy(.*)",     "dest": "/api/coin.js" },
+    { "src": "/api/coin-sell(.*)",    "dest": "/api/coin.js" },
+    { "src": "/api/coin-cycle(.*)",   "dest": "/api/coin.js" },
+    { "src": "/api/coin-account(.*)", "dest": "/api/coin.js" },
+    { "src": "/api/coin-runner(.*)",  "dest": "/api/coin.js" },
+    { "src": "/api/coin-ip(.*)",      "dest": "/api/coin.js" }
   ]
 }

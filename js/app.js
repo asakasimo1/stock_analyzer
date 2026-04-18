@@ -1,8 +1,99 @@
 
 // ══════════════════════════════════════════════════════════
+// 설정
+// ══════════════════════════════════════════════════════════
+const SETTINGS_KEY = 'app-settings-v1';
+const TAB_LABELS = {
+  dashboard:'📊 대시보드', portfolio:'📈 포트폴리오', market:'📊 시장현황',
+  etf:'💹 ETF', stocks:'📊 개별주', autotrade:'🤖 자동매매', cointrade:'🪙 자동코인매매',
+};
+let _settings = { hiddenTabs:[], darkMode:false, defaultTab:'dashboard', autoRefreshSec:0 };
+let _autoRefreshTimer = null;
+
+function _loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (s) _settings = { ..._settings, ...s };
+  } catch(_) {}
+}
+
+function _saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings)); } catch(_) {}
+}
+
+function _applySettingsState() {
+  document.body.classList.toggle('dark', !!_settings.darkMode);
+  _applyTabVisibility();
+  clearInterval(_autoRefreshTimer);
+  if (_settings.autoRefreshSec > 0) {
+    _autoRefreshTimer = setInterval(() => {
+      const cur = document.querySelector('.tab-btn.active')
+        ?.getAttribute('onclick')?.match(/switchTab\('(\w+)'\)/)?.[1];
+      if (cur === 'dashboard') initDashboard();
+    }, _settings.autoRefreshSec * 1000);
+  }
+}
+
+function _applyTabVisibility() {
+  TAB_ORDER.forEach(tab => {
+    const btn = document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`);
+    if (btn) btn.style.display = _settings.hiddenTabs.includes(tab) ? 'none' : '';
+  });
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    const first = TAB_ORDER.find(t => !_settings.hiddenTabs.includes(t));
+    if (first) switchTab(first);
+  }
+}
+
+function applySettings() {
+  const darkEl = document.getElementById('set-dark');
+  if (darkEl) _settings.darkMode = darkEl.checked;
+  const dtEl = document.getElementById('set-default-tab');
+  if (dtEl) _settings.defaultTab = dtEl.value;
+  const arEl = document.getElementById('set-auto-refresh');
+  if (arEl) _settings.autoRefreshSec = +arEl.value;
+  _settings.hiddenTabs = [];
+  document.querySelectorAll('.set-tab-toggle').forEach(cb => {
+    if (!cb.checked) _settings.hiddenTabs.push(cb.dataset.tab);
+  });
+  _saveSettings();
+  _applySettingsState();
+}
+
+function openSettings() {
+  const darkEl = document.getElementById('set-dark');
+  if (darkEl) darkEl.checked = !!_settings.darkMode;
+  const dtEl = document.getElementById('set-default-tab');
+  if (dtEl) dtEl.value = _settings.defaultTab || 'dashboard';
+  const arEl = document.getElementById('set-auto-refresh');
+  if (arEl) arEl.value = String(_settings.autoRefreshSec || 0);
+  const list = document.getElementById('set-tabs-list');
+  if (list) {
+    list.innerHTML = TAB_ORDER.map(tab => `
+      <div class="settings-row">
+        <div class="settings-row-label">${TAB_LABELS[tab]}</div>
+        <label class="toggle">
+          <input type="checkbox" class="set-tab-toggle" data-tab="${tab}"
+            ${_settings.hiddenTabs.includes(tab) ? '' : 'checked'}
+            onchange="applySettings()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`).join('');
+  }
+  document.getElementById('settings-overlay').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+_loadSettings();
+
+// ══════════════════════════════════════════════════════════
 // 탭 전환
 // ══════════════════════════════════════════════════════════
-const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks', 'autotrade'];
+const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks', 'autotrade', 'cointrade'];
 
 function switchTab(name) {
   document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
@@ -20,6 +111,7 @@ function switchTab(name) {
   if (name === 'etf') loadEtfRecords();
   if (name === 'stocks') loadStockRecords();
   if (name === 'autotrade') initAutoTrade();
+  if (name === 'cointrade') initCoinTrade();
 }
 
 // ── 탭 스와이프 (모바일) ──────────────────────────────────
@@ -45,9 +137,10 @@ function switchTab(name) {
     const active = document.querySelector('.tab-btn.active');
     if (!active) return;
     const cur = active.getAttribute('onclick').match(/switchTab\('(\w+)'\)/)?.[1];
-    const idx = TAB_ORDER.indexOf(cur);
-    if (dx < 0 && idx < TAB_ORDER.length - 1) switchTab(TAB_ORDER[idx + 1]);
-    if (dx > 0 && idx > 0) switchTab(TAB_ORDER[idx - 1]);
+    const visible = TAB_ORDER.filter(t => !(_settings.hiddenTabs||[]).includes(t));
+    const idx = visible.indexOf(cur);
+    if (dx < 0 && idx < visible.length - 1) switchTab(visible[idx + 1]);
+    if (dx > 0 && idx > 0) switchTab(visible[idx - 1]);
   }, { passive: true });
 })();
 
@@ -2314,8 +2407,9 @@ async function deleteStkTransaction(id) {
   }
 }
 
-// 페이지 로드 시 대시보드 즉시 초기화 (모든 변수/함수 선언 완료 후)
-initDashboard();
+// 페이지 로드 시 설정 적용 후 시작 탭 초기화
+_applySettingsState();
+switchTab(_settings.defaultTab || 'dashboard');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 공모주 관리 (웹 CRUD)
@@ -6275,3 +6369,577 @@ async function abRefreshPrices() {
   }
 }
 
+
+// ══════════════════════════════════════════════════════════
+// 자동코인매매 탭
+// ══════════════════════════════════════════════════════════
+
+const COIN_LIST = [
+  {ticker:'KRW-BTC',  name:'비트코인',       symbol:'BTC'},
+  {ticker:'KRW-ETH',  name:'이더리움',        symbol:'ETH'},
+  {ticker:'KRW-XRP',  name:'리플',            symbol:'XRP'},
+  {ticker:'KRW-SOL',  name:'솔라나',          symbol:'SOL'},
+  {ticker:'KRW-DOGE', name:'도지코인',        symbol:'DOGE'},
+  {ticker:'KRW-ADA',  name:'에이다',          symbol:'ADA'},
+  {ticker:'KRW-AVAX', name:'아발란체',        symbol:'AVAX'},
+  {ticker:'KRW-DOT',  name:'폴카닷',          symbol:'DOT'},
+  {ticker:'KRW-LINK', name:'체인링크',        symbol:'LINK'},
+  {ticker:'KRW-ATOM', name:'코스모스',        symbol:'ATOM'},
+  {ticker:'KRW-MATIC',name:'폴리곤',          symbol:'MATIC'},
+  {ticker:'KRW-TRX',  name:'트론',            symbol:'TRX'},
+  {ticker:'KRW-SHIB', name:'시바이누',        symbol:'SHIB'},
+  {ticker:'KRW-LTC',  name:'라이트코인',      symbol:'LTC'},
+  {ticker:'KRW-BCH',  name:'비트코인캐시',    symbol:'BCH'},
+  {ticker:'KRW-ETC',  name:'이더리움클래식',  symbol:'ETC'},
+  {ticker:'KRW-NEAR', name:'니어프로토콜',    symbol:'NEAR'},
+  {ticker:'KRW-AAVE', name:'에이브',          symbol:'AAVE'},
+  {ticker:'KRW-UNI',  name:'유니스왑',        symbol:'UNI'},
+  {ticker:'KRW-SAND', name:'샌드박스',        symbol:'SAND'},
+];
+
+const COIN_FEE = 0.0005;  // 업비트 수수료 0.05%
+
+let _ctBuyJobs   = [];
+let _ctSellJobs  = [];
+let _ctCycleJobs = [];
+let _ctAccount   = null;
+let _ctRefreshTimer = null;
+let _ctPriceTimer   = null;
+
+async function initCoinTrade() {
+  await ctLoadAll();
+  clearInterval(_ctRefreshTimer);
+  _ctRefreshTimer = setInterval(() => {
+    if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('cointrade')) {
+      ctLoadAll();
+    } else {
+      clearInterval(_ctRefreshTimer);
+      clearInterval(_ctPriceTimer);
+    }
+  }, 30000);
+  clearInterval(_ctPriceTimer);
+  ctRefreshPrices();
+  _ctPriceTimer = setInterval(() => {
+    if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('cointrade')) {
+      ctRefreshPrices();
+    }
+  }, 30000);
+}
+
+async function ctLoadAll() {
+  try {
+    const [rBuy, rSell, rCycle, rAccount] = await Promise.all([
+      fetch('/api/coin-buy'),
+      fetch('/api/coin-sell'),
+      fetch('/api/coin-cycle'),
+      fetch('/api/coin-account'),
+    ]);
+    _ctBuyJobs   = rBuy.ok   ? await rBuy.json()   : [];
+    _ctSellJobs  = rSell.ok  ? await rSell.json()  : [];
+    _ctCycleJobs = rCycle.ok ? await rCycle.json() : [];
+    _ctAccount   = rAccount.ok ? await rAccount.json() : null;
+  } catch (e) {
+    console.warn('코인 데이터 로드 실패:', e);
+  }
+  ctRenderAccount();
+  ctRenderBuyJobs();
+  ctRenderSellJobs();
+  ctRenderCycleJobs();
+  ctRenderHistory();
+  ctRenderHoldingChips();
+}
+
+// ── 잔고 새로고침 ────────────────────────────────────────
+async function ctRefreshBalance() {
+  const btn = document.getElementById('ct-balance-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ 조회중...'; }
+  try {
+    const r = await fetch('/api/data?mode=trigger_coin_balance');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    let sec = 30;
+    const tick = setInterval(() => {
+      if (btn) btn.textContent = `⟳ 조회중... (${--sec}초)`;
+      if (sec <= 0) {
+        clearInterval(tick);
+        fetch('/api/coin-account').then(res => res.json()).then(d => {
+          _ctAccount = d;
+          ctRenderAccount();
+          if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+        }).catch(() => {
+          if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+        });
+      }
+    }, 1000);
+  } catch {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ 잔고 새로고침'; }
+  }
+}
+
+// ── 계좌 렌더링 ──────────────────────────────────────────
+function ctRenderAccount() {
+  const el = document.getElementById('ct-account');
+  if (!el) return;
+  if (!_ctAccount || !_ctAccount.krw) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:8px 0">잔고 정보 없음 — 잔고 새로고침을 눌러주세요</div>`;
+    return;
+  }
+  const krw = Number(_ctAccount.krw || 0);
+  const holdings = _ctAccount.holdings || [];
+  let html = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">💰 업비트 계좌</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${holdings.length ? 12 : 0}px">
+      <div style="background:var(--bg);border-radius:8px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--muted)">보유 원화</div>
+        <div style="font-size:15px;font-weight:700;color:#f59e0b">${krw.toLocaleString('ko-KR', {maximumFractionDigits:0})}원</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:10px 12px">
+        <div style="font-size:10px;color:var(--muted)">보유 코인 종류</div>
+        <div style="font-size:15px;font-weight:700">${holdings.length}종</div>
+      </div>
+    </div>`;
+
+  if (holdings.length) {
+    html += `<div style="display:flex;flex-direction:column;gap:6px">`;
+    for (const h of holdings) {
+      const pnlColor = h.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px">
+        <div>
+          <span style="font-weight:600;font-size:13px">${h.name}</span>
+          <span style="color:var(--muted);font-size:11px;margin-left:6px">${h.symbol}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;font-weight:600">${h.eval_amount?.toLocaleString('ko-KR', {maximumFractionDigits:0})}원</div>
+          <div style="font-size:11px;color:${pnlColor}">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct?.toFixed(2)}%</div>
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ── 현재가 갱신 ──────────────────────────────────────────
+async function ctRefreshPrices() {
+  const activeSell  = _ctSellJobs.filter(j => j.status === 'active');
+  const activeCycle = _ctCycleJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
+  const all = [...activeSell, ...activeCycle];
+  for (const job of all) {
+    try {
+      const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${job.ticker}`);
+      const data = await r.json();
+      if (!data?.[0]) continue;
+      const cur = data[0].trade_price;
+      const chgPct = (data[0].signed_change_rate * 100).toFixed(2);
+      const uid = job.ticker + (job.created_at || '').replace(/\s/g,'');
+      const priceEl = document.getElementById(`ct-price-${uid}`);
+      const pnlEl   = document.getElementById(`ct-pnl-${uid}`);
+      if (priceEl) priceEl.textContent = `${cur.toLocaleString()}원 (${chgPct >= 0 ? '+' : ''}${chgPct}%)`;
+      if (pnlEl && job.buy_price) {
+        const buyTotal = job.buy_price * (1 + COIN_FEE);
+        const sellNet  = cur * (1 - COIN_FEE);
+        const pnlPct   = (sellNet - buyTotal) / buyTotal * 100;
+        const color    = pnlPct >= 0 ? 'var(--green)' : 'var(--red)';
+        pnlEl.innerHTML = `<span style="color:${color};font-weight:700">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</span>`;
+      }
+    } catch (_) {}
+  }
+}
+
+// ── 보유 코인 칩 ─────────────────────────────────────────
+function ctRenderHoldingChips() {
+  const wrap  = document.getElementById('ct-holding-chips');
+  const inner = document.getElementById('ct-holding-chips-inner');
+  if (!wrap || !inner) return;
+  const holdings = _ctAccount?.holdings || [];
+  if (!holdings.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  inner.innerHTML = holdings.map(h => `
+    <button onclick="csSelectCoin('${h.ticker}','${h.name}','${h.symbol}',${h.qty},${h.avg_price})"
+      style="padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg);color:var(--text);font-size:12px;cursor:pointer">
+      ${h.symbol} · ${h.qty.toFixed(8)}개
+    </button>`).join('');
+}
+
+// ── 코인 자동완성 (공통) ─────────────────────────────────
+function _filterCoins(q) {
+  if (!q) return COIN_LIST.slice(0, 8);
+  const lq = q.toLowerCase();
+  return COIN_LIST.filter(c =>
+    c.name.includes(q) || c.symbol.toLowerCase().includes(lq) || c.ticker.toLowerCase().includes(lq)
+  ).slice(0, 8);
+}
+
+function _renderAcList(listId, coins, onSelect) {
+  const el = document.getElementById(listId);
+  if (!el) return;
+  if (!coins.length) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = coins.map(c =>
+    `<div onmousedown="event.preventDefault()" onclick='(${onSelect.toString()})(${JSON.stringify(c)})'
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">
+      <b>${c.name}</b> <span style="color:var(--muted);font-size:11px">${c.symbol} · ${c.ticker}</span>
+    </div>`
+  ).join('');
+}
+
+// ── 매수 폼 ──────────────────────────────────────────────
+function onCbNameInput(v) {
+  _renderAcList('cb-ac-list', _filterCoins(v), (c) => {
+    document.getElementById('cb-name').value = c.name;
+    document.getElementById('cb-ticker').value = c.ticker;
+    document.getElementById('cb-ticker-display').textContent = c.ticker;
+    document.getElementById('cb-ac-list').style.display = 'none';
+    cbUpdateHint();
+  });
+}
+function hideCbAc() { setTimeout(() => { const el = document.getElementById('cb-ac-list'); if (el) el.style.display = 'none'; }, 150); }
+
+function cbCondChange() {
+  const v = document.querySelector('input[name="cb-cond"]:checked')?.value;
+  const row = document.getElementById('cb-limit-row');
+  if (row) row.style.display = v === 'limit' ? 'block' : 'none';
+}
+
+function cbUpdateHint() {
+  const amt = Number(document.getElementById('cb-krw-amount')?.value || 0);
+  const ticker = document.getElementById('cb-ticker')?.value;
+  const hint = document.getElementById('cb-hint');
+  if (!hint) return;
+  if (amt > 0 && ticker) {
+    hint.textContent = `${amt.toLocaleString()}원 매수 · 수수료 ${(amt * COIN_FEE).toFixed(0)}원`;
+  } else {
+    hint.textContent = '매수에 사용할 KRW 금액';
+  }
+}
+
+async function cbRegister() {
+  const ticker = document.getElementById('cb-ticker')?.value;
+  const name   = document.getElementById('cb-name')?.value;
+  const cond   = document.querySelector('input[name="cb-cond"]:checked')?.value || 'market_krw';
+  const amt    = Number(document.getElementById('cb-krw-amount')?.value || 0);
+  const tp     = Number(document.getElementById('cb-target-price')?.value || 0);
+  const msg    = document.getElementById('cb-msg');
+
+  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
+  if (amt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+  if (cond === 'limit' && tp <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">목표 매수가를 입력해주세요</span>'; return; }
+
+  const job = {
+    ticker,
+    name,
+    condition_type: cond,
+    krw_amount: amt,
+    ...(cond === 'limit' ? {target_price: tp} : {}),
+  };
+
+  if (msg) msg.textContent = '등록 중...';
+  try {
+    const r = await fetch('/api/coin-buy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(job) });
+    const d = await r.json();
+    if (d.ok) {
+      if (msg) msg.innerHTML = '<span style="color:var(--green)">✅ 매수 잡 등록 완료</span>';
+      document.getElementById('cb-name').value = '';
+      document.getElementById('cb-ticker').value = '';
+      document.getElementById('cb-ticker-display').textContent = '—';
+      document.getElementById('cb-krw-amount').value = '';
+      await ctLoadAll();
+    } else {
+      if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 등록 실패: ${d.error || ''}</span>`;
+    }
+  } catch (e) {
+    if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 오류: ${e.message}</span>`;
+  }
+}
+
+// ── 매수 잡 렌더링 ───────────────────────────────────────
+function ctRenderBuyJobs() {
+  const el = document.getElementById('cb-active-list');
+  if (!el) return;
+  const active = _ctBuyJobs.filter(j => j.status === 'active');
+  if (!active.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div>`; return; }
+  el.innerHTML = active.map(j => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:700">${j.name}</span>
+          <span style="color:var(--muted);font-size:11px;margin-left:6px">${j.ticker}</span>
+          <span style="margin-left:8px;font-size:11px;background:#f59e0b22;color:#f59e0b;padding:1px 6px;border-radius:4px">
+            ${j.condition_type === 'market_krw' ? '시장가' : '지정가'}
+          </span>
+        </div>
+        <button onclick="ctCancelJob('buy','${j.ticker}')"
+          style="padding:3px 10px;border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;font-size:12px;cursor:pointer">취소</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">
+        매수금액: <b style="color:var(--text)">${Number(j.krw_amount || 0).toLocaleString()}원</b>
+        ${j.target_price ? ` | 목표가: <b>${Number(j.target_price).toLocaleString()}원</b>` : ''}
+        | 등록: ${j.created_at || '—'}
+      </div>
+    </div>`).join('');
+}
+
+// ── 매도 폼 ──────────────────────────────────────────────
+function onCsNameFocus() { onCsNameInput(document.getElementById('cs-name')?.value || ''); }
+function onCsNameInput(v) {
+  const coins = v ? _filterCoins(v) : (_ctAccount?.holdings || []).map(h =>
+    COIN_LIST.find(c => c.ticker === h.ticker) || {ticker: h.ticker, name: h.name || h.ticker, symbol: h.symbol || ''}
+  ).slice(0, 8);
+  _renderAcList('cs-ac-list', coins, (c) => {
+    document.getElementById('cs-name').value = c.name;
+    document.getElementById('cs-ticker').value = c.ticker;
+    document.getElementById('cs-ticker-display').textContent = c.ticker;
+    const holding = _ctAccount?.holdings?.find(h => h.ticker === c.ticker);
+    if (holding) {
+      document.getElementById('cs-qty').value = holding.qty;
+      document.getElementById('cs-buyprice').value = holding.avg_price;
+    }
+    document.getElementById('cs-ac-list').style.display = 'none';
+    csUpdateHint();
+    csShowCurPrice(c.ticker);
+  });
+}
+function hideCsAc() { setTimeout(() => { const el = document.getElementById('cs-ac-list'); if (el) el.style.display = 'none'; }, 150); }
+
+function csSelectCoin(ticker, name, _symbol, qty, avgPrice) {
+  document.getElementById('cs-name').value = name;
+  document.getElementById('cs-ticker').value = ticker;
+  document.getElementById('cs-ticker-display').textContent = ticker;
+  document.getElementById('cs-qty').value = qty;
+  document.getElementById('cs-buyprice').value = avgPrice;
+  csShowCurPrice(ticker);
+}
+
+async function csShowCurPrice(ticker) {
+  const wrap = document.getElementById('cs-cur-price-wrap');
+  const el   = document.getElementById('cs-cur-price');
+  const pct  = document.getElementById('cs-cur-pct');
+  if (!wrap || !el) return;
+  try {
+    const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${ticker}`);
+    const d = await r.json();
+    if (!d?.[0]) return;
+    const cur = d[0].trade_price;
+    const chg = (d[0].signed_change_rate * 100).toFixed(2);
+    el.textContent  = `${cur.toLocaleString()}원`;
+    if (pct) { pct.textContent = `${chg >= 0 ? '+' : ''}${chg}%`; pct.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)'; }
+    wrap.style.display = 'inline';
+  } catch (_) {}
+}
+
+function csTypeChange() {
+  const v    = document.querySelector('input[name="cs-type"]:checked')?.value;
+  const hint = document.getElementById('cs-target-hint');
+  if (hint) hint.textContent = v === 'price' ? '이 가격 이상일 때 시장가 매도' : '수수료 차감 후 순수익 달성 시 매도';
+}
+
+function csUpdateHint() {}
+
+async function csRegister() {
+  const ticker   = document.getElementById('cs-ticker')?.value;
+  const name     = document.getElementById('cs-name')?.value;
+  const qty      = Number(document.getElementById('cs-qty')?.value || 0);
+  const buyPrice = Number(document.getElementById('cs-buyprice')?.value || 0);
+  const type     = document.querySelector('input[name="cs-type"]:checked')?.value || 'pct';
+  const target   = Number(document.getElementById('cs-target')?.value || 0);
+  const msg      = document.getElementById('cs-msg');
+
+  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
+  if (qty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">수량을 입력해주세요</span>'; return; }
+  if (target <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">목표값을 입력해주세요</span>'; return; }
+
+  const job = { ticker, name, qty, buy_price: buyPrice, target_type: type, target_value: target };
+  if (msg) msg.textContent = '등록 중...';
+  try {
+    const r = await fetch('/api/coin-sell', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(job) });
+    const d = await r.json();
+    if (d.ok) {
+      if (msg) msg.innerHTML = '<span style="color:var(--green)">✅ 매도 잡 등록 완료</span>';
+      document.getElementById('cs-name').value = '';
+      document.getElementById('cs-ticker').value = '';
+      document.getElementById('cs-ticker-display').textContent = '—';
+      document.getElementById('cs-qty').value = '';
+      document.getElementById('cs-buyprice').value = '';
+      document.getElementById('cs-target').value = '';
+      document.getElementById('cs-cur-price-wrap').style.display = 'none';
+      await ctLoadAll();
+    } else {
+      if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 등록 실패: ${d.error || ''}</span>`;
+    }
+  } catch (e) {
+    if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 오류: ${e.message}</span>`;
+  }
+}
+
+// ── 매도 잡 렌더링 ───────────────────────────────────────
+function ctRenderSellJobs() {
+  const el = document.getElementById('cs-active-list');
+  if (!el) return;
+  const active = _ctSellJobs.filter(j => j.status === 'active');
+  if (!active.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div>`; return; }
+  el.innerHTML = active.map(j => {
+    const uid = j.ticker + (j.created_at || '').replace(/\s/g,'');
+    const typeLabel = {pct:'수익률', price:'지정가', amount:'수익금액'}[j.target_type] || j.target_type;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:700">${j.name}</span>
+          <span style="color:var(--muted);font-size:11px;margin-left:6px">${j.ticker}</span>
+        </div>
+        <button onclick="ctCancelJob('sell','${j.ticker}')"
+          style="padding:3px 10px;border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;font-size:12px;cursor:pointer">취소</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">
+        수량: <b style="color:var(--text)">${Number(j.qty || 0).toFixed(8)}</b>
+        | 평단: ${j.buy_price ? Number(j.buy_price).toLocaleString() + '원' : '—'}
+        | 목표: <b>${typeLabel} ${j.target_value}${j.target_type === 'pct' ? '%' : '원'}</b>
+      </div>
+      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
+      <div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 사이클 폼 ────────────────────────────────────────────
+function onCcNameFocus() { onCcNameInput(document.getElementById('cc-name')?.value || ''); }
+function onCcNameInput(v) {
+  const list = v ? _filterCoins(v) : COIN_LIST.slice(0, 8);
+  _renderAcList('cc-ac-list', list, (c) => {
+    document.getElementById('cc-name').value = c.name;
+    document.getElementById('cc-ticker').value = c.ticker;
+    document.getElementById('cc-ticker-display').textContent = c.ticker;
+    document.getElementById('cc-ac-list').style.display = 'none';
+  });
+}
+function hideCcAc() { setTimeout(() => { const el = document.getElementById('cc-ac-list'); if (el) el.style.display = 'none'; }, 150); }
+
+function ccCondChange() {
+  const v = document.querySelector('input[name="cc-cond"]:checked')?.value;
+  const row = document.getElementById('cc-limit-row');
+  if (row) row.style.display = v === 'limit' ? 'block' : 'none';
+}
+
+async function ccRegister() {
+  const ticker    = document.getElementById('cc-ticker')?.value;
+  const name      = document.getElementById('cc-name')?.value;
+  const cond      = document.querySelector('input[name="cc-cond"]:checked')?.value || 'market_krw';
+  const buyTarget = Number(document.getElementById('cc-buy-price')?.value || 0);
+  const krwAmt    = Number(document.getElementById('cc-krw-amount')?.value || 0);
+  const takePct   = Number(document.getElementById('cc-take-pct')?.value || 3);
+  const rebuyDrop = Number(document.getElementById('cc-rebuy-drop')?.value || 2);
+  const repeatTake= Number(document.getElementById('cc-repeat-take')?.value || 2);
+  const maxCycles = Number(document.getElementById('cc-max-cycles')?.value || 0);
+  const msg       = document.getElementById('cc-msg');
+
+  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
+  if (krwAmt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+
+  const job = {
+    ticker, name,
+    condition_type: cond,
+    ...(cond === 'limit' ? {buy_target_price: buyTarget} : {}),
+    krw_amount: krwAmt,
+    take_pct: takePct,
+    rebuy_drop: rebuyDrop,
+    repeat_take: repeatTake,
+    max_cycles: maxCycles,
+    phase: 'waiting_buy',
+    cycle_count: 0,
+  };
+
+  if (msg) msg.textContent = '등록 중...';
+  try {
+    const r = await fetch('/api/coin-cycle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(job) });
+    const d = await r.json();
+    if (d.ok) {
+      if (msg) msg.innerHTML = '<span style="color:var(--green)">✅ 사이클 잡 등록 완료</span>';
+      document.getElementById('cc-name').value = '';
+      document.getElementById('cc-ticker').value = '';
+      document.getElementById('cc-ticker-display').textContent = '—';
+      document.getElementById('cc-krw-amount').value = '';
+      await ctLoadAll();
+    } else {
+      if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 등록 실패: ${d.error || ''}</span>`;
+    }
+  } catch (e) {
+    if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 오류: ${e.message}</span>`;
+  }
+}
+
+// ── 사이클 잡 렌더링 ─────────────────────────────────────
+function ctRenderCycleJobs() {
+  const el = document.getElementById('cc-active-list');
+  if (!el) return;
+  const active = _ctCycleJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
+  if (!active.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div>`; return; }
+  const phaseLabel = {waiting_buy:'매수 대기', holding:'보유 중', waiting_rebuy:'재매수 대기'};
+  el.innerHTML = active.map(j => {
+    const uid = j.ticker + (j.created_at || '').replace(/\s/g,'');
+    const pLabel = phaseLabel[j.phase] || j.phase;
+    const pColor = {holding:'var(--green)', waiting_rebuy:'#f59e0b'}[j.phase] || 'var(--muted)';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:700">${j.name}</span>
+          <span style="color:var(--muted);font-size:11px;margin-left:6px">${j.ticker}</span>
+          <span style="margin-left:8px;font-size:11px;color:${pColor};font-weight:600">${pLabel}</span>
+        </div>
+        <button onclick="ctCancelJob('cycle','${j.ticker}')"
+          style="padding:3px 10px;border:1px solid var(--red);color:var(--red);border-radius:6px;background:none;font-size:12px;cursor:pointer">중단</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">
+        매수금액: ${Number(j.krw_amount || 0).toLocaleString()}원
+        | 수익: ${j.take_pct}% / 재매수: -${j.rebuy_drop}% / 반복: ${j.repeat_take}%
+        | 사이클: ${j.cycle_count || 0}${j.max_cycles > 0 ? '/'+j.max_cycles : ''}회
+      </div>
+      ${j.buy_price ? `<div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
+        <div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>` : ''}
+      ${j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Number(j.sell_price).toLocaleString()}원</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── 히스토리 렌더링 ──────────────────────────────────────
+function ctRenderHistory() {
+  const el = document.getElementById('ct-history-list');
+  if (!el) return;
+  const done = [
+    ..._ctBuyJobs.filter(j => ['done','cancelled'].includes(j.status)),
+    ..._ctSellJobs.filter(j => ['done','cancelled'].includes(j.status)),
+    ..._ctCycleJobs.filter(j => ['done','cancelled','stopped'].includes(j.status)),
+  ].sort((a, b) => (b.executed_at || b.cancelled_at || b.created_at || '').localeCompare(
+                   a.executed_at || a.cancelled_at || a.created_at || ''));
+
+  if (!done.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div>`; return; }
+  el.innerHTML = done.slice(0, 30).map(j => {
+    const isCancelled = j.status === 'cancelled' || j.status === 'stopped';
+    const statusColor = isCancelled ? 'var(--muted)' : 'var(--green)';
+    const statusLabel = isCancelled ? '취소' : '완료';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div>
+        <span style="font-weight:600">${j.name}</span>
+        <span style="color:var(--muted);margin-left:6px">${j.ticker}</span>
+        ${j.exec_price ? `<span style="margin-left:6px;color:var(--text)">@ ${Number(j.exec_price).toLocaleString()}원</span>` : ''}
+        ${j.pnl_pct != null ? `<span style="margin-left:6px;color:${j.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)'}">${j.pnl_pct >= 0 ? '+' : ''}${j.pnl_pct}%</span>` : ''}
+      </div>
+      <div style="text-align:right;color:var(--muted)">
+        <span style="color:${statusColor};font-weight:600">${statusLabel}</span>
+        <span style="margin-left:8px">${j.executed_at || j.cancelled_at || j.created_at || '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 잡 취소 ──────────────────────────────────────────────
+async function ctCancelJob(type, ticker) {
+  if (!confirm(`${ticker} 잡을 취소하시겠습니까?`)) return;
+  const endpoint = type === 'buy' ? 'coin-buy' : type === 'sell' ? 'coin-sell' : 'coin-cycle';
+  try {
+    const r = await fetch(`/api/${endpoint}?ticker=${encodeURIComponent(ticker)}`, { method:'DELETE' });
+    const d = await r.json();
+    if (d.ok) await ctLoadAll();
+    else alert('취소 실패: ' + (d.error || ''));
+  } catch (e) {
+    alert('오류: ' + e.message);
+  }
+}
