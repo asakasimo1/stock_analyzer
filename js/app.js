@@ -6562,6 +6562,14 @@ function ctRenderHoldingChips() {
 }
 
 // ── 코인 자동완성 (공통) ─────────────────────────────────
+const _acRegistry = {};
+
+function _acPick(listId, idx) {
+  const entry = _acRegistry[listId];
+  if (!entry) return;
+  entry.onSelect(entry.coins[idx]);
+}
+
 function _filterCoins(q) {
   if (!q) return COIN_LIST.slice(0, 8);
   const lq = q.toLowerCase();
@@ -6574,9 +6582,10 @@ function _renderAcList(listId, coins, onSelect) {
   const el = document.getElementById(listId);
   if (!el) return;
   if (!coins.length) { el.style.display = 'none'; return; }
+  _acRegistry[listId] = { coins, onSelect };
   el.style.display = 'block';
-  el.innerHTML = coins.map(c =>
-    `<div onmousedown="event.preventDefault()" onclick='(${onSelect.toString()})(${JSON.stringify(c)})'
+  el.innerHTML = coins.map((c, i) =>
+    `<div onmousedown="event.preventDefault()" onclick="_acPick('${listId}',${i})"
       style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">
       <b>${c.name}</b> <span style="color:var(--muted);font-size:11px">${c.symbol} · ${c.ticker}</span>
     </div>`

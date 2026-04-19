@@ -27,6 +27,15 @@ import crypto from 'crypto';
 const nowKst = () =>
   new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
 
+const COIN_NAMES = {
+  'KRW-BTC':'비트코인','KRW-ETH':'이더리움','KRW-XRP':'리플','KRW-SOL':'솔라나',
+  'KRW-DOGE':'도지코인','KRW-ADA':'에이다','KRW-AVAX':'아발란체','KRW-DOT':'폴카닷',
+  'KRW-LINK':'체인링크','KRW-ATOM':'코스모스','KRW-MATIC':'폴리곤','KRW-TRX':'트론',
+  'KRW-SHIB':'시바이누','KRW-LTC':'라이트코인','KRW-BCH':'비트코인캐시',
+  'KRW-ETC':'이더리움클래식','KRW-NEAR':'니어프로토콜','KRW-AAVE':'에이브',
+  'KRW-UNI':'유니스왑','KRW-SAND':'샌드박스',
+};
+
 // ══════════════════════════════════════════════════════════
 // Gist 공통 헬퍼
 // ══════════════════════════════════════════════════════════
@@ -302,7 +311,7 @@ async function handleCoinRunner(req, res, gistId, ghToken) {
         const curPrice = prices[ticker]?.price ?? avgPrice;
         const cost     = avgPrice * qty * (1 + BUY_FEE);
         const evalAmt  = curPrice * qty;
-        holdings.push({ ticker, symbol: acc.currency, qty, avg_price: avgPrice,
+        holdings.push({ ticker, symbol: acc.currency, name: COIN_NAMES[ticker] || acc.currency, qty, avg_price: avgPrice,
           cur_price: curPrice, eval_amount: evalAmt,
           pnl: evalAmt - cost, pnl_pct: +((evalAmt - cost) / cost * 100).toFixed(2) });
       }
