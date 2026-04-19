@@ -862,8 +862,8 @@
     <!-- 자동매도 규칙 안내 -->
     <div style="background:#1e3a5f22;border:1px solid #3b82f644;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--text);line-height:1.8">
       <b>🤖 자동매도 규칙 (항상 적용 · 매 5분 체크)</b><br>
-      🚀 수익률 <b style="color:#16a34a">+20% 이상</b> 도달 시 전량 즉시 익절<br>
-      🔴 수익률 <b style="color:#dc2626">-4% 이하</b> 도달 시 전량 즉시 손절
+      🚀 수익률 <b style="color:#16a34a">+<span id="at-rule-profit">20</span>% 이상</b> 도달 시 전량 즉시 익절<br>
+      🔴 수익률 <b style="color:#dc2626">-<span id="at-rule-stop">4</span>% 이하</b> 도달 시 전량 즉시 손절
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <!-- 보유종목 칩 -->
@@ -1058,6 +1058,66 @@
   <!-- 완료/취소 내역 (매수+매도 통합) -->
   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 완료 / 취소 내역</div>
   <div id="at-history-list"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
+
+  <!-- 구분선 -->
+  <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
+
+  <!-- ── 환경설정 ─────────────────────────────────────────── -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:24px">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px">⚙️ 환경설정</div>
+
+    <!-- Oracle VM 데몬 상태 -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Oracle VM 데몬</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;font-weight:600" id="at-daemon-status-label">—</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="at-daemon-updated-at">마지막 갱신: —</div>
+        </div>
+        <button onclick="atCheckDaemonStatus()"
+          style="padding:5px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);cursor:pointer">
+          확인
+        </button>
+      </div>
+    </div>
+
+    <!-- 자동매도 전역 규칙 -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">자동매도 전역 규칙</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">자동 익절 기준 (%)</div>
+          <input id="at-cfg-profit-pct" type="number" min="1" step="0.5" value="20"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">자동 손절 기준 (%)</div>
+          <input id="at-cfg-stop-pct" type="number" min="0.5" step="0.5" value="4"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">매도 등록 섹션 안내 표시에 반영됩니다</div>
+    </div>
+
+    <!-- 잔고 자동 갱신 -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">잔고 자동 갱신</div>
+      <select id="at-cfg-auto-refresh"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px">
+        <option value="0">끄기</option>
+        <option value="60">1분</option>
+        <option value="300">5분</option>
+        <option value="600">10분</option>
+        <option value="1800">30분</option>
+      </select>
+    </div>
+
+    <button onclick="atSaveConfig()"
+      style="width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      설정 저장
+    </button>
+    <div id="at-cfg-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+  </div>
 
 </div>
 </div><!-- /tab-autotrade -->
@@ -1306,6 +1366,48 @@
   <!-- 완료/취소 내역 -->
   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 완료 / 취소 내역</div>
   <div id="ct-history-list"><div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div></div>
+
+  <!-- 구분선 -->
+  <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
+
+  <!-- ── 환경설정 ─────────────────────────────────────────── -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:24px">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px">⚙️ 환경설정</div>
+
+    <!-- coin-runner 상태 -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Vercel 코인 엔진</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;font-weight:600" id="ct-runner-status-label">—</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="ct-runner-ip">IP: —</div>
+        </div>
+        <button onclick="ctCheckRunnerStatus()"
+          style="padding:5px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);cursor:pointer">
+          확인
+        </button>
+      </div>
+    </div>
+
+    <!-- 잔고 자동 갱신 -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">잔고 자동 갱신</div>
+      <select id="ct-cfg-auto-refresh"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px">
+        <option value="0">끄기</option>
+        <option value="60">1분</option>
+        <option value="300">5분</option>
+        <option value="600">10분</option>
+        <option value="1800">30분</option>
+      </select>
+    </div>
+
+    <button onclick="ctSaveConfig()"
+      style="width:100%;padding:10px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      설정 저장
+    </button>
+    <div id="ct-cfg-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+  </div>
 
 </div>
 </div><!-- /tab-cointrade -->

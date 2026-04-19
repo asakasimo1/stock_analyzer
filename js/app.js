@@ -4987,8 +4987,79 @@ let _acEditTicker = null; // 수정 모드 중인 ticker (null = 신규 등록)
 let _atAccount = null;
 let _atRefreshTimer = null;
 let _atPriceTimer = null;
+let _atBalanceTimer = null;
+let _atConfig = { profitPct: 20, stopPct: 4, autoRefreshSec: 0 };
+
+function atLoadConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('at_config') || '{}');
+    _atConfig = { profitPct: 20, stopPct: 4, autoRefreshSec: 0, ...saved };
+  } catch (_) {}
+  const profitEl = document.getElementById('at-cfg-profit-pct');
+  const stopEl   = document.getElementById('at-cfg-stop-pct');
+  const arEl     = document.getElementById('at-cfg-auto-refresh');
+  if (profitEl) profitEl.value = _atConfig.profitPct;
+  if (stopEl)   stopEl.value   = _atConfig.stopPct;
+  if (arEl)     arEl.value     = _atConfig.autoRefreshSec;
+  const rProfit = document.getElementById('at-rule-profit');
+  const rStop   = document.getElementById('at-rule-stop');
+  if (rProfit) rProfit.textContent = _atConfig.profitPct;
+  if (rStop)   rStop.textContent   = _atConfig.stopPct;
+}
+
+function atSaveConfig() {
+  _atConfig.profitPct      = parseFloat(document.getElementById('at-cfg-profit-pct')?.value) || 20;
+  _atConfig.stopPct        = parseFloat(document.getElementById('at-cfg-stop-pct')?.value)   || 4;
+  _atConfig.autoRefreshSec = parseInt(document.getElementById('at-cfg-auto-refresh')?.value)  || 0;
+  localStorage.setItem('at_config', JSON.stringify(_atConfig));
+  const rProfit = document.getElementById('at-rule-profit');
+  const rStop   = document.getElementById('at-rule-stop');
+  if (rProfit) rProfit.textContent = _atConfig.profitPct;
+  if (rStop)   rStop.textContent   = _atConfig.stopPct;
+  clearInterval(_atBalanceTimer);
+  if (_atConfig.autoRefreshSec > 0) {
+    _atBalanceTimer = setInterval(() => {
+      if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
+        atRefreshBalance();
+      } else {
+        clearInterval(_atBalanceTimer);
+      }
+    }, _atConfig.autoRefreshSec * 1000);
+  }
+  const msg = document.getElementById('at-cfg-msg');
+  if (msg) { msg.textContent = '✓ 저장 완료'; msg.style.color = 'var(--green)'; setTimeout(() => { msg.textContent = ''; }, 2000); }
+}
+
+function atCheckDaemonStatus() {
+  const label = document.getElementById('at-daemon-status-label');
+  const updEl = document.getElementById('at-daemon-updated-at');
+  if (!_atAccount) {
+    if (label) { label.textContent = '데이터 없음'; label.style.color = 'var(--muted)'; }
+    if (updEl) updEl.textContent = '잔고 새로고침 후 확인하세요';
+    return;
+  }
+  const updatedAt = _atAccount.updated_at || '';
+  if (!updatedAt) {
+    if (label) { label.textContent = '갱신 시각 없음'; label.style.color = 'var(--muted)'; }
+    return;
+  }
+  // 마지막 갱신으로부터 경과 시간 계산
+  try {
+    const last = new Date(updatedAt.replace(' ', 'T') + '+09:00');
+    const diffMin = Math.floor((Date.now() - last.getTime()) / 60000);
+    const isAlive = diffMin < 10;
+    if (label) {
+      label.textContent = isAlive ? '● 정상 동작 중' : '● 응답 없음 (10분 이상 경과)';
+      label.style.color = isAlive ? 'var(--green)' : 'var(--red)';
+    }
+    if (updEl) updEl.textContent = `마지막 갱신: ${updatedAt} (${diffMin}분 전)`;
+  } catch (_) {
+    if (label) { label.textContent = updatedAt; label.style.color = 'var(--text)'; }
+  }
+}
 
 async function initAutoTrade() {
+  atLoadConfig();
   await atLoadAll();
 
   // 잡 목록 30초마다 재로드
@@ -5012,6 +5083,20 @@ async function initAutoTrade() {
       acRefreshPrices();
     }
   }, 30000);
+
+  // 잔고 자동 갱신 타이머
+  clearInterval(_atBalanceTimer);
+  if (_atConfig.autoRefreshSec > 0) {
+    _atBalanceTimer = setInterval(() => {
+      if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('autotrade')) {
+        atRefreshBalance();
+      } else {
+        clearInterval(_atBalanceTimer);
+      }
+    }, _atConfig.autoRefreshSec * 1000);
+  }
+
+  atCheckDaemonStatus();
 }
 
 async function atRefreshPrices() {
@@ -6405,8 +6490,54 @@ let _ctCycleJobs = [];
 let _ctAccount   = null;
 let _ctRefreshTimer = null;
 let _ctPriceTimer   = null;
+let _ctBalanceTimer = null;
+let _ctConfig = { autoRefreshSec: 0 };
+
+function ctLoadConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ct_config') || '{}');
+    _ctConfig = { autoRefreshSec: 0, ...saved };
+  } catch (_) {}
+  const arEl = document.getElementById('ct-cfg-auto-refresh');
+  if (arEl) arEl.value = _ctConfig.autoRefreshSec;
+}
+
+function ctSaveConfig() {
+  _ctConfig.autoRefreshSec = parseInt(document.getElementById('ct-cfg-auto-refresh')?.value) || 0;
+  localStorage.setItem('ct_config', JSON.stringify(_ctConfig));
+  clearInterval(_ctBalanceTimer);
+  if (_ctConfig.autoRefreshSec > 0) {
+    _ctBalanceTimer = setInterval(() => {
+      if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('cointrade')) {
+        ctRefreshBalance();
+      } else {
+        clearInterval(_ctBalanceTimer);
+      }
+    }, _ctConfig.autoRefreshSec * 1000);
+  }
+  const msg = document.getElementById('ct-cfg-msg');
+  if (msg) { msg.textContent = '✓ 저장 완료'; msg.style.color = 'var(--green)'; setTimeout(() => { msg.textContent = ''; }, 2000); }
+}
+
+async function ctCheckRunnerStatus() {
+  const label = document.getElementById('ct-runner-status-label');
+  const ipEl  = document.getElementById('ct-runner-ip');
+  if (label) { label.textContent = '확인 중...'; label.style.color = 'var(--muted)'; }
+  try {
+    const r = await fetch('/api/coin-ip');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const ip = d.ip || '—';
+    if (label) { label.textContent = '● 정상 동작 중'; label.style.color = 'var(--green)'; }
+    if (ipEl)  ipEl.textContent = `IP: ${ip}`;
+  } catch (e) {
+    if (label) { label.textContent = '● 연결 실패'; label.style.color = 'var(--red)'; }
+    if (ipEl)  ipEl.textContent = e.message;
+  }
+}
 
 async function initCoinTrade() {
+  ctLoadConfig();
   await ctLoadAll();
   clearInterval(_ctRefreshTimer);
   _ctRefreshTimer = setInterval(() => {
@@ -6424,6 +6555,18 @@ async function initCoinTrade() {
       ctRefreshPrices();
     }
   }, 30000);
+
+  // 잔고 자동 갱신 타이머
+  clearInterval(_ctBalanceTimer);
+  if (_ctConfig.autoRefreshSec > 0) {
+    _ctBalanceTimer = setInterval(() => {
+      if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('cointrade')) {
+        ctRefreshBalance();
+      } else {
+        clearInterval(_ctBalanceTimer);
+      }
+    }, _ctConfig.autoRefreshSec * 1000);
+  }
 }
 
 async function ctLoadAll() {
