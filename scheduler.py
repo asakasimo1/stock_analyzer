@@ -97,6 +97,132 @@ def _send(msg: str):
 
 # ── 일일 브리핑 ───────────────────────────────────────────────────────────────
 
+def update_account_balance():
+    """
+    장중(09:00~15:35) 5분 간격으로 실행
+    KIS API로 계좌 잔고 조회 후 Gist account_balance.json 업데이트
+    """
+    now = datetime.now()
+    if now.weekday() >= 5:
+        return
+    t = now.hour * 60 + now.minute
+    if not (9 * 60 <= t <= 15 * 60 + 35):
+        return
+
+    app_key    = getattr(config, "KIS_APP_KEY", "")
+    app_secret = getattr(config, "KIS_APP_SECRET", "")
+    cano       = getattr(config, "KIS_CANO", "")
+    acnt_prdt  = getattr(config, "KIS_ACNT_PRDT_CD", "01")
+    gist_id    = getattr(config, "GIST_ID", "")
+    gh_token   = getattr(config, "GH_TOKEN", "")
+
+    if not all([app_key, app_secret, cano, gist_id, gh_token]):
+        log.debug("KIS/Gist 설정 미완료 — 잔고 업데이트 건너뜀")
+        return
+
+    try:
+        import urllib.request
+        import urllib.parse
+
+        # 1) 토큰 발급
+        token_body = json.dumps({
+            "grant_type": "client_credentials",
+            "appkey": app_key,
+            "appsecret": app_secret,
+        }).encode()
+        req = urllib.request.Request(
+            "https://openapi.kis.or.kr/oauth2/tokenP",
+            data=token_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            token_data = json.loads(resp.read())
+        access_token = token_data["access_token"]
+
+        # 2) 잔고 조회
+        params = urllib.parse.urlencode({
+            "CANO": cano, "ACNT_PRDT_CD": acnt_prdt,
+            "AFHR_FLPR_YN": "N", "OFL_YN": "", "INQR_DVSN": "02",
+            "UNPR_DVSN": "01", "FUND_STTL_ICLD_YN": "N",
+            "FNCG_AMT_AUTO_RDPT_YN": "N", "PRCS_DVSN": "01",
+            "CTX_AREA_FK100": "", "CTX_AREA_NK100": "",
+        })
+        balance_url = f"https://openapi.kis.or.kr/uapi/domestic-stock/v1/trading/inquire-balance?{params}"
+        req2 = urllib.request.Request(balance_url, headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "authorization": f"Bearer {access_token}",
+            "appkey": app_key,
+            "appsecret": app_secret,
+            "tr_id": "TTTC8434R",
+            "custtype": "P",
+        })
+        with urllib.request.urlopen(req2, timeout=10) as resp2:
+            balance_data = json.loads(resp2.read())
+
+        if balance_data.get("rt_cd") != "0":
+            log.warning(f"KIS 잔고 조회 오류: {balance_data.get('msg1')}")
+            return
+
+        summary  = balance_data.get("output2", [{}])[0]
+        holdings = [
+            {
+                "ticker":     h["pdno"],
+                "name":       h["prdt_name"],
+                "qty":        int(h["hldg_qty"]),
+                "avg_price":  round(float(h["pchs_avg_pric"])),
+                "eval_price": int(h["prpr"]),
+                "pnl_pct":    float(h["evlu_pfls_rt"]),
+                "eval_amt":   int(h["evlu_amt"]),
+                "buy_amt":    int(h["pchs_amt"]),
+            }
+            for h in balance_data.get("output1", [])
+            if int(h.get("hldg_qty", 0)) > 0
+        ]
+
+        cash       = int(summary.get("dnca_tot_amt", 0))
+        total_eval = int(summary.get("tot_evlu_amt", 0))
+        day_pnl    = int(summary.get("evlu_pfls_smtl_amt", 0))
+        stock_eval = total_eval - cash
+        day_ret    = round(day_pnl / stock_eval * 100, 2) if stock_eval > 0 else 0.0
+
+        account_balance = {
+            "updated_at": now.strftime("%Y-%m-%d %H:%M"),
+            "cash":       cash,
+            "total_eval": total_eval,
+            "day_pnl":    day_pnl,
+            "day_ret":    day_ret,
+            "holdings":   holdings,
+        }
+
+        # 3) Gist 업데이트
+        patch_body = json.dumps({
+            "files": {
+                "account_balance.json": {
+                    "content": json.dumps(account_balance, ensure_ascii=False, indent=2)
+                }
+            }
+        }).encode()
+        req3 = urllib.request.Request(
+            f"https://api.github.com/gists/{gist_id}",
+            data=patch_body,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {gh_token}",
+                "Content-Type": "application/json",
+                "User-Agent": "stock-analyzer",
+            },
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req3, timeout=10) as resp3:
+            resp3.read()
+
+        log.info(f"✅ KIS 잔고 업데이트 완료 — 총평가: {total_eval:,}원, 예수금: {cash:,}원, 보유종목: {len(holdings)}개")
+
+    except Exception as e:
+        log.warning(f"KIS 잔고 업데이트 실패: {e}")
+
+
 def daily_briefing():
     """매일 07:30 실행 — 미국 증시 + 관심종목 요약"""
     log.info("📊 일일 브리핑 시작")
@@ -431,10 +557,14 @@ def run():
             if t >= "09:10" and t <= "15:20":
                 schedule.every().day.at(t).do(check_signals)
 
+    # KIS 계좌 잔고: 장중 5분 간격
+    schedule.every(5).minutes.do(update_account_balance)
+
     log.info("스케줄러 시작")
     log.info(f"  • 일일 브리핑: 매일 07:30")
     log.info(f"  • 매수 추천:  매일 08:50 (장 시작 10분 전)")
     log.info(f"  • 신호 알림:  09:00~15:30 (30분 간격, 장중 한정)")
+    log.info(f"  • KIS 잔고:   09:00~15:35 (5분 간격, 장중 한정)")
     log.info(f"  • 알림 채널:  {getattr(config, 'ALERT_CHANNEL', 'telegram')}")
     log.info(f"  • 관심종목:  {[s['name'] for s in load_watchlist()]}")
 

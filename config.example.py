@@ -49,3 +49,15 @@ TELEGRAM_CHAT_ID    = os.environ.get("TELEGRAM_CHAT_ID", "")
 # 스케줄러 알림 채널 설정
 # "telegram" / "kakao" / "both" / "none"
 ALERT_CHANNEL       = os.environ.get("ALERT_CHANNEL", "telegram")
+
+# ── 한국투자증권 (KIS) API ────────────────────────────────
+# 발급: https://apiportal.koreainvestment.com → 앱 등록
+# 스케줄러가 장중 5분마다 잔고를 조회해 Gist에 기록
+KIS_APP_KEY         = os.environ.get("KIS_APP_KEY", "")
+KIS_APP_SECRET      = os.environ.get("KIS_APP_SECRET", "")
+KIS_CANO            = os.environ.get("KIS_CANO", "")         # 계좌번호 앞 8자리
+KIS_ACNT_PRDT_CD    = os.environ.get("KIS_ACNT_PRDT_CD", "01")  # 계좌 상품코드
+
+# ── GitHub Gist (웹 대시보드 데이터 저장소) ────────────────
+GIST_ID             = os.environ.get("GIST_ID", "")
+GH_TOKEN            = os.environ.get("GH_TOKEN", "")

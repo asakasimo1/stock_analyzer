@@ -40,6 +40,9 @@
     { "src": "/api/coin-cycle(.*)",   "dest": "/api/coin.js" },
     { "src": "/api/coin-account(.*)", "dest": "/api/coin.js" },
     { "src": "/api/coin-runner(.*)",  "dest": "/api/coin.js" },
-    { "src": "/api/coin-ip(.*)",      "dest": "/api/coin.js" }
+    { "src": "/api/coin-ip(.*)",      "dest": "/api/coin.js" },
+    { "src": "/api/chart(.*)",        "dest": "/api/quote.js" },
+    { "src": "/api/account(.*)",      "dest": "/api/data.js" },
+    { "src": "/api/kis-balance(.*)",  "dest": "/api/data.js" }
   ]
 }

@@ -161,6 +161,25 @@ export default async function handler(req, res) {
   const ticker = (req.query.ticker || '').trim().toUpperCase().replace(/^A/, '');
   if (!/^[A-Z0-9]{6}$/.test(ticker)) return res.status(400).json({ error: '유효한 티커(6자리)를 입력하세요' });
 
+  // ── 일봉 차트 데이터 (?chart=1) ────────────────────────────
+  if (req.query.chart === '1') {
+    const count = Math.min(Number(req.query.count) || 60, 200);
+    try {
+      const url = `https://fchart.stock.naver.com/sise.nhn?symbol=${ticker}&timeframe=day&count=${count}&requestType=0`;
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' } });
+      if (!r.ok) throw new Error(`Naver fchart ${r.status}`);
+      const text = await r.text();
+      const candles = [...text.matchAll(/data="([^"]+)"/g)].map(m => {
+        const [date, open, high, low, close, volume] = m[1].split('|');
+        return { time: `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`, open: Number(open), high: Number(high), low: Number(low), close: Number(close), volume: Number(volume) };
+      }).filter(d => d.close > 0);
+      res.setHeader('Cache-Control', 'max-age=300');
+      return res.status(200).json({ candles });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   try {
     const url = `https://m.stock.naver.com/api/etf/${ticker}/basic`;
     const r = await fetch(url, {
