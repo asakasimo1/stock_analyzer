@@ -1308,9 +1308,14 @@
             background:var(--surface);border:1.5px solid #16a34a;border-radius:8px;overflow:hidden;
             box-shadow:0 4px 16px rgba(0,0,0,.15)"></div>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">
           마켓: <span id="cc-ticker-display" style="color:#16a34a;font-weight:600">—</span>
           <input id="cc-ticker" type="hidden" />
+          <span id="cc-cur-price-wrap" style="display:none;align-items:center;gap:4px">
+            <span style="color:var(--border)">·</span>
+            <span id="cc-cur-price" style="font-size:12px;font-weight:700;color:var(--text)">—</span>
+            <span id="cc-cur-pct" style="font-size:11px">—</span>
+          </span>
         </div>
       </div>
 
@@ -1332,12 +1337,28 @@
         </div>
       </div>
 
-      <!-- 매수 금액 -->
+      <!-- 매수 방식 -->
       <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매수 금액 (원) *</div>
-        <input id="cc-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">사이클마다 이 금액으로 매수</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 방식 *</div>
+        <div style="display:flex;gap:14px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cc-amt-mode" value="krw" checked onchange="ccAmtModeChange()" /> 금액 (원)
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cc-amt-mode" value="qty" onchange="ccAmtModeChange()" /> 수량 (개)
+          </label>
+        </div>
+        <div id="cc-krw-row">
+          <input id="cc-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">사이클마다 이 금액으로 매수</div>
+        </div>
+        <div id="cc-qty-row" style="display:none">
+          <input id="cc-coin-qty" type="number" min="0" step="any" placeholder="예: 0.001"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="ccUpdateQtyHint()" />
+          <div id="cc-qty-hint" style="font-size:11px;color:var(--muted);margin-top:4px">사이클마다 이 수량으로 매수</div>
+        </div>
       </div>
 
       <!-- 수익/하락률 설정 -->
