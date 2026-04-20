@@ -61,6 +61,44 @@ function applySettings() {
   _applySettingsState();
 }
 
+const SETTINGS_PW_KEY = 'settings-pw-v1';
+const DEFAULT_PW_HASH = '1234';
+
+function _hashPw(pw) { return pw; }
+
+function openSettingsWithAuth() {
+  const stored = localStorage.getItem(SETTINGS_PW_KEY);
+  if (!stored) {
+    openSettings();
+    return;
+  }
+  const el = document.getElementById('pw-overlay');
+  if (el) {
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-error').style.display = 'none';
+    el.classList.add('open');
+    setTimeout(() => document.getElementById('pw-input').focus(), 100);
+  }
+}
+
+function checkSettingsPw() {
+  const stored = localStorage.getItem(SETTINGS_PW_KEY) || DEFAULT_PW_HASH;
+  const input = document.getElementById('pw-input').value;
+  if (_hashPw(input) === stored) {
+    closePwModal();
+    openSettings();
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function closePwModal() {
+  const el = document.getElementById('pw-overlay');
+  if (el) el.classList.remove('open');
+}
+
 function openSettings() {
   const darkEl = document.getElementById('set-dark');
   if (darkEl) darkEl.checked = !!_settings.darkMode;
@@ -86,6 +124,27 @@ function openSettings() {
 
 function closeSettings() {
   document.getElementById('settings-overlay').classList.remove('open');
+}
+
+function saveSettingsPw() {
+  const n = document.getElementById('set-pw-new').value;
+  const c = document.getElementById('set-pw-confirm').value;
+  const msg = document.getElementById('set-pw-msg');
+  if (!n) {
+    localStorage.removeItem(SETTINGS_PW_KEY);
+    msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = '비밀번호가 제거되었습니다.';
+    document.getElementById('set-pw-new').value = '';
+    document.getElementById('set-pw-confirm').value = '';
+    return;
+  }
+  if (n !== c) {
+    msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = '비밀번호가 일치하지 않습니다.';
+    return;
+  }
+  localStorage.setItem(SETTINGS_PW_KEY, _hashPw(n));
+  msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = '비밀번호가 저장되었습니다.';
+  document.getElementById('set-pw-new').value = '';
+  document.getElementById('set-pw-confirm').value = '';
 }
 
 _loadSettings();
