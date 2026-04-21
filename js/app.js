@@ -6464,6 +6464,7 @@ const COIN_LIST = [
   {ticker:'KRW-ETH',  name:'이더리움',        symbol:'ETH'},
   {ticker:'KRW-XRP',  name:'리플',            symbol:'XRP'},
   {ticker:'KRW-SOL',  name:'솔라나',          symbol:'SOL'},
+  {ticker:'KRW-USDT', name:'테더',            symbol:'USDT'},
   {ticker:'KRW-DOGE', name:'도지코인',        symbol:'DOGE'},
   {ticker:'KRW-ADA',  name:'에이다',          symbol:'ADA'},
   {ticker:'KRW-AVAX', name:'아발란체',        symbol:'AVAX'},
@@ -6480,6 +6481,19 @@ const COIN_LIST = [
   {ticker:'KRW-AAVE', name:'에이브',          symbol:'AAVE'},
   {ticker:'KRW-UNI',  name:'유니스왑',        symbol:'UNI'},
   {ticker:'KRW-SAND', name:'샌드박스',        symbol:'SAND'},
+  {ticker:'KRW-SUI',  name:'수이',            symbol:'SUI'},
+  {ticker:'KRW-HBAR', name:'헤데라',          symbol:'HBAR'},
+  {ticker:'KRW-ARB',  name:'아비트럼',        symbol:'ARB'},
+  {ticker:'KRW-OP',   name:'옵티미즘',        symbol:'OP'},
+  {ticker:'KRW-XLM',  name:'스텔라루멘',      symbol:'XLM'},
+  {ticker:'KRW-ALGO', name:'알고랜드',        symbol:'ALGO'},
+  {ticker:'KRW-FLOW', name:'플로우',          symbol:'FLOW'},
+  {ticker:'KRW-MANA', name:'디센트럴랜드',    symbol:'MANA'},
+  {ticker:'KRW-CHZ',  name:'칠리즈',          symbol:'CHZ'},
+  {ticker:'KRW-KLAY', name:'클레이튼',        symbol:'KLAY'},
+  {ticker:'KRW-FIL',  name:'파일코인',        symbol:'FIL'},
+  {ticker:'KRW-ICP',  name:'인터넷컴퓨터',    symbol:'ICP'},
+  {ticker:'KRW-SEI',  name:'세이',            symbol:'SEI'},
 ];
 
 const COIN_FEE = 0.0005;  // 업비트 수수료 0.05%
