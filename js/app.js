@@ -6914,6 +6914,16 @@ function csShowCurPrice(ticker) {
   _showCoinCurPrice(ticker, 'cs-cur-price-wrap', 'cs-cur-price', 'cs-cur-pct');
 }
 
+function csAmountTypeChange() {
+  const v = document.querySelector('input[name="cs-amount-type"]:checked')?.value;
+  const qtyEl    = document.getElementById('cs-qty');
+  const qtyLabel = document.getElementById('cs-qty-label');
+  const krwRow   = document.getElementById('cs-krw-row');
+  if (qtyEl)    qtyEl.style.display    = v === 'krw' ? 'none' : '';
+  if (qtyLabel) qtyLabel.style.display = v === 'krw' ? 'none' : '';
+  if (krwRow)   krwRow.style.display   = v === 'krw' ? 'block' : 'none';
+}
+
 function csTypeChange() {
   const v    = document.querySelector('input[name="cs-type"]:checked')?.value;
   const hint = document.getElementById('cs-target-hint');
@@ -6923,19 +6933,31 @@ function csTypeChange() {
 function csUpdateHint() {}
 
 async function csRegister() {
-  const ticker   = document.getElementById('cs-ticker')?.value;
-  const name     = document.getElementById('cs-name')?.value;
-  const qty      = Number(document.getElementById('cs-qty')?.value || 0);
-  const buyPrice = Number(document.getElementById('cs-buyprice')?.value || 0);
-  const type     = document.querySelector('input[name="cs-type"]:checked')?.value || 'pct';
-  const target   = Number(document.getElementById('cs-target')?.value || 0);
-  const msg      = document.getElementById('cs-msg');
+  const ticker    = document.getElementById('cs-ticker')?.value;
+  const name      = document.getElementById('cs-name')?.value;
+  const amtType   = document.querySelector('input[name="cs-amount-type"]:checked')?.value || 'qty';
+  const qty       = Number(document.getElementById('cs-qty')?.value || 0);
+  const krwAmt    = Number(document.getElementById('cs-krw-amount')?.value || 0);
+  const buyPrice  = Number(document.getElementById('cs-buyprice')?.value || 0);
+  const type      = document.querySelector('input[name="cs-type"]:checked')?.value || 'pct';
+  const target    = Number(document.getElementById('cs-target')?.value || 0);
+  const msg       = document.getElementById('cs-msg');
 
   if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
-  if (qty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">수량을 입력해주세요</span>'; return; }
+  if (amtType === 'qty' && qty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">수량을 입력해주세요</span>'; return; }
+  if (amtType === 'krw' && krwAmt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 5,000원 이상 입력해주세요</span>'; return; }
   if (target <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">목표값을 입력해주세요</span>'; return; }
 
-  const job = { ticker, name, qty, buy_price: buyPrice, target_type: type, target_value: target };
+  let finalQty = qty;
+  if (amtType === 'krw') {
+    const curPriceText = document.getElementById('cs-cur-price')?.textContent?.replace(/[^0-9.]/g, '');
+    const curPrice = Number(curPriceText) || 0;
+    if (curPrice <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">현재가를 확인할 수 없습니다. 코인을 다시 선택해주세요</span>'; return; }
+    finalQty = Math.floor(krwAmt / curPrice * 1e8) / 1e8;
+    if (finalQty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">수량 계산 실패 — 금액을 확인해주세요</span>'; return; }
+  }
+
+  const job = { ticker, name, qty: finalQty, buy_price: buyPrice, target_type: type, target_value: target };
   if (msg) msg.textContent = '등록 중...';
   try {
     const r = await fetch('/api/coin-sell', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(job) });
@@ -6946,6 +6968,7 @@ async function csRegister() {
       document.getElementById('cs-ticker').value = '';
       document.getElementById('cs-ticker-display').textContent = '—';
       document.getElementById('cs-qty').value = '';
+      document.getElementById('cs-krw-amount').value = '';
       document.getElementById('cs-buyprice').value = '';
       document.getElementById('cs-target').value = '';
       document.getElementById('cs-cur-price-wrap').style.display = 'none';
@@ -7007,12 +7030,22 @@ function ccCondChange() {
   if (row) row.style.display = v === 'limit' ? 'block' : 'none';
 }
 
+function ccAmountTypeChange() {
+  const v = document.querySelector('input[name="cc-amount-type"]:checked')?.value;
+  const krwRow = document.getElementById('cc-krw-row');
+  const qtyRow = document.getElementById('cc-qty-row');
+  if (krwRow) krwRow.style.display = v === 'qty' ? 'none' : 'block';
+  if (qtyRow) qtyRow.style.display = v === 'qty' ? 'block' : 'none';
+}
+
 async function ccRegister() {
   const ticker    = document.getElementById('cc-ticker')?.value;
   const name      = document.getElementById('cc-name')?.value;
   const cond      = document.querySelector('input[name="cc-cond"]:checked')?.value || 'market_krw';
+  const amtType   = document.querySelector('input[name="cc-amount-type"]:checked')?.value || 'krw';
   const buyTarget = Number(document.getElementById('cc-buy-price')?.value || 0);
   const krwAmt    = Number(document.getElementById('cc-krw-amount')?.value || 0);
+  const coinQty   = Number(document.getElementById('cc-coin-qty')?.value || 0);
   const takePct   = Number(document.getElementById('cc-take-pct')?.value || 3);
   const rebuyDrop = Number(document.getElementById('cc-rebuy-drop')?.value || 2);
   const repeatTake= Number(document.getElementById('cc-repeat-take')?.value || 2);
@@ -7020,13 +7053,14 @@ async function ccRegister() {
   const msg       = document.getElementById('cc-msg');
 
   if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
-  if (krwAmt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+  if (amtType === 'krw' && krwAmt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+  if (amtType === 'qty' && coinQty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인 수량을 입력해주세요</span>'; return; }
 
   const job = {
     ticker, name,
     condition_type: cond,
     ...(cond === 'limit' ? {buy_target_price: buyTarget} : {}),
-    krw_amount: krwAmt,
+    ...(amtType === 'qty' ? {coin_qty: coinQty} : {krw_amount: krwAmt}),
     take_pct: takePct,
     rebuy_drop: rebuyDrop,
     repeat_take: repeatTake,
@@ -7045,6 +7079,9 @@ async function ccRegister() {
       document.getElementById('cc-ticker').value = '';
       document.getElementById('cc-ticker-display').textContent = '—';
       document.getElementById('cc-krw-amount').value = '';
+      document.getElementById('cc-coin-qty').value = '';
+      const wrap = document.getElementById('cc-cur-price-wrap');
+      if (wrap) wrap.style.display = 'none';
       await ctLoadAll();
     } else {
       if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 등록 실패: ${d.error || ''}</span>`;
