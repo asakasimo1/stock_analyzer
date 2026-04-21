@@ -965,6 +965,23 @@
   }
   .pw-confirm-btn:hover { opacity: .85; }
 
+  /* ── COLLAPSIBLE SECTION ── */
+  .collapsible-section { border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+  .collapsible-header {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; padding: 14px 20px;
+    border-radius: 14px; transition: background .15s;
+  }
+  .collapsible-section.open .collapsible-header { border-radius: 14px 14px 0 0; }
+  .collapsible-header:hover { filter: brightness(0.97); }
+  .collapsible-header-left { display: flex; flex-direction: column; gap: 2px; }
+  .collapsible-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .collapsible-subtitle { font-size: 11px; color: var(--muted); }
+  .collapsible-arrow { font-size: 12px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
+  .collapsible-section.open .collapsible-arrow { transform: rotate(180deg); }
+  .collapsible-body { display: none; padding: 0 20px 18px; }
+  .collapsible-section.open .collapsible-body { display: block; }
+
   /* ── SETTINGS ── */
   .settings-btn {
     background:none; border:none; cursor:pointer;

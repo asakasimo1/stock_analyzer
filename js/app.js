@@ -7012,6 +7012,10 @@ function ctRenderSellJobs() {
 }
 
 // ── 사이클 폼 ────────────────────────────────────────────
+function toggleSection(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
 let _ccCurPrice = 0;
 
 function onCcNameFocus() { onCcNameInput(document.getElementById('cc-name')?.value || ''); }
