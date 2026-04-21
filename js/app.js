@@ -6681,44 +6681,89 @@ async function ctRefreshBalance() {
 function ctRenderAccount() {
   const el = document.getElementById('ct-account');
   if (!el) return;
-  if (!_ctAccount || !_ctAccount.krw) {
+  if (!_ctAccount || _ctAccount.krw == null) {
     el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:8px 0">잔고 정보 없음 — 잔고 새로고침을 눌러주세요</div>`;
     return;
   }
-  const krw = Number(_ctAccount.krw || 0);
-  const holdings = _ctAccount.holdings || [];
-  let html = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">💰 업비트 계좌</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${holdings.length ? 12 : 0}px">
-      <div style="background:var(--bg);border-radius:8px;padding:10px 12px">
-        <div style="font-size:10px;color:var(--muted)">보유 원화</div>
-        <div style="font-size:15px;font-weight:700;color:#f59e0b">${krw.toLocaleString('ko-KR', {maximumFractionDigits:0})}원</div>
+  const BUY_FEE  = COIN_FEE;
+  const SELL_FEE = COIN_FEE;
+  const krw       = Number(_ctAccount.krw || 0);
+  const holdings  = _ctAccount.holdings || [];
+  const updatedAt = _ctAccount.updated_at || '';
+
+  // 수수료 차감 후 순평가손익 합산
+  const totalNetAmt = Math.round(holdings.reduce((sum, h) => {
+    const cost    = h.avg_price  * (1 + BUY_FEE)  * h.qty;
+    const netProc = (h.cur_price ?? h.eval_amount / Math.max(h.qty, 1e-8)) * (1 - SELL_FEE) * h.qty;
+    return sum + netProc - cost;
+  }, 0));
+  const totalEval  = Math.round(holdings.reduce((s, h) => s + (h.eval_amount || 0), 0)) + krw;
+  const totalColor = totalNetAmt >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const rows = holdings.map(h => {
+    const curPrice = h.cur_price ?? (h.eval_amount / Math.max(h.qty, 1e-8));
+    const cost     = h.avg_price * (1 + BUY_FEE)  * h.qty;
+    const netProc  = curPrice    * (1 - SELL_FEE)  * h.qty;
+    const netAmt   = Math.round(netProc - cost);
+    const netPct   = cost > 0 ? (netProc - cost) / cost * 100 : 0;
+    const netColor = netAmt >= 0 ? 'var(--green)' : 'var(--red)';
+    const qtyStr   = h.qty >= 1 ? h.qty.toLocaleString('ko-KR', {maximumFractionDigits:4})
+                                : h.qty.toPrecision(4);
+    return `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 6px;white-space:nowrap">
+        <div style="cursor:pointer;color:var(--primary);font-size:11px"
+          onclick="csSelectCoin('${h.ticker}','${h.name}','${h.symbol}',${h.qty},${h.avg_price})">${h.symbol}</div>
+        <div style="color:var(--text);font-size:11px">${h.name}</div>
+      </td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap;color:var(--text);font-size:11px">${qtyStr}개</td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap;font-size:11px">
+        <div style="color:var(--muted)">${Math.round(h.avg_price).toLocaleString()}</div>
+        <div style="color:var(--text)">${Math.round(curPrice).toLocaleString()}</div>
+      </td>
+      <td style="padding:5px 6px;text-align:right;white-space:nowrap">
+        <div style="color:${netColor};font-weight:600;font-size:12px">${netAmt>=0?'+':''}${netAmt.toLocaleString()}원</div>
+        <div style="color:${netColor};font-size:10px">${netPct>=0?'+':''}${netPct.toFixed(2)}%</div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">🪙 업비트 계좌 <span style="font-size:11px;color:var(--muted);font-weight:400">기준: ${updatedAt}</span></div>
+      <div style="display:flex;gap:0;flex-wrap:nowrap;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">총평가금액</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${totalEval.toLocaleString()}원</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">보유 원화</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${krw.toLocaleString()}원</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">보유 코인</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${holdings.length}종</div>
+        </div>
+        <div style="flex:1;padding:6px 4px;text-align:center;min-width:0">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">평가손익</div>
+          <div style="font-size:11px;font-weight:700;color:${totalColor};white-space:nowrap">${totalNetAmt>=0?'+':''}${totalNetAmt.toLocaleString()}원</div>
+          <div style="font-size:9px;color:var(--muted)">수수료제외</div>
+        </div>
       </div>
-      <div style="background:var(--bg);border-radius:8px;padding:10px 12px">
-        <div style="font-size:10px;color:var(--muted)">보유 코인 종류</div>
-        <div style="font-size:15px;font-weight:700">${holdings.length}종</div>
-      </div>
+      ${rows ? `<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border);font-size:11px">
+          <th style="padding:4px 6px;text-align:left;font-weight:500">심볼 / 코인명</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">수량</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">평균→현재(원)</th>
+          <th style="padding:4px 6px;text-align:right;font-weight:500">평가손익<span style="font-size:9px;font-weight:400;margin-left:2px">(수수료제외)</span></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">수수료(0.05%) 차감 기준 · 심볼 클릭 시 매도 폼 자동입력</div>`
+      : '<div style="color:var(--muted);font-size:12px">보유 코인 없음</div>'}
     </div>`;
 
-  if (holdings.length) {
-    html += `<div style="display:flex;flex-direction:column;gap:6px">`;
-    for (const h of holdings) {
-      const pnlColor = h.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px">
-        <div>
-          <span style="font-weight:600;font-size:13px">${h.name}</span>
-          <span style="color:var(--muted);font-size:11px;margin-left:6px">${h.symbol}</span>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:12px;font-weight:600">${h.eval_amount?.toLocaleString('ko-KR', {maximumFractionDigits:0})}원</div>
-          <div style="font-size:11px;color:${pnlColor}">${h.pnl_pct >= 0 ? '+' : ''}${h.pnl_pct?.toFixed(2)}%</div>
-        </div>
-      </div>`;
-    }
-    html += `</div>`;
-  }
-  html += `</div>`;
-  el.innerHTML = html;
+  ctRenderHoldingChips();
 }
 
 // ── 현재가 갱신 ──────────────────────────────────────────
