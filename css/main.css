@@ -966,21 +966,51 @@
   .pw-confirm-btn:hover { opacity: .85; }
 
   /* ── COLLAPSIBLE SECTION ── */
-  .collapsible-section { border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+  .collapsible-section {
+    border-radius: 14px; margin-bottom: 10px; overflow: hidden;
+    border: 1.5px solid var(--border);
+  }
   .collapsible-header {
     display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer; user-select: none; padding: 14px 20px;
-    border-radius: 14px; transition: background .15s;
+    cursor: pointer; user-select: none; padding: 13px 18px;
+    transition: filter .15s;
+    border-left: 4px solid transparent;
   }
-  .collapsible-section.open .collapsible-header { border-radius: 14px 14px 0 0; }
-  .collapsible-header:hover { filter: brightness(0.97); }
-  .collapsible-header-left { display: flex; flex-direction: column; gap: 2px; }
-  .collapsible-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .collapsible-section.open .collapsible-header { border-bottom: 1px solid var(--border); }
+  .collapsible-header:hover { filter: brightness(0.96); }
+  .collapsible-header-left { display: flex; align-items: center; gap: 10px; }
+  .collapsible-icon { font-size: 18px; line-height: 1; }
+  .collapsible-text { display: flex; flex-direction: column; gap: 2px; }
+  .collapsible-title { font-size: 13px; font-weight: 700; color: var(--text); }
   .collapsible-subtitle { font-size: 11px; color: var(--muted); }
-  .collapsible-arrow { font-size: 12px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
+  .collapsible-arrow {
+    font-size: 11px; color: var(--muted);
+    transition: transform .2s; flex-shrink: 0; margin-left: 8px;
+  }
   .collapsible-section.open .collapsible-arrow { transform: rotate(180deg); }
-  .collapsible-body { display: none; padding: 0 20px 18px; }
+  .collapsible-body { display: none; padding: 16px 18px 18px; }
   .collapsible-section.open .collapsible-body { display: block; }
+
+  /* 섹션 컬러 테마 */
+  .section-buy  { border-color: #3b82f640; }
+  .section-sell { border-color: #f59e0b40; }
+  .section-cycle{ border-color: #22c55e40; }
+
+  .section-buy  .collapsible-header { background: linear-gradient(135deg,#eff6ff,#f0f9ff); border-left-color: #3b82f6; }
+  .section-sell .collapsible-header { background: linear-gradient(135deg,#fffbeb,#fef9c3); border-left-color: #f59e0b; }
+  .section-cycle.collapsible-header { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border-left-color: #22c55e; }
+  .section-cycle .collapsible-header { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border-left-color: #22c55e; }
+
+  .section-buy  .collapsible-title { color: #1d4ed8; }
+  .section-sell .collapsible-title { color: #b45309; }
+  .section-cycle .collapsible-title { color: #15803d; }
+
+  body.dark .section-buy  .collapsible-header { background: linear-gradient(135deg,#1e3a8a18,#1e40af10); border-left-color: #60a5fa; }
+  body.dark .section-sell .collapsible-header { background: linear-gradient(135deg,#78350f18,#92400e10); border-left-color: #fbbf24; }
+  body.dark .section-cycle .collapsible-header { background: linear-gradient(135deg,#14532d18,#15803d10); border-left-color: #4ade80; }
+  body.dark .section-buy  .collapsible-title { color: #93c5fd; }
+  body.dark .section-sell .collapsible-title { color: #fcd34d; }
+  body.dark .section-cycle .collapsible-title { color: #86efac; }
 
   /* ── SETTINGS ── */
   .settings-btn {

@@ -799,8 +799,18 @@
   <div id="at-account" style="margin-bottom:20px"></div>
 
   <!-- ── 매수 섹션 ─────────────────────────────────────── -->
-  <div style="background:var(--surface);border:1.5px solid #2563eb44;border-radius:14px;padding:18px 20px;margin-bottom:10px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">🛒 매수 잡 등록</div>
+  <div class="collapsible-section section-buy" id="at-buy-section">
+    <div class="collapsible-header" onclick="toggleSection('at-buy-section')">
+      <div class="collapsible-header-left">
+        <span class="collapsible-icon">🛒</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">매수 잡 등록</div>
+          <div class="collapsible-subtitle">조건 달성 시 자동 매수</div>
+        </div>
+      </div>
+      <span class="collapsible-arrow">▼</span>
+    </div>
+    <div class="collapsible-body">
     <div style="display:flex;flex-direction:column;gap:12px">
 
       <!-- 종목명 검색 -->
@@ -862,6 +872,7 @@
       매수 잡 등록
     </button>
     <div id="ab-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+    </div><!-- /collapsible-body -->
   </div>
 
   <!-- 매수 활성 잡 -->
@@ -872,8 +883,18 @@
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
   <!-- ── 매도 섹션 ─────────────────────────────────────── -->
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:10px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">💰 매도 등록</div>
+  <div class="collapsible-section section-sell" id="at-sell-section">
+    <div class="collapsible-header" onclick="toggleSection('at-sell-section')">
+      <div class="collapsible-header-left">
+        <span class="collapsible-icon">💰</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">매도 등록</div>
+          <div class="collapsible-subtitle">수익/손절 목표 달성 시 자동 매도</div>
+        </div>
+      </div>
+      <span class="collapsible-arrow">▼</span>
+    </div>
+    <div class="collapsible-body">
     <!-- 자동매도 규칙 안내 -->
     <div style="background:#1e3a5f22;border:1px solid #3b82f644;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:11px;color:var(--text);line-height:1.8">
       <b>🤖 자동매도 규칙 (항상 적용 · 매 5분 체크)</b><br>
@@ -942,6 +963,7 @@
       등록
     </button>
     <div id="at-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+    </div><!-- /collapsible-body -->
   </div>
 
   <!-- 활성 잡 -->
@@ -952,9 +974,18 @@
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
   <!-- ── 사이클 트레이딩 섹션 ─────────────────────────── -->
-  <div style="background:var(--surface);border:1.5px solid #16a34a44;border-radius:14px;padding:18px 20px;margin-bottom:10px">
-    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">🔄 사이클 트레이딩 등록</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">매수→수익매도→하락재매수→수익매도 사이클을 자동 반복합니다</div>
+  <div class="collapsible-section section-cycle open" id="at-cycle-section">
+    <div class="collapsible-header" onclick="toggleSection('at-cycle-section')">
+      <div class="collapsible-header-left">
+        <span class="collapsible-icon">🔄</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">사이클 트레이딩</div>
+          <div class="collapsible-subtitle">매수→수익매도→하락재매수 자동 반복</div>
+        </div>
+      </div>
+      <span class="collapsible-arrow">▼</span>
+    </div>
+    <div class="collapsible-body">
     <div style="display:flex;flex-direction:column;gap:12px">
 
       <!-- 종목명 검색 -->
@@ -1061,6 +1092,7 @@
       수정 취소
     </button>
     <div id="ac-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:18px"></div>
+    </div><!-- /collapsible-body -->
   </div>
 
   <!-- 사이클 활성 잡 -->
@@ -1151,11 +1183,14 @@
   <div id="ct-account" style="margin-bottom:20px"></div>
 
   <!-- ── 매수 섹션 ─────────────────────────────────────── -->
-  <div class="collapsible-section" id="ct-buy-section" style="background:var(--surface);border:1.5px solid #f59e0b44">
-    <div class="collapsible-header" onclick="toggleSection('ct-buy-section')" style="background:var(--surface)">
+  <div class="collapsible-section section-buy" id="ct-buy-section">
+    <div class="collapsible-header" onclick="toggleSection('ct-buy-section')">
       <div class="collapsible-header-left">
-        <div class="collapsible-title">🛒 코인 매수 잡 등록</div>
-        <div class="collapsible-subtitle">조건 달성 시 즉시 매수 실행</div>
+        <span class="collapsible-icon">🛒</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">코인 매수 잡 등록</div>
+          <div class="collapsible-subtitle">조건 달성 시 즉시 매수 실행</div>
+        </div>
       </div>
       <span class="collapsible-arrow">▼</span>
     </div>
@@ -1225,11 +1260,14 @@
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
   <!-- ── 매도 섹션 ─────────────────────────────────────── -->
-  <div class="collapsible-section" id="ct-sell-section" style="background:var(--surface);border:1px solid var(--border)">
-    <div class="collapsible-header" onclick="toggleSection('ct-sell-section')" style="background:var(--surface)">
+  <div class="collapsible-section section-sell" id="ct-sell-section">
+    <div class="collapsible-header" onclick="toggleSection('ct-sell-section')">
       <div class="collapsible-header-left">
-        <div class="collapsible-title">💰 코인 매도 등록</div>
-        <div class="collapsible-subtitle">수익률·지정가 목표 도달 시 자동 매도</div>
+        <span class="collapsible-icon">💰</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">코인 매도 등록</div>
+          <div class="collapsible-subtitle">수익률·지정가 목표 도달 시 자동 매도</div>
+        </div>
       </div>
       <span class="collapsible-arrow">▼</span>
     </div>
@@ -1308,11 +1346,14 @@
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
   <!-- ── 사이클 트레이딩 섹션 ─────────────────────────── -->
-  <div class="collapsible-section open" id="ct-cycle-section" style="background:var(--surface);border:1.5px solid #16a34a44">
-    <div class="collapsible-header" onclick="toggleSection('ct-cycle-section')" style="background:var(--surface)">
+  <div class="collapsible-section section-cycle open" id="ct-cycle-section">
+    <div class="collapsible-header" onclick="toggleSection('ct-cycle-section')">
       <div class="collapsible-header-left">
-        <div class="collapsible-title">🔄 코인 사이클 트레이딩</div>
-        <div class="collapsible-subtitle">매수→수익매도→하락재매수 자동 반복 (24/7)</div>
+        <span class="collapsible-icon">🔄</span>
+        <div class="collapsible-text">
+          <div class="collapsible-title">코인 사이클 트레이딩</div>
+          <div class="collapsible-subtitle">매수→수익매도→하락재매수 자동 반복 (24/7)</div>
+        </div>
       </div>
       <span class="collapsible-arrow">▼</span>
     </div>
