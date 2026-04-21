@@ -5059,6 +5059,9 @@ function atCheckDaemonStatus() {
 }
 
 async function initAutoTrade() {
+  _restoreTradeSection('ab', false);
+  _restoreTradeSection('at', false);
+  _restoreTradeSection('ac', true);
   atLoadConfig();
   await atLoadAll();
 
@@ -6459,6 +6462,28 @@ async function abRefreshPrices() {
 // 자동코인매매 탭
 // ══════════════════════════════════════════════════════════
 
+// ── 섹션 접기/펼치기 ─────────────────────────────────────
+function toggleTradeSection(id) {
+  const body = document.getElementById(id + '-body');
+  const icon = document.getElementById(id + '-toggle-icon');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (icon) icon.textContent = isOpen ? '▶' : '▼';
+  try { localStorage.setItem('trade-section-' + id, isOpen ? '0' : '1'); } catch (_) {}
+}
+
+function _restoreTradeSection(id, defaultOpen) {
+  try {
+    const saved = localStorage.getItem('trade-section-' + id);
+    const open  = saved !== null ? saved === '1' : defaultOpen;
+    const body  = document.getElementById(id + '-body');
+    const icon  = document.getElementById(id + '-toggle-icon');
+    if (body) body.style.display = open ? 'block' : 'none';
+    if (icon) icon.textContent   = open ? '▼' : '▶';
+  } catch (_) {}
+}
+
 const COIN_LIST = [
   {ticker:'KRW-BTC',  name:'비트코인',       symbol:'BTC'},
   {ticker:'KRW-ETH',  name:'이더리움',        symbol:'ETH'},
@@ -6551,6 +6576,9 @@ async function ctCheckRunnerStatus() {
 }
 
 async function initCoinTrade() {
+  _restoreTradeSection('cb', false);
+  _restoreTradeSection('cs', false);
+  _restoreTradeSection('cc', true);
   ctLoadConfig();
   await ctLoadAll();
   clearInterval(_ctRefreshTimer);
