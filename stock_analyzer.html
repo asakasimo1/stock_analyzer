@@ -1182,12 +1182,29 @@
         </div>
       </div>
 
-      <!-- KRW 금액 -->
+      <!-- 매수 방식 선택 -->
       <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매수 금액 (원) *</div>
-        <input id="cb-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000 (최소 5,000원)"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
-          oninput="cbUpdateHint()" />
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 방식</div>
+        <div style="display:flex;gap:14px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cb-amount-type" value="krw" checked onchange="cbAmountTypeChange()" /> KRW 금액
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cb-amount-type" value="qty" onchange="cbAmountTypeChange()" /> 코인 수량
+          </label>
+        </div>
+        <div id="cb-krw-row">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매수 금액 (원)</div>
+          <input id="cb-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000 (최소 5,000원)"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="cbUpdateHint()" />
+        </div>
+        <div id="cb-qty-row" style="display:none">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">코인 수량</div>
+          <input id="cb-coin-qty" type="number" min="0" step="any" placeholder="예: 10.5"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px"
+            oninput="cbUpdateHint()" />
+        </div>
         <div id="cb-hint" style="font-size:11px;color:var(--muted);margin-top:4px">매수에 사용할 KRW 금액</div>
       </div>
     </div>

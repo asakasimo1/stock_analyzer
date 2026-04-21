@@ -6768,35 +6768,48 @@ function cbCondChange() {
   if (row) row.style.display = v === 'limit' ? 'block' : 'none';
 }
 
+function cbAmountTypeChange() {
+  const v = document.querySelector('input[name="cb-amount-type"]:checked')?.value;
+  const krwRow = document.getElementById('cb-krw-row');
+  const qtyRow = document.getElementById('cb-qty-row');
+  if (krwRow) krwRow.style.display = v === 'qty' ? 'none' : 'block';
+  if (qtyRow) qtyRow.style.display = v === 'qty' ? 'block' : 'none';
+  cbUpdateHint();
+}
+
 function cbUpdateHint() {
-  const amt = Number(document.getElementById('cb-krw-amount')?.value || 0);
-  const ticker = document.getElementById('cb-ticker')?.value;
+  const amtType = document.querySelector('input[name="cb-amount-type"]:checked')?.value || 'krw';
   const hint = document.getElementById('cb-hint');
   if (!hint) return;
-  if (amt > 0 && ticker) {
-    hint.textContent = `${amt.toLocaleString()}원 매수 · 수수료 ${(amt * COIN_FEE).toFixed(0)}원`;
+  if (amtType === 'qty') {
+    const qty = Number(document.getElementById('cb-coin-qty')?.value || 0);
+    hint.textContent = qty > 0 ? `${qty}개 매수` : '매수할 코인 수량';
   } else {
-    hint.textContent = '매수에 사용할 KRW 금액';
+    const amt = Number(document.getElementById('cb-krw-amount')?.value || 0);
+    hint.textContent = amt > 0 ? `${amt.toLocaleString()}원 매수 · 수수료 ${(amt * COIN_FEE).toFixed(0)}원` : '매수에 사용할 KRW 금액';
   }
 }
 
 async function cbRegister() {
-  const ticker = document.getElementById('cb-ticker')?.value;
-  const name   = document.getElementById('cb-name')?.value;
-  const cond   = document.querySelector('input[name="cb-cond"]:checked')?.value || 'market_krw';
-  const amt    = Number(document.getElementById('cb-krw-amount')?.value || 0);
-  const tp     = Number(document.getElementById('cb-target-price')?.value || 0);
-  const msg    = document.getElementById('cb-msg');
+  const ticker    = document.getElementById('cb-ticker')?.value;
+  const name      = document.getElementById('cb-name')?.value;
+  const cond      = document.querySelector('input[name="cb-cond"]:checked')?.value || 'market_krw';
+  const amtType   = document.querySelector('input[name="cb-amount-type"]:checked')?.value || 'krw';
+  const amt       = Number(document.getElementById('cb-krw-amount')?.value || 0);
+  const coinQty   = Number(document.getElementById('cb-coin-qty')?.value || 0);
+  const tp        = Number(document.getElementById('cb-target-price')?.value || 0);
+  const msg       = document.getElementById('cb-msg');
 
   if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인을 선택해주세요</span>'; return; }
-  if (amt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+  if (amtType === 'krw' && amt < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">최소 매수금액은 5,000원입니다</span>'; return; }
+  if (amtType === 'qty' && coinQty <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인 수량을 입력해주세요</span>'; return; }
   if (cond === 'limit' && tp <= 0) { if (msg) msg.innerHTML = '<span style="color:var(--red)">목표 매수가를 입력해주세요</span>'; return; }
 
   const job = {
     ticker,
     name,
     condition_type: cond,
-    krw_amount: amt,
+    ...(amtType === 'qty' ? {coin_qty: coinQty} : {krw_amount: amt}),
     ...(cond === 'limit' ? {target_price: tp} : {}),
   };
 
@@ -6810,6 +6823,9 @@ async function cbRegister() {
       document.getElementById('cb-ticker').value = '';
       document.getElementById('cb-ticker-display').textContent = '—';
       document.getElementById('cb-krw-amount').value = '';
+      document.getElementById('cb-coin-qty').value = '';
+      const wrap = document.getElementById('cb-cur-price-wrap');
+      if (wrap) wrap.style.display = 'none';
       await ctLoadAll();
     } else {
       if (msg) msg.innerHTML = `<span style="color:var(--red)">❌ 등록 실패: ${d.error || ''}</span>`;
