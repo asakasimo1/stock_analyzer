@@ -1374,46 +1374,97 @@
         </div>
       </div>
 
-      <!-- 최초 매수 방식 -->
+      <!-- 시작 방식 -->
       <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">최초 매수 방식</div>
-        <div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:nowrap">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
-            <input type="radio" name="cc-cond" value="market_krw" checked onchange="ccCondChange()" /> 즉시 시장가
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">시작 방식</div>
+        <div style="display:flex;gap:14px">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cc-start-type" value="buy" checked onchange="ccStartTypeChange()" /> 신규 매수
           </label>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
-            <input type="radio" name="cc-cond" value="limit" onchange="ccCondChange()" /> 지정가 이하
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+            <input type="radio" name="cc-start-type" value="sell" onchange="ccStartTypeChange()" /> 보유 코인 매도 먼저
           </label>
-        </div>
-        <div id="cc-limit-row" style="display:none">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원)</div>
-          <input id="cc-buy-price" type="number" min="0" placeholder="예: 85000000"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
         </div>
       </div>
 
-      <!-- 매수 방식 선택 -->
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 방식</div>
-        <div style="display:flex;gap:14px;margin-bottom:10px">
+      <!-- 신규 매수 섹션 -->
+      <div id="cc-buy-first-section">
+        <!-- 최초 매수 방식 -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">최초 매수 방식</div>
+          <div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:nowrap">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+              <input type="radio" name="cc-cond" value="market_krw" checked onchange="ccCondChange()" /> 즉시 시장가
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
+              <input type="radio" name="cc-cond" value="limit" onchange="ccCondChange()" /> 지정가 이하
+            </label>
+          </div>
+          <div id="cc-limit-row" style="display:none">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원)</div>
+            <input id="cc-buy-price" type="number" min="0" placeholder="예: 85000000"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          </div>
+        </div>
+        <!-- 매수 방식 선택 -->
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">매수 방식</div>
+          <div style="display:flex;gap:14px;margin-bottom:10px">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+              <input type="radio" name="cc-amount-type" value="krw" checked onchange="ccAmountTypeChange()" /> KRW 금액
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+              <input type="radio" name="cc-amount-type" value="qty" onchange="ccAmountTypeChange()" /> 코인 수량
+            </label>
+          </div>
+          <div id="cc-krw-row">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매수 금액 (원)</div>
+            <input id="cc-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          </div>
+          <div id="cc-qty-row" style="display:none">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">코인 수량</div>
+            <input id="cc-coin-qty" type="number" min="0" step="any" placeholder="예: 10.5"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">사이클마다 이 기준으로 매수</div>
+        </div>
+      </div>
+
+      <!-- 보유 코인 매도 먼저 섹션 -->
+      <div id="cc-sell-first-section" style="display:none">
+        <div style="background:var(--bg);border:1px solid #f59e0b;border-radius:8px;padding:10px 12px;font-size:11px;color:#b45309;margin-bottom:8px">
+          보유 중인 코인을 먼저 매도하고, 이후 재매수→매도 사이클을 반복합니다.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">평균 매수가 (원) *</div>
+            <input id="cc-avg-price" type="number" min="0" step="any" placeholder="보유 코인의 평균단가"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매도 수량 *</div>
+            <input id="cc-hold-qty" type="number" min="0" step="any" placeholder="매도할 수량"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px" />
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">재매수 방식</div>
+        <div style="display:flex;gap:14px;margin-top:4px">
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
-            <input type="radio" name="cc-amount-type" value="krw" checked onchange="ccAmountTypeChange()" /> KRW 금액
+            <input type="radio" name="cc-rebuy-type" value="krw" checked onchange="ccRebuyTypeChange()" /> KRW 금액
           </label>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
-            <input type="radio" name="cc-amount-type" value="qty" onchange="ccAmountTypeChange()" /> 코인 수량
+            <input type="radio" name="cc-rebuy-type" value="qty" onchange="ccRebuyTypeChange()" /> 코인 수량
           </label>
         </div>
-        <div id="cc-krw-row">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">매수 금액 (원)</div>
-          <input id="cc-krw-amount" type="number" min="5000" step="1000" placeholder="예: 100000"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        <div id="cc-rebuy-krw-row" style="margin-top:8px">
+          <input id="cc-rebuy-krw-amount" type="number" min="5000" step="1000" placeholder="재매수 KRW 금액"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px" />
         </div>
-        <div id="cc-qty-row" style="display:none">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">코인 수량</div>
-          <input id="cc-coin-qty" type="number" min="0" step="any" placeholder="예: 10.5"
-            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
+        <div id="cc-rebuy-qty-row" style="display:none;margin-top:8px">
+          <input id="cc-rebuy-coin-qty" type="number" min="0" step="any" placeholder="재매수 코인 수량"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px" />
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">사이클마다 이 기준으로 매수</div>
       </div>
 
       <!-- 수익/하락률 설정 -->

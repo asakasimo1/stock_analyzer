@@ -18,7 +18,7 @@
  */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -105,6 +105,19 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ ok: true, triggered, triggerError });
+  }
+
+  // ── PATCH ─────────────────────────────────────────────────────
+  if (req.method === 'PATCH') {
+    const body = req.body || {};
+    const { ticker, created_at, ...updates } = body;
+    if (!ticker || !created_at) return res.status(400).json({ error: 'ticker, created_at 필수' });
+    const jobs = await readFile(FILENAME);
+    const idx = jobs.findIndex(j => j.ticker === ticker && j.created_at === created_at);
+    if (idx < 0) return res.status(404).json({ error: '잡 없음' });
+    jobs[idx] = { ...jobs[idx], ...updates };
+    const ok = await writeFile(FILENAME, jobs);
+    return res.status(ok ? 200 : 500).json(ok ? { ok: true } : { error: '저장 실패' });
   }
 
   // ── DELETE ────────────────────────────────────────────────────
