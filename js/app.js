@@ -6757,6 +6757,7 @@ function onCbNameInput(v) {
     document.getElementById('cb-ticker-display').textContent = c.ticker;
     document.getElementById('cb-ac-list').style.display = 'none';
     cbUpdateHint();
+    _showCoinCurPrice(c.ticker, 'cb-cur-price-wrap', 'cb-cur-price', 'cb-cur-pct');
   });
 }
 function hideCbAc() { setTimeout(() => { const el = document.getElementById('cb-ac-list'); if (el) el.style.display = 'none'; }, 150); }
@@ -6876,10 +6877,10 @@ function csSelectCoin(ticker, name, _symbol, qty, avgPrice) {
   csShowCurPrice(ticker);
 }
 
-async function csShowCurPrice(ticker) {
-  const wrap = document.getElementById('cs-cur-price-wrap');
-  const el   = document.getElementById('cs-cur-price');
-  const pct  = document.getElementById('cs-cur-pct');
+async function _showCoinCurPrice(ticker, wrapId, priceId, pctId) {
+  const wrap = document.getElementById(wrapId);
+  const el   = document.getElementById(priceId);
+  const pct  = document.getElementById(pctId);
   if (!wrap || !el) return;
   try {
     const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${ticker}`);
@@ -6887,10 +6888,14 @@ async function csShowCurPrice(ticker) {
     if (!d?.[0]) return;
     const cur = d[0].trade_price;
     const chg = (d[0].signed_change_rate * 100).toFixed(2);
-    el.textContent  = `${cur.toLocaleString()}원`;
+    el.textContent = `${cur.toLocaleString()}원`;
     if (pct) { pct.textContent = `${chg >= 0 ? '+' : ''}${chg}%`; pct.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)'; }
     wrap.style.display = 'inline';
   } catch (_) {}
+}
+
+function csShowCurPrice(ticker) {
+  _showCoinCurPrice(ticker, 'cs-cur-price-wrap', 'cs-cur-price', 'cs-cur-pct');
 }
 
 function csTypeChange() {
@@ -6975,6 +6980,7 @@ function onCcNameInput(v) {
     document.getElementById('cc-ticker').value = c.ticker;
     document.getElementById('cc-ticker-display').textContent = c.ticker;
     document.getElementById('cc-ac-list').style.display = 'none';
+    _showCoinCurPrice(c.ticker, 'cc-cur-price-wrap', 'cc-cur-price', 'cc-cur-pct');
   });
 }
 function hideCcAc() { setTimeout(() => { const el = document.getElementById('cc-ac-list'); if (el) el.style.display = 'none'; }, 150); }
