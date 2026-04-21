@@ -6632,6 +6632,7 @@ async function ctLoadAll() {
   ctRenderCycleJobs();
   ctRenderHistory();
   ctRenderHoldingChips();
+  ctRefreshPrices();
 }
 
 // ── 잔고 새로고침 ────────────────────────────────────────
@@ -6742,14 +6743,22 @@ async function ctRefreshPrices() {
   const activeSell  = _ctSellJobs.filter(j => j.status === 'active');
   const activeCycle = _ctCycleJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
   const all = [...activeSell, ...activeCycle];
-  for (const job of all) {
-    try {
-      const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${job.ticker}`);
-      const data = await r.json();
-      if (!data?.[0]) continue;
-      const cur = data[0].trade_price;
-      const chgPct = (data[0].signed_change_rate * 100).toFixed(2);
-      const uid = job.ticker + (job.created_at || '').replace(/\s/g,'');
+  if (!all.length) return;
+
+  const tickers = [...new Set(all.map(j => j.ticker))];
+  try {
+    const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${tickers.join(',')}`);
+    const data = await r.json();
+    if (!Array.isArray(data)) return;
+    const priceMap = {};
+    for (const d of data) priceMap[d.market] = d;
+
+    for (const job of all) {
+      const d = priceMap[job.ticker];
+      if (!d) continue;
+      const cur    = d.trade_price;
+      const chgPct = (d.signed_change_rate * 100).toFixed(2);
+      const uid    = job.ticker + (job.created_at || '').replace(/\s/g,'');
       const priceEl = document.getElementById(`ct-price-${uid}`);
       const pnlEl   = document.getElementById(`ct-pnl-${uid}`);
       if (priceEl) priceEl.textContent = `${cur.toLocaleString()}원 (${chgPct >= 0 ? '+' : ''}${chgPct}%)`;
@@ -6760,8 +6769,8 @@ async function ctRefreshPrices() {
         const color    = pnlPct >= 0 ? 'var(--green)' : 'var(--red)';
         pnlEl.innerHTML = `<span style="color:${color};font-weight:700">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</span>`;
       }
-    } catch (_) {}
-  }
+    }
+  } catch (_) {}
 }
 
 // ── 보유 코인 칩 ─────────────────────────────────────────
