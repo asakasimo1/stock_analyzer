@@ -6697,7 +6697,7 @@ function ctRenderAccount() {
     const netProc = (h.cur_price ?? h.eval_amount / Math.max(h.qty, 1e-8)) * (1 - SELL_FEE) * h.qty;
     return sum + netProc - cost;
   }, 0));
-  const totalEval  = Math.round(holdings.reduce((s, h) => s + (h.eval_amount || 0), 0)) + krw;
+  const totalEval  = Math.round(holdings.reduce((s, h) => s + (h.eval_amount || 0), 0) + krw);
   const totalColor = totalNetAmt >= 0 ? 'var(--green)' : 'var(--red)';
 
   const rows = holdings.map(h => {
@@ -6738,7 +6738,7 @@ function ctRenderAccount() {
         </div>
         <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
           <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">보유 원화</div>
-          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${krw.toLocaleString()}원</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${Math.round(krw).toLocaleString()}원</div>
         </div>
         <div style="flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--border);min-width:0">
           <div style="font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap">보유 코인</div>
