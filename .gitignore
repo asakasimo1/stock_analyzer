@@ -1,6 +1,7 @@
 # 민감 정보
 config.py
 .kakao_tokens.json
+.env.prod
 
 # 생성 파일
 output/
