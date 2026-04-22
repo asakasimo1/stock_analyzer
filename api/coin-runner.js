@@ -131,7 +131,7 @@ function calcNetPnlPct(buyPrice, curPrice) {
 
 function calcSellPrice(buyPrice, takePct) {
   const cost = buyPrice * (1 + BUY_FEE);
-  return cost * (1 + takePct / 100) / (1 - SELL_FEE);
+  return Math.ceil(cost * (1 + takePct / 100) / (1 - SELL_FEE));
 }
 
 // ── 잔고 조회 & Gist 저장 ────────────────────────────────────
@@ -323,7 +323,7 @@ async function processCycleJobs(ctx, jobs, prices) {
           log(`  → ${maxCycles}회 완료, 종료`);
         } else {
           job.phase = 'waiting_rebuy';
-          job.rebuy_price = curPrice * (1 - rebuyDrop / 100);
+          job.rebuy_price = Math.floor(curPrice * (1 - rebuyDrop / 100));
           log(`  → 매도 완료 / 재매수 목표: ${job.rebuy_price.toFixed(0)}원`);
         }
         changed = true;

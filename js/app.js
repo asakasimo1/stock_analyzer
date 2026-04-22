@@ -7281,7 +7281,7 @@ async function ccRegister() {
     if (rebuyType === 'krw' && rebuyKrw < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">재매수 금액은 5,000원 이상</span>'; return; }
     if (rebuyType === 'qty' && rebuyQty <= 0)   { if (msg) msg.innerHTML = '<span style="color:var(--red)">재매수 수량을 입력해주세요</span>'; return; }
 
-    const sellPrice = avgPrice * (1 + COIN_FEE) * (1 + takePct / 100) / (1 - COIN_FEE);
+    const sellPrice = Math.ceil(avgPrice * (1 + COIN_FEE) * (1 + takePct / 100) / (1 - COIN_FEE));
     job = {
       ticker, name,
       condition_type: 'holding_sell',
@@ -7368,9 +7368,9 @@ function ctRenderCycleJobs() {
       </div>
       <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
       ${j.buy_price ? `<div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>` : ''}
-      ${j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Number(j.sell_price).toLocaleString()}원/개</div>` : ''}
-      ${j.rebuy_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">재매수 목표: ${Number(j.rebuy_price).toLocaleString()}원/개</div>` : ''}
-      ${j.buy_target_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매수 목표: ${Number(j.buy_target_price).toLocaleString()}원/개</div>` : ''}
+      ${j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Math.ceil(Number(j.sell_price)).toLocaleString()}원/개</div>` : ''}
+      ${j.rebuy_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">재매수 목표: ${Math.floor(Number(j.rebuy_price)).toLocaleString()}원/개</div>` : ''}
+      ${j.buy_target_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매수 목표: ${Math.floor(Number(j.buy_target_price)).toLocaleString()}원/개</div>` : ''}
       <!-- 수정 폼 -->
       <div id="ct-edit-${uid}" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
@@ -7418,7 +7418,7 @@ async function ctSaveJobEdit(ticker, createdAt, uid) {
   const job = _ctCycleJobs.find(j => j.ticker === ticker && j.created_at === createdAt);
   const updates = { take_pct: takePct, rebuy_drop: rebuyDrop, repeat_take: repeatTake, max_cycles: maxCycles };
   if (job?.phase === 'holding' && job?.buy_price) {
-    updates.sell_price = job.buy_price * (1 + COIN_FEE) * (1 + takePct / 100) / (1 - COIN_FEE);
+    updates.sell_price = Math.ceil(job.buy_price * (1 + COIN_FEE) * (1 + takePct / 100) / (1 - COIN_FEE));
   }
 
   if (msgEl) msgEl.textContent = '저장 중...';
