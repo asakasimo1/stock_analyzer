@@ -6818,7 +6818,7 @@ async function ctRefreshPrices() {
 
   const tickers = [...new Set(all.map(j => j.ticker))];
   try {
-    const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${tickers.join(',')}`);
+    const r = await fetch(`/api/coin-price?markets=${tickers.join(',')}`);
     const data = await r.json();
     if (!Array.isArray(data)) return;
     const priceMap = {};
