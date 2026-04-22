@@ -7366,9 +7366,11 @@ function ctRenderCycleJobs() {
         | 수익: ${j.take_pct}% / 재매수: -${j.rebuy_drop}% / 반복: ${j.repeat_take}%
         | 사이클: ${j.cycle_count || 0}${j.max_cycles > 0 ? '/'+j.max_cycles : ''}회
       </div>
-      ${j.buy_price ? `<div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
-        <div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>` : ''}
-      ${j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Number(j.sell_price).toLocaleString()}원</div>` : ''}
+      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
+      ${j.buy_price ? `<div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>` : ''}
+      ${j.phase === 'holding' && j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Number(j.sell_price).toLocaleString()}원/개</div>` : ''}
+      ${j.phase === 'waiting_rebuy' && j.rebuy_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">재매수 목표: ${Number(j.rebuy_price).toLocaleString()}원/개</div>` : ''}
+      ${j.phase === 'waiting_buy' && j.buy_target_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매수 목표: ${Number(j.buy_target_price).toLocaleString()}원/개</div>` : ''}
       <!-- 수정 폼 -->
       <div id="ct-edit-${uid}" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
@@ -7449,7 +7451,7 @@ function ctRenderHistory() {
                    a.executed_at || a.cancelled_at || a.created_at || ''));
 
   if (!done.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0">없음</div>`; return; }
-  el.innerHTML = done.slice(0, 30).map(j => {
+  el.innerHTML = done.slice(0, 5).map(j => {
     const isCancelled = j.status === 'cancelled' || j.status === 'stopped';
     const statusColor = isCancelled ? 'var(--muted)' : 'var(--green)';
     const statusLabel = isCancelled ? '취소' : '완료';
