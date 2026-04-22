@@ -6578,20 +6578,30 @@ function ctSaveConfig() {
   if (msg) { msg.textContent = '✓ 저장 완료'; msg.style.color = 'var(--green)'; setTimeout(() => { msg.textContent = ''; }, 2000); }
 }
 
-async function ctCheckRunnerStatus() {
-  const label = document.getElementById('ct-runner-status-label');
-  const ipEl  = document.getElementById('ct-runner-ip');
-  if (label) { label.textContent = '확인 중...'; label.style.color = 'var(--muted)'; }
+function ctCheckDaemonStatus() {
+  const label = document.getElementById('ct-daemon-status-label');
+  const updEl = document.getElementById('ct-daemon-updated-at');
+  if (!_ctAccount) {
+    if (label) { label.textContent = '데이터 없음'; label.style.color = 'var(--muted)'; }
+    if (updEl) updEl.textContent = '잔고 새로고침 후 확인하세요';
+    return;
+  }
+  const updatedAt = _ctAccount.updated_at || '';
+  if (!updatedAt) {
+    if (label) { label.textContent = '갱신 시각 없음'; label.style.color = 'var(--muted)'; }
+    return;
+  }
   try {
-    const r = await fetch('/api/coin-ip');
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    const ip = d.ip || '—';
-    if (label) { label.textContent = '● 정상 동작 중'; label.style.color = 'var(--green)'; }
-    if (ipEl)  ipEl.textContent = `IP: ${ip}`;
-  } catch (e) {
-    if (label) { label.textContent = '● 연결 실패'; label.style.color = 'var(--red)'; }
-    if (ipEl)  ipEl.textContent = e.message;
+    const last = new Date(updatedAt.replace(' ', 'T') + '+09:00');
+    const diffMin = Math.floor((Date.now() - last.getTime()) / 60000);
+    const isAlive = diffMin < 10;
+    if (label) {
+      label.textContent = isAlive ? '● 정상 동작 중' : '● 응답 없음 (10분 이상 경과)';
+      label.style.color = isAlive ? 'var(--green)' : 'var(--red)';
+    }
+    if (updEl) updEl.textContent = `마지막 갱신: ${updatedAt} (${diffMin}분 전)`;
+  } catch (_) {
+    if (label) { label.textContent = updatedAt; label.style.color = 'var(--text)'; }
   }
 }
 
@@ -6626,6 +6636,8 @@ async function initCoinTrade() {
       }
     }, _ctConfig.autoRefreshSec * 1000);
   }
+
+  ctCheckDaemonStatus();
 }
 
 async function ctLoadAll() {

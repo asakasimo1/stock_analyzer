@@ -1474,15 +1474,15 @@
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:24px">
     <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px">⚙️ 환경설정</div>
 
-    <!-- coin-runner 상태 -->
+    <!-- Oracle VM 데몬 상태 -->
     <div style="margin-bottom:18px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Vercel 코인 엔진</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Oracle VM 데몬</div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
         <div>
-          <div style="font-size:13px;font-weight:600" id="ct-runner-status-label">—</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="ct-runner-ip">IP: —</div>
+          <div style="font-size:13px;font-weight:600" id="ct-daemon-status-label">—</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="ct-daemon-updated-at">마지막 갱신: —</div>
         </div>
-        <button onclick="ctCheckRunnerStatus()"
+        <button onclick="ctCheckDaemonStatus()"
           style="padding:5px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text);cursor:pointer">
           확인
         </button>
