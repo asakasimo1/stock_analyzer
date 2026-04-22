@@ -1,0 +1,18 @@
+name: Vercel 자동 배포
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Vercel Production 배포
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vercel CLI 배포
+        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: team_YZ5WSE5qUhxO1bN8C0h5aQSl
+          VERCEL_PROJECT_ID: prj_ZUcOiP4iBkk4xPCYoe7HsS8jRmAq
