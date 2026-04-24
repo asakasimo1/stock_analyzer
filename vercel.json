@@ -16,9 +16,6 @@
     { "src": "api/investor.js", "use": "@vercel/node" },
     { "src": "api/coin.js", "use": "@vercel/node" }
   ],
-  "crons": [
-    { "path": "/api/coin-runner", "schedule": "* * * * *" }
-  ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
     { "src": "/css/(.*)", "dest": "/css/$1" },
