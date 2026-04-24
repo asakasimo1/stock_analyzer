@@ -6589,6 +6589,7 @@ let _ctAccount   = null;
 let _ctRefreshTimer = null;
 let _ctPriceTimer   = null;
 let _ctBalanceTimer = null;
+let _ctPriceCache   = {};  // ticker → { priceText, pnlHtml }
 let _ctConfig = { autoRefreshSec: 0 };
 
 function ctLoadConfig() {
@@ -6834,16 +6835,21 @@ async function ctRefreshPrices() {
       const cur    = d.trade_price;
       const chgPct = (d.signed_change_rate * 100).toFixed(2);
       const uid    = job.ticker + (job.created_at || '').replace(/\s/g,'');
-      const priceEl = document.getElementById(`ct-price-${uid}`);
-      const pnlEl   = document.getElementById(`ct-pnl-${uid}`);
-      if (priceEl) priceEl.textContent = `${cur.toLocaleString()}원 (${chgPct >= 0 ? '+' : ''}${chgPct}%)`;
-      if (pnlEl && job.buy_price) {
+      const priceText = `${cur.toLocaleString()}원 (${chgPct >= 0 ? '+' : ''}${chgPct}%)`;
+      let pnlHtml = null;
+      if (job.buy_price) {
         const buyTotal = job.buy_price * (1 + COIN_FEE);
         const sellNet  = cur * (1 - COIN_FEE);
         const pnlPct   = (sellNet - buyTotal) / buyTotal * 100;
         const color    = pnlPct >= 0 ? 'var(--green)' : 'var(--red)';
-        pnlEl.innerHTML = `<span style="color:${color};font-weight:700">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</span>`;
+        pnlHtml = `<span style="color:${color};font-weight:700">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</span>`;
       }
+      _ctPriceCache[job.ticker] = { priceText, pnlHtml };
+
+      const priceEl = document.getElementById(`ct-price-${uid}`);
+      const pnlEl   = document.getElementById(`ct-pnl-${uid}`);
+      if (priceEl) priceEl.textContent = priceText;
+      if (pnlEl && pnlHtml) pnlEl.innerHTML = pnlHtml;
     }
   } catch (_) {}
 }
@@ -7149,8 +7155,8 @@ function ctRenderSellJobs() {
         | 평단: ${j.buy_price ? Number(j.buy_price).toLocaleString() + '원' : '—'}
         | 목표: <b>${typeLabel} ${j.target_value}${j.target_type === 'pct' ? '%' : '원'}</b>
       </div>
-      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
-      <div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>
+      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">${_ctPriceCache[j.ticker]?.priceText || '현재가 로딩중...'}</div>
+      <div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">${_ctPriceCache[j.ticker]?.pnlHtml || '—'}</div>
     </div>`;
   }).join('');
 }
@@ -7370,8 +7376,8 @@ function ctRenderCycleJobs() {
         | 수익: ${j.take_pct}% / 재매수: -${j.rebuy_drop}% / 반복: ${j.repeat_take}%
         | 사이클: ${j.cycle_count || 0}${j.max_cycles > 0 ? '/'+j.max_cycles : ''}회
       </div>
-      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">현재가 로딩중...</div>
-      ${j.buy_price ? `<div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">—</div>` : ''}
+      <div id="ct-price-${uid}" style="font-size:12px;color:var(--muted);margin-top:4px">${_ctPriceCache[j.ticker]?.priceText || '현재가 로딩중...'}</div>
+      ${j.buy_price ? `<div id="ct-pnl-${uid}" style="font-size:12px;margin-top:2px">${_ctPriceCache[j.ticker]?.pnlHtml || '—'}</div>` : ''}
       ${j.sell_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매도 목표: ${Math.ceil(Number(j.sell_price)).toLocaleString()}원/개</div>` : ''}
       ${j.rebuy_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">재매수 목표: ${Math.floor(Number(j.rebuy_price)).toLocaleString()}원/개</div>` : ''}
       ${j.buy_target_price ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">매수 목표: ${Math.floor(Number(j.buy_target_price)).toLocaleString()}원/개</div>` : ''}
