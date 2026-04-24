@@ -6814,6 +6814,10 @@ async function ctRefreshPrices() {
   const activeSell  = _ctSellJobs.filter(j => j.status === 'active');
   const activeCycle = _ctCycleJobs.filter(j => !['done','cancelled','stopped'].includes(j.status));
   const all = [...activeSell, ...activeCycle];
+  // 앱 탭이 활성화된 동안 coin-runner를 서버사이드에서 트리거 (매매 자동 실행)
+  if (all.length > 0) {
+    fetch('/api/data?mode=trigger_coin_runner&runner_mode=sell').catch(() => {});
+  }
   if (!all.length) return;
 
   const tickers = [...new Set(all.map(j => j.ticker))];

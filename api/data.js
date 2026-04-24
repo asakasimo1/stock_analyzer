@@ -56,6 +56,17 @@ export default async function handler(req, res) {
 
   const mode = req.query.mode || '';
 
+  // ── 코인 runner 트리거 (coin-runner 서버사이드 호출) ─────────
+  if (mode === 'trigger_coin_runner' || mode === 'trigger_coin_balance') {
+    const host       = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const proto      = req.headers['x-forwarded-proto'] || 'https';
+    const coinSecret = process.env.COIN_RUNNER_SECRET || '';
+    const runnerMode = req.query.runner_mode || (mode === 'trigger_coin_balance' ? 'balance' : 'all');
+    const qs         = `mode=${runnerMode}${coinSecret ? `&secret=${encodeURIComponent(coinSecret)}` : ''}`;
+    fetch(`${proto}://${host}/api/coin-runner?${qs}`).catch(() => {});
+    return res.status(200).json({ ok: true, triggered: runnerMode });
+  }
+
   // ── GitHub Actions balance job 트리거 ────────────────────
   if (mode === 'trigger_balance') {
     if (!ghToken) return res.status(500).json({ error: 'GH_TOKEN 미설정' });

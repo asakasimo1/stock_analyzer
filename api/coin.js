@@ -281,8 +281,11 @@ function sellTarget(buyPrice, takePct) {
 
 // ── 코인 실행 엔진 ────────────────────────────────────────
 async function handleCoinRunner(req, res, gistId, ghToken) {
-  const secret = process.env.COIN_RUNNER_SECRET;
-  if (secret && req.query.secret !== secret)
+  const secret     = process.env.COIN_RUNNER_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers['authorization'] || '';
+  const isCronCall = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  if (!isCronCall && secret && req.query.secret !== secret)
     return res.status(401).json({ error: '인증 실패' });
 
   const accessKey = process.env.UPBIT_ACCESS_KEY;
@@ -443,33 +446,44 @@ async function handleCoinRunner(req, res, gistId, ghToken) {
           log(`★ [waiting_buy] ${job.ticker} ${amt.toLocaleString()}원`);
           try {
             const r = await upbitOrder(accessKey, secretKey, { market: job.ticker, side: 'bid', ordType: 'price', price: amt });
-            const qty = +(amt / cur).toFixed(8);
+            // 실제 수령 수량: 매수수수료 차감 반영
+            const qty = +(amt / cur * (1 - BUY_FEE)).toFixed(8);
             Object.assign(job, { phase:'holding', buy_price:cur, hold_qty:qty, sell_price:sellTarget(cur, takePct), bought_at:nowKst(), buy_uuid:r.uuid });
             cChg = true;
           } catch (e) { log(`사이클 매수 실패: ${e.message}`); }
 
         } else if (phase === 'holding') {
-          if (+job.sell_price > 0 && cur < +job.sell_price) continue;
+          const sellPrice = +job.sell_price || 0;
+          const buyPrice  = +job.buy_price  || 0;
+          // sell_price가 0이거나 수수료 포함 손익분기점 이하면 매도 불가
+          const breakevenPrice = buyPrice > 0 ? buyPrice * (1 + BUY_FEE) / (1 - SELL_FEE) : 0;
+          const effectiveSellPrice = (sellPrice > breakevenPrice) ? sellPrice : (buyPrice > 0 ? sellTarget(buyPrice, takePct) : 0);
+          if (effectiveSellPrice <= 0 || cur < effectiveSellPrice) continue;
+          // sell_price가 잘못 저장된 경우 자동 복구
+          if (effectiveSellPrice !== sellPrice) { job.sell_price = effectiveSellPrice; cChg = true; }
           const qty = +job.hold_qty || 0;
           if (!qty) continue;
-          log(`★ [holding] 매도 ${job.ticker} @ ${cur.toLocaleString()}원`);
+          log(`★ [holding] 매도 ${job.ticker} @ ${cur.toLocaleString()}원 (목표: ${effectiveSellPrice.toLocaleString()}원)`);
           try {
             const r = await upbitOrder(accessKey, secretKey, { market: job.ticker, side: 'ask', ordType: 'market', volume: qty });
             const cc = (+job.cycle_count || 0) + 1;
             job.cycle_count = cc; job.sell_price_exec = cur; job.sold_at = nowKst(); job.sell_uuid = r.uuid;
             if (maxCycles > 0 && cc >= maxCycles) { job.phase = 'done'; job.status = 'done'; log('최대 사이클 완료'); }
-            else { job.phase = 'waiting_rebuy'; job.rebuy_price = cur * (1 - rebuyDrop / 100); }
+            else { job.phase = 'waiting_rebuy'; job.rebuy_price = Math.floor(cur * (1 - rebuyDrop / 100)); }
             cChg = true;
           } catch (e) { log(`사이클 매도 실패: ${e.message}`); }
 
         } else if (phase === 'waiting_rebuy') {
-          if (+job.rebuy_price > 0 && cur > +job.rebuy_price) continue;
+          const rebuyPrice = +job.rebuy_price || 0;
+          // rebuy_price가 0이면 재매수 조건 미충족으로 처리 (잘못된 데이터 보호)
+          if (rebuyPrice <= 0 || cur > rebuyPrice) continue;
           const amt = +job.krw_amount || 0;
           if (amt < 5000) continue;
           log(`★ [waiting_rebuy] ${job.ticker} ${amt.toLocaleString()}원`);
           try {
             const r = await upbitOrder(accessKey, secretKey, { market: job.ticker, side: 'bid', ordType: 'price', price: amt });
-            const qty = +(amt / cur).toFixed(8);
+            // 실제 수령 수량: 매수수수료 차감 반영
+            const qty = +(amt / cur * (1 - BUY_FEE)).toFixed(8);
             Object.assign(job, { phase:'holding', buy_price:cur, hold_qty:qty, sell_price:sellTarget(cur, repeatTake), bought_at:nowKst(), buy_uuid:r.uuid });
             cChg = true;
           } catch (e) { log(`사이클 재매수 실패: ${e.message}`); }
