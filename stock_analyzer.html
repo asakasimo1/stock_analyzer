@@ -1208,11 +1208,11 @@
             <input type="radio" name="cb-cond" value="market_krw" checked onchange="cbCondChange()" /> 즉시 시장가
           </label>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
-            <input type="radio" name="cb-cond" value="limit" onchange="cbCondChange()" /> 지정가 이하
+            <input type="radio" name="cb-cond" value="limit" onchange="cbCondChange()" /> 지정가
           </label>
         </div>
         <div id="cb-limit-row" style="display:none">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원) — 현재가 ≤ 이 가격일 때 매수</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원) — 이 가격으로 지정가 주문 즉시 등록</div>
           <input id="cb-target-price" type="number" min="0" placeholder="예: 85000000"
             style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
         </div>
@@ -1417,11 +1417,11 @@
               <input type="radio" name="cc-cond" value="market_krw" checked onchange="ccCondChange()" /> 즉시 시장가
             </label>
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">
-              <input type="radio" name="cc-cond" value="limit" onchange="ccCondChange()" /> 지정가 이하
+              <input type="radio" name="cc-cond" value="limit" onchange="ccCondChange()" /> 지정가
             </label>
           </div>
           <div id="cc-limit-row" style="display:none">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원)</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">목표 매수가 (원) — 이 가격으로 지정가 주문 즉시 등록</div>
             <input id="cc-buy-price" type="number" min="0" placeholder="예: 85000000"
               style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" />
           </div>
