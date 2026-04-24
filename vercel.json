@@ -14,7 +14,8 @@
     { "src": "api/stocks.js", "use": "@vercel/node" },
     { "src": "api/stock.js", "use": "@vercel/node" },
     { "src": "api/investor.js", "use": "@vercel/node" },
-    { "src": "api/coin.js", "use": "@vercel/node" }
+    { "src": "api/coin.js", "use": "@vercel/node" },
+    { "src": "api/coin-price.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "/stock_analyzer.html" },
@@ -41,6 +42,7 @@
     { "src": "/api/coin-account(.*)", "dest": "/api/coin.js" },
     { "src": "/api/coin-runner(.*)",  "dest": "/api/coin.js" },
     { "src": "/api/coin-ip(.*)",      "dest": "/api/coin.js" },
+    { "src": "/api/coin-price(.*)",   "dest": "/api/coin-price.js" },
     { "src": "/api/chart(.*)",        "dest": "/api/quote.js" },
     { "src": "/api/account(.*)",      "dest": "/api/data.js" },
     { "src": "/api/kis-balance(.*)",  "dest": "/api/data.js" }
