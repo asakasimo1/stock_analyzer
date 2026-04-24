@@ -509,6 +509,20 @@ async function handleCoinRunner(req, res, gistId, ghToken) {
 }
 
 // ── Vercel 아웃바운드 IP 확인 ─────────────────────────────
+async function handleCoinPrice(req, res) {
+  const { markets } = req.query;
+  if (!markets) return res.status(400).json({ error: 'markets 파라미터 필요' });
+  try {
+    const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${encodeURIComponent(markets)}`);
+    if (!r.ok) return res.status(r.status).json({ error: 'Upbit API 오류' });
+    const data = await r.json();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 async function handleCoinIp(res) {
   try {
     const r = await fetch('https://api.ipify.org?format=json');
@@ -539,6 +553,7 @@ export default async function handler(req, res) {
 
   if (url.includes('coin-runner')) return handleCoinRunner(req, res, gistId, ghToken);
   if (url.includes('coin-ip'))     return handleCoinIp(res);
+  if (url.includes('coin-price'))  return handleCoinPrice(req, res);
   if (url.includes('coin-'))       return handleCoinJobs(req, res, url, gistId, ghToken);
   if (url.includes('profit-'))     return handleStockJobs(req, res, url, gistId, ghToken);
 
