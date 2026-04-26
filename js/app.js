@@ -7507,11 +7507,56 @@ async function ctCancelJob(type, ticker, createdAt) {
 // 그리드 트레이딩
 // ══════════════════════════════════════════════════════════
 
+function onCgNameFocus() { onCgNameInput(document.getElementById('cg-name')?.value || ''); }
+function onCgNameInput(v) {
+  _renderAcList('cg-ac-list', _filterCoins(v), (c) => {
+    document.getElementById('cg-name').value = c.name;
+    document.getElementById('cg-ticker').value = c.ticker;
+    document.getElementById('cg-ticker-display').textContent = c.ticker;
+    document.getElementById('cg-ac-list').style.display = 'none';
+    _cgFetchAndAutoFill(c.ticker);
+  });
+}
+function hideCgAc() { setTimeout(() => { const el = document.getElementById('cg-ac-list'); if (el) el.style.display = 'none'; }, 150); }
+
+async function _cgFetchAndAutoFill(ticker) {
+  const hint = document.getElementById('cg-price-hint');
+  if (hint) hint.textContent = '현재가 조회 중...';
+  _showCoinCurPrice(ticker, 'cg-cur-price-wrap', 'cg-cur-price', 'cg-cur-pct');
+  try {
+    const r = await fetch(`/api/coin-price?markets=${ticker}`);
+    const d = await r.json();
+    const price = d?.[0]?.trade_price;
+    if (!price) { if (hint) hint.textContent = ''; return; }
+    document.getElementById('cg-lower').value = Math.round(price * 0.85);
+    document.getElementById('cg-upper').value = Math.round(price * 1.15);
+    if (hint) hint.textContent = `${price.toLocaleString()}원 기준 → 하한 ×0.85 / 상한 ×1.15 자동설정`;
+    ctGridPreview();
+  } catch (e) {
+    if (hint) hint.textContent = '';
+  }
+}
+
 function ctToggleGridForm() {
   const form = document.getElementById('ct-grid-form');
   if (!form) return;
-  form.style.display = form.style.display === 'none' ? 'block' : 'none';
-  if (form.style.display === 'block') ctGridPreview();
+  const opening = form.style.display === 'none';
+  form.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    ['cg-name','cg-ticker','cg-lower','cg-upper','cg-krw'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    document.getElementById('cg-pct').value = '1.5';
+    const tickerDisp = document.getElementById('cg-ticker-display');
+    if (tickerDisp) tickerDisp.textContent = '—';
+    const priceWrap = document.getElementById('cg-cur-price-wrap');
+    if (priceWrap) priceWrap.style.display = 'none';
+    const hint = document.getElementById('cg-price-hint');
+    if (hint) hint.textContent = '';
+    document.getElementById('cg-preview').textContent = '';
+    document.getElementById('cg-msg').textContent = '';
+  }
 }
 
 function ctGridPreview() {
@@ -7540,7 +7585,7 @@ async function ctAddGridJob() {
   const pct    = +document.getElementById('cg-pct')?.value   || 1.5;
   const krw    = +document.getElementById('cg-krw')?.value   || 0;
 
-  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인 티커를 입력하세요</span>'; return; }
+  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인명을 검색해서 선택하세요</span>'; return; }
   if (!lower || !upper || lower >= upper) { if (msg) msg.innerHTML = '<span style="color:var(--red)">하한가 < 상한가 조건 확인</span>'; return; }
   if (krw < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자당 금액 5,000원 이상</span>'; return; }
 
