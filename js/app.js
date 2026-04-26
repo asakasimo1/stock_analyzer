@@ -6586,6 +6586,7 @@ let _ctBuyJobs    = [];
 let _ctSellJobs   = [];
 let _ctCycleJobs  = [];
 let _ctSignalJobs = [];
+let _ctGridJobs   = [];
 let _ctAccount   = null;
 let _ctRefreshTimer = null;
 let _ctPriceTimer   = null;
@@ -6686,18 +6687,20 @@ async function initCoinTrade() {
 
 async function ctLoadAll() {
   try {
-    const [rBuy, rSell, rCycle, rAccount, rSignal] = await Promise.all([
+    const [rBuy, rSell, rCycle, rAccount, rSignal, rGrid] = await Promise.all([
       fetch('/api/coin-buy'),
       fetch('/api/coin-sell'),
       fetch('/api/coin-cycle'),
       fetch('/api/coin-account'),
       fetch('/api/coin-signal'),
+      fetch('/api/coin-grid'),
     ]);
     _ctBuyJobs    = rBuy.ok    ? await rBuy.json()    : [];
     _ctSellJobs   = rSell.ok   ? await rSell.json()   : [];
     _ctCycleJobs  = rCycle.ok  ? await rCycle.json()  : [];
     _ctAccount    = rAccount.ok ? await rAccount.json() : null;
     _ctSignalJobs = rSignal.ok ? await rSignal.json() : [];
+    _ctGridJobs   = rGrid.ok   ? await rGrid.json()   : [];
   } catch (e) {
     console.warn('코인 데이터 로드 실패:', e);
   }
@@ -6705,6 +6708,7 @@ async function ctLoadAll() {
   ctRenderBuyJobs();
   ctRenderSellJobs();
   ctRenderCycleJobs();
+  ctRenderGridJobs();
   ctRenderSignalJobs();
   ctRenderHistory();
   ctRenderHoldingChips();
@@ -7497,6 +7501,159 @@ async function ctCancelJob(type, ticker, createdAt) {
   } catch (e) {
     alert('오류: ' + e.message);
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// 그리드 트레이딩
+// ══════════════════════════════════════════════════════════
+
+function ctToggleGridForm() {
+  const form = document.getElementById('ct-grid-form');
+  if (!form) return;
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  if (form.style.display === 'block') ctGridPreview();
+}
+
+function ctGridPreview() {
+  const lower  = +document.getElementById('cg-lower')?.value || 0;
+  const upper  = +document.getElementById('cg-upper')?.value || 0;
+  const pct    = +document.getElementById('cg-pct')?.value   || 1.5;
+  const krw    = +document.getElementById('cg-krw')?.value   || 0;
+  const el     = document.getElementById('cg-preview');
+  if (!el) return;
+  if (!lower || !upper || lower >= upper) { el.textContent = ''; return; }
+
+  let count = 0, price = lower;
+  while (price <= upper * 1.0001) { count++; price *= (1 + pct / 100); }
+
+  const totalKrw  = count * krw;
+  const netPerGrid = (pct - 0.1).toFixed(2);
+  el.innerHTML = `격자 수: <b>${count}개</b> &nbsp;|&nbsp; 총 투자금: <b>${totalKrw.toLocaleString()}원</b> &nbsp;|&nbsp; 격자당 순이익: <b>≈${netPerGrid}%</b> (수수료 0.1% 제외)`;
+}
+
+async function ctAddGridJob() {
+  const msg    = document.getElementById('cg-msg');
+  const ticker = (document.getElementById('cg-ticker')?.value || '').trim().toUpperCase();
+  const name   = (document.getElementById('cg-name')?.value   || '').trim();
+  const lower  = +document.getElementById('cg-lower')?.value || 0;
+  const upper  = +document.getElementById('cg-upper')?.value || 0;
+  const pct    = +document.getElementById('cg-pct')?.value   || 1.5;
+  const krw    = +document.getElementById('cg-krw')?.value   || 0;
+
+  if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인 티커를 입력하세요</span>'; return; }
+  if (!lower || !upper || lower >= upper) { if (msg) msg.innerHTML = '<span style="color:var(--red)">하한가 < 상한가 조건 확인</span>'; return; }
+  if (krw < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자당 금액 5,000원 이상</span>'; return; }
+
+  const finalTicker = ticker.startsWith('KRW-') ? ticker : `KRW-${ticker}`;
+  if (msg) msg.innerHTML = '<span style="color:var(--muted)">등록 중...</span>';
+
+  try {
+    const r = await fetch('/api/coin-grid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:         name || `${finalTicker} 그리드`,
+        ticker:       finalTicker,
+        grid_pct:     pct,
+        lower_price:  lower,
+        upper_price:  upper,
+        krw_per_grid: krw,
+      }),
+    });
+    const d = await r.json();
+    if (r.ok && !d.error) {
+      if (msg) msg.innerHTML = '<span style="color:var(--green)">등록 완료 — 30초 내 초기화 시작</span>';
+      await ctLoadAll();
+      document.getElementById('ct-grid-form').style.display = 'none';
+    } else {
+      if (msg) msg.innerHTML = `<span style="color:var(--red)">${d.error || '저장 실패'}</span>`;
+    }
+  } catch (e) {
+    if (msg) msg.innerHTML = `<span style="color:var(--red)">오류: ${e.message}</span>`;
+  }
+}
+
+async function ctStopGridJob(id, name) {
+  if (!confirm(`"${name}" 그리드를 중단하시겠습니까?\n미체결 주문이 모두 취소됩니다.`)) return;
+  try {
+    const r = await fetch(`/api/coin-grid?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) { await ctLoadAll(); }
+    else alert('중단 실패: ' + (d.error || ''));
+  } catch (e) { alert('오류: ' + e.message); }
+}
+
+function ctRenderGridJobs() {
+  const el = document.getElementById('ct-grid-list');
+  if (!el) return;
+
+  const jobs = Array.isArray(_ctGridJobs) ? _ctGridJobs : [];
+  if (!jobs.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div>';
+    return;
+  }
+
+  el.innerHTML = jobs.map(j => {
+    const grids     = j.grids || [];
+    const buyWait   = grids.filter(g => g.state === 'buy_waiting').length;
+    const sellWait  = grids.filter(g => g.state === 'sell_waiting').length;
+    const idle      = grids.filter(g => g.state === 'idle').length;
+    const total     = grids.length;
+
+    const statusMap = {
+      init: ['초기화중', 'var(--muted)'],
+      active: ['활성', 'var(--green)'],
+      stopping: ['중단중', 'var(--red)'],
+      stopped: ['중단됨', 'var(--muted)'],
+    };
+    const [statusLabel, statusColor] = statusMap[j.status] || ['알 수 없음', 'var(--muted)'];
+
+    const pnl    = j.total_profit_krw || 0;
+    const pnlClr = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const canStop = j.status === 'active' || j.status === 'init';
+
+    // 그리드 미니 시각화 (최대 20칸)
+    const visGrids = grids.slice(0, 20);
+    const barHtml  = visGrids.map(g => {
+      const c = g.state === 'sell_waiting' ? '#f59e0b'
+              : g.state === 'buy_waiting'  ? 'var(--primary)'
+              : 'var(--border)';
+      return `<div title="${Number(g.level).toLocaleString()}원 (${g.state})"
+        style="flex:1;height:14px;background:${c};border-radius:2px;min-width:4px"></div>`;
+    }).join('');
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div>
+          <span style="font-weight:700">${j.name}</span>
+          <span style="color:var(--muted);font-size:11px;margin-left:6px">${j.ticker}</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="color:${statusColor};font-size:12px;font-weight:600">${statusLabel}</span>
+          ${canStop ? `<button onclick="ctStopGridJob('${j.id}','${j.name}')"
+            style="padding:2px 9px;border:1px solid var(--red);border-radius:5px;background:none;font-size:11px;color:var(--red);cursor:pointer">중단</button>` : ''}
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">
+        범위: ${Number(j.lower_price).toLocaleString()} ~ ${Number(j.upper_price).toLocaleString()}원
+        &nbsp;|&nbsp; 간격: ${j.grid_pct}%
+        &nbsp;|&nbsp; 격자당: ${Number(j.krw_per_grid).toLocaleString()}원
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:6px" title="파랑=매수대기 / 노랑=매도대기 / 회색=미활성">${barHtml}</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <div style="color:var(--muted)">
+          매수대기 <b style="color:var(--primary)">${buyWait}</b>
+          &nbsp; 매도대기 <b style="color:#f59e0b">${sellWait}</b>
+          &nbsp; 총 ${total}격자
+        </div>
+        <div>
+          <span style="color:var(--muted)">누적수익 </span>
+          <span style="color:${pnlClr};font-weight:700">${pnl >= 0 ? '+' : ''}${Math.round(pnl).toLocaleString()}원</span>
+          <span style="color:var(--muted);margin-left:8px">${j.trade_count||0}회</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── 시그널 타입별 파라미터 UI ─────────────────────────────

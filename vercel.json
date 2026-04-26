@@ -43,6 +43,7 @@
     { "src": "/api/coin-ip(.*)",      "dest": "/api/coin.js" },
     { "src": "/api/coin-price(.*)",   "dest": "/api/coin.js" },
     { "src": "/api/coin-signal(.*)",  "dest": "/api/coin.js" },
+    { "src": "/api/coin-grid(.*)",    "dest": "/api/coin.js" },
     { "src": "/api/chart(.*)",        "dest": "/api/quote.js" },
     { "src": "/api/account(.*)",      "dest": "/api/data.js" },
     { "src": "/api/kis-balance(.*)",  "dest": "/api/data.js" }

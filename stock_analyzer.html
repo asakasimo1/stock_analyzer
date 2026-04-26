@@ -1526,6 +1526,55 @@
 
   <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
 
+  <!-- 그리드 트레이딩 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:13px;font-weight:700;color:var(--text)">📊 그리드 트레이딩</div>
+    <button onclick="ctToggleGridForm()" id="ct-grid-add-btn"
+      style="padding:4px 12px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">+ 추가</button>
+  </div>
+
+  <!-- 그리드 추가 폼 -->
+  <div id="ct-grid-form" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">이름</div>
+        <input id="cg-name" type="text" placeholder="예: 리플 그리드" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">코인 (티커)</div>
+        <input id="cg-ticker" type="text" placeholder="예: KRW-XRP" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">하한가 (원)</div>
+        <input id="cg-lower" type="number" placeholder="예: 1800" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">상한가 (원)</div>
+        <input id="cg-upper" type="number" placeholder="예: 2400" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">그리드 간격 (%)</div>
+        <input id="cg-pct" type="number" value="1.5" step="0.1" min="0.5" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">격자당 매수금액 (원)</div>
+      <input id="cg-krw" type="number" placeholder="예: 10000" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+    </div>
+    <div id="cg-preview" style="font-size:11px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="ctAddGridJob()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">등록</button>
+      <button onclick="ctToggleGridForm()" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer">취소</button>
+    </div>
+    <div id="cg-msg" style="font-size:12px;margin-top:8px;text-align:center;min-height:16px"></div>
+  </div>
+
+  <div id="ct-grid-list" style="margin-bottom:24px"><div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div></div>
+
+  <div style="border-top:1px solid var(--border);margin:8px 0 20px"></div>
+
   <!-- 시그널 자동매수 -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div style="font-size:13px;font-weight:700;color:var(--text)">📡 시그널 자동매수</div>
