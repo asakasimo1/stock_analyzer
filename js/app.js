@@ -6704,6 +6704,15 @@ async function ctLoadAll() {
   } catch (e) {
     console.warn('코인 데이터 로드 실패:', e);
   }
+
+  // stopped 그리드 잡 Gist에서 자동 삭제
+  const stoppedGrids = (_ctGridJobs || []).filter(j => j.status === 'stopped');
+  for (const j of stoppedGrids) {
+    fetch(`/api/coin-grid?id=${encodeURIComponent(j.id)}`, { method: 'DELETE' }).catch(() => {});
+  }
+  if (stoppedGrids.length) {
+    _ctGridJobs = (_ctGridJobs || []).filter(j => j.status !== 'stopped');
+  }
   ctRenderAccount();
   ctRenderBuyJobs();
   ctRenderSellJobs();
@@ -7635,7 +7644,7 @@ function ctRenderGridJobs() {
   const el = document.getElementById('ct-grid-list');
   if (!el) return;
 
-  const jobs = Array.isArray(_ctGridJobs) ? _ctGridJobs : [];
+  const jobs = (Array.isArray(_ctGridJobs) ? _ctGridJobs : []).filter(j => j.status !== 'stopped');
   if (!jobs.length) {
     el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">없음</div>';
     return;
