@@ -7540,9 +7540,15 @@ async function _cgFetchAndAutoFill(ticker) {
     const d = await r.json();
     const price = d?.[0]?.trade_price;
     if (!price) { if (hint) hint.textContent = ''; return; }
-    document.getElementById('cg-lower').value = Math.round(price * 0.85);
-    document.getElementById('cg-upper').value = Math.round(price * 1.15);
-    if (hint) hint.textContent = `${price.toLocaleString()}원 기준 → 하한 ×0.85 / 상한 ×1.15 자동설정`;
+    const lower = Math.round(price * 0.85);
+    const upper = Math.round(price * 1.15);
+    document.getElementById('cg-lower').value = lower;
+    document.getElementById('cg-upper').value = upper;
+    // 10개 격자가 나오도록 grid_pct 자동 계산
+    // lower * (1+pct)^9 = upper  →  pct = (upper/lower)^(1/9) - 1
+    const autoPct = ((Math.pow(upper / lower, 1 / 9) - 1) * 100).toFixed(1);
+    document.getElementById('cg-pct').value = autoPct;
+    if (hint) hint.textContent = `${price.toLocaleString()}원 기준 → 하한 ×0.85 / 상한 ×1.15 / 간격 ${autoPct}% (10개 격자) 자동설정`;
     ctGridPreview();
   } catch (e) {
     if (hint) hint.textContent = '';
