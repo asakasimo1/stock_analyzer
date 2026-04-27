@@ -6812,7 +6812,10 @@ function ctRenderAccount() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">티커 클릭 시 매도 폼 자동입력</div>` : '<div style="color:var(--muted);font-size:12px">보유 코인 없음</div>'}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between">
+        <span>티커 클릭 시 매도 폼 자동입력</span>
+        ${a.updated_at ? `<span>갱신: ${a.updated_at}</span>` : ''}
+      </div>` : '<div style="color:var(--muted);font-size:12px">보유 코인 없음</div>'}
     </div>`;
 
   ctRenderHoldingChips();
