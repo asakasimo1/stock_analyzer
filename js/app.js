@@ -2521,6 +2521,8 @@ async function saveIpoRecords() {
   });
   // _dashData 유지하되 ipo 부분만 최신화 (_dashData=null로 초기화하면 캘린더가 비워짐)
   if (_dashData) _dashData.ipo = _ipoRecords;
+  // 포트폴리오 탭 동기화: _portIpo가 구 배열을 참조하는 경우 대비
+  _portIpo = _ipoRecords;
 }
 
 // ── 목록 렌더링 ───────────────────────────────────────────────────────────────
@@ -3751,6 +3753,11 @@ async function _adjustCash(delta) {
     });
     if (!saveRes.ok) throw new Error(`예수금 저장 실패 (${saveRes.status})`);
     _portCash = newCash;
+    // 5분 캐시(_sharedGistData)도 동기화해 탭 재진입 시 구 값으로 덮어씌워지지 않도록
+    if (_sharedGistData) {
+      if (!_sharedGistData.portfolio_meta) _sharedGistData.portfolio_meta = {};
+      _sharedGistData.portfolio_meta.cash = newCash;
+    }
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = newCash ? newCash.toLocaleString() : '0';
     if (typeof _renderPortAsset === 'function') _renderPortAsset();
