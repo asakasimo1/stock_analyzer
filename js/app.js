@@ -1417,7 +1417,8 @@ function closeModal(evt) {
 // ══════════════════════════════════════════════════════════
 // 포트폴리오 대시보드
 // ══════════════════════════════════════════════════════════
-let _portAutoTimer = null;
+let _portAutoTimer  = null;
+let _portGeneration = 0;   // initPortfolio() 호출마다 증가 — 구 refresh 결과 무시에 사용
 let _stockRecords  = [];
 let _portEtf       = [];
 let _portIpo       = [];
@@ -1499,6 +1500,7 @@ function _showPortLoading() {
 async function initPortfolio() {
   _initPortCollapse();
   _showPortLoading();
+  const gen = ++_portGeneration; // 이 호출의 세대 번호 — 이후 구 refresh가 덮어쓰지 못하도록
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
     // /api/ipo · /api/data는 전역 캐시(_ipoRecords, _sharedGistData) 재사용해 중복 호출 방지
@@ -1512,6 +1514,7 @@ async function initPortfolio() {
       fetch('/api/stocks').then(r=>r.json()),
       _fetchGistData(),
     ]);
+    if (gen !== _portGeneration) return; // 더 새로운 initPortfolio()가 이미 실행됨
     _portEtf      = etfRes.records || [];
     _portIpo      = ipoRes.records || [];
     _portDiv      = divRes.records || [];
@@ -1523,18 +1526,20 @@ async function initPortfolio() {
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
-  renderPortfolio(); // 저장된 데이터로 먼저 표시
-  _refreshPortfolioRealtime(); // 실시간 현재가 백그라운드 조회
+  renderPortfolio();
+  _refreshPortfolioRealtime(gen); // 세대 번호 전달
   _startPortAutoRefresh();
 }
 
 // 포트폴리오 탭 — 실시간 현재가 일괄 조회 (Gist 저장 없이 화면만 갱신)
 let _portRefreshing = false;
-async function _refreshPortfolioRealtime() {
+async function _refreshPortfolioRealtime(gen) {
   if (_portRefreshing) return;   // 중복 실행 차단
   _portRefreshing = true;
   try {
-    const etfFetches = _portEtf
+    const etfSnap = [..._portEtf];      // 이 시점의 배열 스냅샷 — 교체돼도 구 fetch 결과 무시
+    const stkSnap = [..._stockRecords];
+    const etfFetches = etfSnap
       .filter(r => r.ticker)
       .map(async r => {
         const release = await _priceSem();
@@ -1544,7 +1549,7 @@ async function _refreshPortfolioRealtime() {
         } catch {} finally { release(); }
       });
 
-    const stkFetches = _stockRecords
+    const stkFetches = stkSnap
       .filter(r => r.ticker)
       .map(async r => {
         const release = await _priceSem();
@@ -1555,6 +1560,8 @@ async function _refreshPortfolioRealtime() {
       });
 
     await Promise.all([...etfFetches, ...stkFetches]);
+    // 세대가 바뀌었으면(더 새로운 initPortfolio가 실행됨) 렌더링 생략
+    if (gen !== undefined && gen !== _portGeneration) return;
     renderPortfolio();
   } finally {
     _portRefreshing = false;
