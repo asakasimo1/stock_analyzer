@@ -1501,6 +1501,7 @@ async function initPortfolio() {
   _initPortCollapse();
   _showPortLoading();
   const gen = ++_portGeneration; // 이 호출의 세대 번호 — 이후 구 refresh가 덮어쓰지 못하도록
+  _portRefreshing = false; // 이전 refresh 플래그 초기화 — 새 방문에서 반드시 실행되도록
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
     // /api/ipo · /api/data는 전역 캐시(_ipoRecords, _sharedGistData) 재사용해 중복 호출 방지
@@ -1520,14 +1521,14 @@ async function initPortfolio() {
     _portDiv      = divRes.records || [];
     _stockRecords = (stkRes.records || []).map(r => ({ ...r, current_price: null, chg: null, chgPct: null }));
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
-    // 예수금 입력란 초기값 세팅
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = _portCash ? _portCash.toLocaleString() : '';
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
-  renderPortfolio();
-  _refreshPortfolioRealtime(gen); // 세대 번호 전달
+  // 현재가 조회 완료 후 한 번만 렌더 — avg_price→current_price 전환 깜빡임 방지
+  await _refreshPortfolioRealtime(gen);
+  if (gen === _portGeneration) renderPortfolio();
   _startPortAutoRefresh();
 }
 
@@ -1560,9 +1561,6 @@ async function _refreshPortfolioRealtime(gen) {
       });
 
     await Promise.all([...etfFetches, ...stkFetches]);
-    // 세대가 바뀌었으면(더 새로운 initPortfolio가 실행됨) 렌더링 생략
-    if (gen !== undefined && gen !== _portGeneration) return;
-    renderPortfolio();
   } finally {
     _portRefreshing = false;
   }
