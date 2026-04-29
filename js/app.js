@@ -1482,8 +1482,23 @@ function _initPortCollapse() {
 // 포트폴리오 (ETF Gist + IPO Gist + 개별주 Gist 기반)
 // ══════════════════════════════════════════════════════════
 
+function _showPortLoading() {
+  const loading = '<tr><td colspan="4" class="port-loading">로딩 중...</td></tr>';
+  const el = id => document.getElementById(id);
+  ['pk-stk-eval','pk-etf-eval','pk-ipo-profit','pk-div-total'].forEach(id => { const e = el(id); if (e) e.textContent = '—'; });
+  if (el('port-etf-tbody'))   el('port-etf-tbody').innerHTML   = loading;
+  if (el('port-stock-tbody')) el('port-stock-tbody').innerHTML = loading;
+  if (el('port-ipo-tbody'))   el('port-ipo-tbody').innerHTML   = '';
+  if (el('port-ipo-card'))    el('port-ipo-card').style.display = 'none';
+  if (el('port-asset-wrap'))  el('port-asset-wrap').innerHTML  = '<div class="port-loading" style="padding:20px;text-align:center">로딩 중...</div>';
+  if (el('port-donut-wrap'))  el('port-donut-wrap').innerHTML  = '<div class="port-loading" style="padding:20px;text-align:center">로딩 중...</div>';
+  if (el('port-etf-div-chart')) el('port-etf-div-chart').innerHTML = '<div class="port-loading" style="padding:20px">로딩 중...</div>';
+  if (el('cash-input')) el('cash-input').value = '';
+}
+
 async function initPortfolio() {
   _initPortCollapse();
+  _showPortLoading();
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
   try {
     // /api/ipo · /api/data는 전역 캐시(_ipoRecords, _sharedGistData) 재사용해 중복 호출 방지
