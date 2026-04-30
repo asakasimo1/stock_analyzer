@@ -63,11 +63,7 @@ async function getKisPrice(ticker, appKey, appSecret) {
   if (d.rt_cd !== '0') throw new Error(d.msg1 || 'KIS 조회 오류');
   const o = d.output;
   const price = Number(o.stck_prpr) || Number(o.stck_clpr) || Number(o.prdy_clpr);
-  if (!price) {
-    const err = new Error('KIS 가격 없음');
-    err._debug = { rt_cd: d.rt_cd, stck_prpr: o.stck_prpr, stck_clpr: o.stck_clpr, hts_kor_isnm: o.hts_kor_isnm, msg1: d.msg1 };
-    throw err;
-  }
+  if (!price) throw new Error('KIS 가격 없음');
   return {
     price,
     chg: Number(o.prdy_vrss),
@@ -150,7 +146,7 @@ const KNOWN_DIV_CYCLES = {
   '466920': '분기배당', // ACE 미국나스닥100
   '468330': '분기배당', // ACE 미국S&P500
   '469990': '월배당',   // TIGER 미국S&P500+7%프리미엄다우존스
-  '470530': '월배당',   // SOL 미국30년국채커버드콜(합성)
+  '473330': '월배당',   // SOL 미국30년국채커버드콜(합성)
   '272560': '월배당',   // TIGER 국채3년
   '475560': '분기배당', // PLUS 미국나스닥100
   '476480': '월배당',   // KODEX 미국배당프리미엄액티브
@@ -316,7 +312,7 @@ export default async function handler(req, res) {
           ticker, name: kis.name, price: kis.price, chg: kis.chg, chgPct: kis.chgPct,
           divCycle, divMonths, annualDiv: 0, annualDivRate: 0, recentDiv: 0, recentDivRate: 0,
         });
-      } catch (kisErr) { return res.status(500).json({ error: naverErr.message, kis_error: kisErr.message, kis_debug: kisErr._debug, ticker }); }
+      } catch (_) { /* KIS도 실패 시 원래 에러 반환 */ }
     }
     return res.status(500).json({ error: naverErr.message, ticker });
   }
