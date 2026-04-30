@@ -9,30 +9,49 @@ let _kisTokenCache = null;
 
 // 실계좌: openapi.koreainvestment.com:9443
 // 모의투자: openapivts.koreainvestment.com:29443 (PAPER_TRADE=true 시)
+// 실계좌 우선 시도 → 403 시 모의투자 자동 폴백
 function kisBase() {
   return (process.env.PAPER_TRADE || '').toLowerCase() === 'true'
     ? 'https://openapivts.koreainvestment.com:29443'
     : 'https://openapi.koreainvestment.com:9443';
 }
+function kisBasePaper() { return 'https://openapivts.koreainvestment.com:29443'; }
+
+async function _kisToken(base, appKey, appSecret) {
+  const r = await fetch(`${base}/oauth2/tokenP`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret }),
+  });
+  if (!r.ok) throw new Error(`KIS 토큰 실패: ${r.status}`);
+  const d = await r.json();
+  return d.access_token;
+}
 
 async function getKisPrice(ticker, appKey, appSecret) {
-  const base = kisBase();
   const now = Date.now();
+  // 토큰 유효성 체크 또는 재발급 (실계좌 우선, 403 시 모의투자 폴백)
   if (!_kisTokenCache || _kisTokenCache.expires <= now + 60_000) {
-    const r = await fetch(`${base}/oauth2/tokenP`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret }),
-    });
-    if (!r.ok) throw new Error(`KIS 토큰 실패: ${r.status}`);
-    const d = await r.json();
-    _kisTokenCache = { token: d.access_token, expires: now + (d.expires_in ? d.expires_in * 1000 : 86_400_000) };
+    let base = kisBase();
+    let token;
+    try {
+      token = await _kisToken(base, appKey, appSecret);
+    } catch (e) {
+      if (e.message.includes('403') && base !== kisBasePaper()) {
+        base = kisBasePaper();
+        token = await _kisToken(base, appKey, appSecret);
+      } else {
+        throw e;
+      }
+    }
+    _kisTokenCache = { token, base, expires: now + 86_400_000 };
   }
+  const { token, base } = _kisTokenCache;
   const params = new URLSearchParams({ FID_COND_MRKT_DIV_CODE: 'J', FID_INPUT_ISCD: ticker });
   const r = await fetch(`${base}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      authorization: `Bearer ${_kisTokenCache.token}`,
+      authorization: `Bearer ${token}`,
       appkey: appKey,
       appsecret: appSecret,
       tr_id: 'FHKST01010100',
