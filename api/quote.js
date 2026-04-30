@@ -62,8 +62,14 @@ async function getKisPrice(ticker, appKey, appSecret) {
   const d = await r.json();
   if (d.rt_cd !== '0') throw new Error(d.msg1 || 'KIS 조회 오류');
   const o = d.output;
+  const price = Number(o.stck_prpr) || Number(o.stck_clpr) || Number(o.prdy_clpr);
+  if (!price) {
+    const err = new Error('KIS 가격 없음');
+    err._debug = { rt_cd: d.rt_cd, stck_prpr: o.stck_prpr, stck_clpr: o.stck_clpr, hts_kor_isnm: o.hts_kor_isnm, msg1: d.msg1 };
+    throw err;
+  }
   return {
-    price: Number(o.stck_prpr),
+    price,
     chg: Number(o.prdy_vrss),
     chgPct: Number(o.prdy_ctrt),
     name: o.hts_kor_isnm || '',
@@ -310,7 +316,7 @@ export default async function handler(req, res) {
           ticker, name: kis.name, price: kis.price, chg: kis.chg, chgPct: kis.chgPct,
           divCycle, divMonths, annualDiv: 0, annualDivRate: 0, recentDiv: 0, recentDivRate: 0,
         });
-      } catch (kisErr) { return res.status(500).json({ error: naverErr.message, kis_error: kisErr.message, ticker }); }
+      } catch (kisErr) { return res.status(500).json({ error: naverErr.message, kis_error: kisErr.message, kis_debug: kisErr._debug, ticker }); }
     }
     return res.status(500).json({ error: naverErr.message, ticker });
   }
