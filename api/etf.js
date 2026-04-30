@@ -134,7 +134,7 @@ export default async function handler(req, res) {
     try {
       const { records } = req.body;
       if (!Array.isArray(records)) return res.status(400).json({ error: 'records 배열 필요' });
-      const data = await readBin(binId, key);
+      const data = await readBin(binId, key, true); // 쓰기 전 fresh 읽기
       await writeBin(binId, key, { ...data, etf: records });
       return res.status(200).json({ ok: true, count: records.length });
     } catch (e) {

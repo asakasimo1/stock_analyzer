@@ -275,7 +275,7 @@ async function runCronFetch(binId, key) {
   const fresh = parseSchedule(plain, listingMap, demandMap, today);
   console.log(`[IPO Cron] 크롤링 완료: ${fresh.length}건`);
 
-  const binData = await readBin(binId, key);
+  const binData = await readBin(binId, key, true); // 크론 쓰기 전 fresh 읽기
   const existing = binData.ipo || [];
   const merged = mergeIpo(fresh, existing);
   console.log(`[IPO Cron] 병합 완료: ${merged.length}건`);
@@ -328,7 +328,7 @@ export default async function handler(req, res) {
     try {
       const { records } = req.body;
       if (!Array.isArray(records)) return res.status(400).json({ error: 'records 배열 필요' });
-      const data = await readBin(binId, key);
+      const data = await readBin(binId, key, true); // 쓰기 전 fresh 읽기
       await writeBin(binId, key, { ...data, ipo: records });
       return res.status(200).json({ ok: true, count: records.length });
     } catch (e) {

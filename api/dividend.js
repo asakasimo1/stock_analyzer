@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { record } = req.body;
       if (!record) return res.status(400).json({ error: 'record 필요' });
-      const data = await readBin(binId, key);
+      const data = await readBin(binId, key, true); // 쓰기 전 fresh 읽기
       const records = data.dividends ?? [];
       if (!record.id) record.id = Date.now();
       records.push(record);
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const id = req.query.id;
       if (!id) return res.status(400).json({ error: 'id 필요' });
-      const data = await readBin(binId, key);
+      const data = await readBin(binId, key, true); // 쓰기 전 fresh 읽기
       const records = (data.dividends ?? []).filter(r => String(r.id) !== String(id));
       await writeBin(binId, key, { ...data, dividends: records });
       return res.status(200).json({ ok: true });
