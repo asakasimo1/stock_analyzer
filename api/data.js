@@ -14,9 +14,9 @@ const GIST_TTL   = 30_000;
 // ── KIS 토큰 캐시 (warm 인스턴스 간 재사용) ─────────────────
 let _tokenCache = null;
 
-// 모의투자: openapivts.koreainvestment.com:29443
-// 실계좌:   openapi.koreainvestment.com:9443
-const KIS_BASE = (process.env.PAPER_TRADE || '').toLowerCase() !== 'false'
+// 실계좌: openapi.koreainvestment.com:9443
+// 모의투자: openapivts.koreainvestment.com:29443 (PAPER_TRADE=true 시)
+const KIS_BASE = (process.env.PAPER_TRADE || '').toLowerCase() === 'true'
   ? 'https://openapivts.koreainvestment.com:29443'
   : 'https://openapi.koreainvestment.com:9443';
 

@@ -7,10 +7,10 @@
 /** KIS API 토큰 캐시 (Naver API 실패 시 폴백용) */
 let _kisTokenCache = null;
 
-// 모의투자: openapivts.koreainvestment.com:29443
-// 실계좌:   openapi.koreainvestment.com:9443
+// 실계좌: openapi.koreainvestment.com:9443
+// 모의투자: openapivts.koreainvestment.com:29443 (PAPER_TRADE=true 시)
 function kisBase() {
-  return (process.env.PAPER_TRADE || '').toLowerCase() !== 'false'
+  return (process.env.PAPER_TRADE || '').toLowerCase() === 'true'
     ? 'https://openapivts.koreainvestment.com:29443'
     : 'https://openapi.koreainvestment.com:9443';
 }
