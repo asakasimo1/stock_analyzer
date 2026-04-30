@@ -7,10 +7,19 @@
 /** KIS API 토큰 캐시 (Naver API 실패 시 폴백용) */
 let _kisTokenCache = null;
 
+// 모의투자: openapivts.koreainvestment.com:29443
+// 실계좌:   openapi.koreainvestment.com:9443
+function kisBase() {
+  return (process.env.PAPER_TRADE || '').toLowerCase() !== 'false'
+    ? 'https://openapivts.koreainvestment.com:29443'
+    : 'https://openapi.koreainvestment.com:9443';
+}
+
 async function getKisPrice(ticker, appKey, appSecret) {
+  const base = kisBase();
   const now = Date.now();
   if (!_kisTokenCache || _kisTokenCache.expires <= now + 60_000) {
-    const r = await fetch('https://openapi.kis.or.kr/oauth2/tokenP', {
+    const r = await fetch(`${base}/oauth2/tokenP`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret }),
@@ -20,7 +29,7 @@ async function getKisPrice(ticker, appKey, appSecret) {
     _kisTokenCache = { token: d.access_token, expires: now + (d.expires_in ? d.expires_in * 1000 : 86_400_000) };
   }
   const params = new URLSearchParams({ FID_COND_MRKT_DIV_CODE: 'J', FID_INPUT_ISCD: ticker });
-  const r = await fetch(`https://openapi.kis.or.kr/uapi/domestic-stock/v1/quotations/inquire-price?${params}`, {
+  const r = await fetch(`${base}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       authorization: `Bearer ${_kisTokenCache.token}`,

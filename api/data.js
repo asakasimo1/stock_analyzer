@@ -14,10 +14,16 @@ const GIST_TTL   = 30_000;
 // ── KIS 토큰 캐시 (warm 인스턴스 간 재사용) ─────────────────
 let _tokenCache = null;
 
+// 모의투자: openapivts.koreainvestment.com:29443
+// 실계좌:   openapi.koreainvestment.com:9443
+const KIS_BASE = (process.env.PAPER_TRADE || '').toLowerCase() !== 'false'
+  ? 'https://openapivts.koreainvestment.com:29443'
+  : 'https://openapi.koreainvestment.com:9443';
+
 async function getKisToken(appKey, appSecret) {
   const now = Date.now();
   if (_tokenCache && _tokenCache.expires > now + 60_000) return _tokenCache.token;
-  const r = await fetch('https://openapi.kis.or.kr/oauth2/tokenP', {
+  const r = await fetch(`${KIS_BASE}/oauth2/tokenP`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret }),
@@ -110,8 +116,9 @@ export default async function handler(req, res) {
         FUND_STTL_ICLD_YN: 'N', FNCG_AMT_AUTO_RDPT_YN: 'N', PRCS_DVSN: '01',
         CTX_AREA_FK100: '', CTX_AREA_NK100: '',
       });
-      const r = await fetch(`https://openapi.kis.or.kr/uapi/domestic-stock/v1/trading/inquire-balance?${params}`, {
-        headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}`, appkey: appKey, appsecret: appSecret, tr_id: 'TTTC8434R', custtype: 'P' },
+      const balTrId = KIS_BASE.includes('vts') ? 'VTTC8434R' : 'TTTC8434R';
+      const r = await fetch(`${KIS_BASE}/uapi/domestic-stock/v1/trading/inquire-balance?${params}`, {
+        headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}`, appkey: appKey, appsecret: appSecret, tr_id: balTrId, custtype: 'P' },
       });
       if (!r.ok) { const err = await r.text(); return res.status(r.status).json({ error: `KIS API 오류: ${r.status}`, detail: err }); }
       const data = await r.json();
