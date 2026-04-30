@@ -107,6 +107,22 @@ export default async function handler(req, res) {
   const key   = process.env.JSONBIN_KEY;
   if (!binId || !key) return res.status(500).json({ error: 'JSONBIN 환경변수 미설정' });
 
+  // ── GET: 번들 (etf + stocks + transactions + dividends 한 번에) ──────────
+  if (req.method === 'GET' && req.query.bundle !== undefined) {
+    try {
+      const data = await readBin(binId, key);
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+      return res.status(200).json({
+        etf:          data.etf          ?? [],
+        stocks:       data.stocks       ?? [],
+        transactions: data.transactions ?? [],
+        dividends:    data.dividends    ?? [],
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── GET: 검색 ─────────────────────────────────────────────────────────────
   if (req.method === 'GET' && req.query.search !== undefined) {
     const q = (req.query.search || '').trim().toLowerCase();

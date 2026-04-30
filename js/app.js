@@ -225,6 +225,26 @@ async function _fetchGistData(force = false) {
   return _gistFetchPromise;
 }
 
+// ══════════════════════════════════════════════════════════
+// JSONBin 번들 캐시 (5분 TTL) — 탭 전환 시 중복 API 호출 방지
+// ══════════════════════════════════════════════════════════
+let _binData = null, _binDataAt = 0, _binFetchPromise = null;
+const BIN_CACHE_MS = 5 * 60 * 1000;
+
+async function _fetchBinData(force = false) {
+  const now = Date.now();
+  if (!force && _binData && now - _binDataAt < BIN_CACHE_MS) return _binData;
+  if (_binFetchPromise) return _binFetchPromise;
+  _binFetchPromise = fetch('/api/etf?bundle=1')
+    .then(r => r.ok ? r.json() : {})
+    .then(d => { _binData = d; _binDataAt = Date.now(); return d; })
+    .catch(() => _binData || {})
+    .finally(() => { _binFetchPromise = null; });
+  return _binFetchPromise;
+}
+
+function _invalidateBinCache() { _binData = null; _binDataAt = 0; }
+
 // 동시 현재가 요청 개수 제한 (semaphore)
 function _makeSemaphore(limit) {
   let running = 0;
@@ -1508,18 +1528,16 @@ async function initPortfolio() {
     const ipoPromise = _ipoRecords.length > 0
       ? Promise.resolve({ records: _ipoRecords })
       : fetch('/api/ipo').then(r => r.json());
-    const [etfRes, ipoRes, divRes, stkRes, metaRes] = await Promise.all([
-      fetch('/api/etf').then(r=>r.json()),
+    const [bundleData, ipoRes, metaRes] = await Promise.all([
+      _fetchBinData(),
       ipoPromise,
-      fetch('/api/dividend').then(r=>r.json()),
-      fetch('/api/stocks').then(r=>r.json()),
       _fetchGistData(),
     ]);
     if (gen !== _portGeneration) return; // 더 새로운 initPortfolio()가 이미 실행됨
-    _portEtf      = etfRes.records || [];
-    _portIpo      = ipoRes.records || [];
-    _portDiv      = divRes.records || [];
-    _stockRecords = (stkRes.records || []).map(r => ({ ...r, current_price: null, chg: null, chgPct: null }));
+    _portEtf      = bundleData.etf       ?? [];
+    _portIpo      = ipoRes.records       || [];
+    _portDiv      = bundleData.dividends ?? [];
+    _stockRecords = (bundleData.stocks   ?? []).map(r => ({ ...r, current_price: null, chg: null, chgPct: null }));
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = _portCash ? _portCash.toLocaleString() : '';
@@ -2123,6 +2141,7 @@ async function saveStockRecord() {
     const res = await fetch('/api/stocks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({record}) });
     const d   = await res.json();
     if (!d.ok) { alert('저장 실패: ' + (d.error||'')); return; }
+    _invalidateBinCache();
     const idx = _stockRecords.findIndex(s => s.id == d.record.id);
     if (idx !== -1) _stockRecords[idx] = d.record; else _stockRecords.push(d.record);
     closeStockModal();
@@ -2136,6 +2155,7 @@ async function saveStockRecord() {
 async function deleteStockRecord(id) {
   if (!confirm('삭제하시겠습니까?')) return;
   await fetch('/api/stocks?id=' + id, { method:'DELETE' });
+  _invalidateBinCache();
   _stockRecords = _stockRecords.filter(s => s.id != id);
   renderPortfolio();
   renderStockCards();
@@ -2150,15 +2170,13 @@ let _stkRefreshing   = false;
 
 async function loadStockRecords() {
   try {
-    const r = await fetch('/api/stocks');
-    const d = await r.json();
-    _stockRecords = (d.records || []).map(s => ({ ...s, current_price: null, chg: null, chgPct: null }));
-  } catch { _stockRecords = []; }
-  try {
-    const r = await fetch('/api/transactions');
-    const all = (await r.json()).records || [];
-    _stkTransactions = all.filter(t => t.stock_id);
-  } catch { _stkTransactions = []; }
+    const d = await _fetchBinData();
+    _stockRecords    = (d.stocks ?? []).map(s => ({ ...s, current_price: null, chg: null, chgPct: null }));
+    _stkTransactions = (d.transactions ?? []).filter(t => t.stock_id);
+  } catch {
+    _stockRecords = [];
+    _stkTransactions = [];
+  }
   renderStockCards();
   refreshAllStockPrices(true); // 탭 진입 시 즉시 현재가 업데이트
 }
@@ -2427,6 +2445,7 @@ async function saveStkTransaction() {
     const tax        = type === 'sell' ? Math.round(tradeAmt * STX_TAX) : 0;
     const cashDelta  = type === 'buy' ? -(tradeAmt + commission) : +(tradeAmt - commission - tax);
     await _adjustCash(cashDelta);
+    _invalidateBinCache();
 
     closeStkTransModal();
     renderStockCards();
@@ -2478,6 +2497,7 @@ async function deleteStkTransaction(id) {
         await _adjustCash(cashDelta);
       }
     }
+    _invalidateBinCache();
 
     renderStockCards();
     renderPortfolio();
@@ -3051,15 +3071,14 @@ const ETF_AUTO_REFRESH_MS = 20 * 60 * 1000; // 20분
 
 async function loadEtfRecords() {
   try {
-    const r = await fetch('/api/etf');
-    _etfRecords = (await r.json()).records || [];
-  } catch { _etfRecords = []; }
+    const d = await _fetchBinData();
+    _etfRecords   = d.etf          ?? [];
+    _transactions = d.transactions ?? [];
+  } catch {
+    _etfRecords = [];
+    _transactions = [];
+  }
   if (ensureEtfIds(_etfRecords)) await saveEtfRecords();
-
-  // 거래 내역을 카드 렌더링 전에 미리 로드
-  try {
-    _transactions = ((await (await fetch('/api/transactions')).json()).records) || [];
-  } catch { _transactions = []; }
 
   renderEtfCards();
   loadDivRecords();
@@ -3080,6 +3099,7 @@ async function saveEtfRecords() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ records: _etfRecords }),
   });
+  _invalidateBinCache();
 }
 
 const TAX_RATE = 0.154; // 배당소득세 14% + 지방소득세 1.4%
@@ -3970,10 +3990,9 @@ let _divRecords = [];
 
 async function loadDivRecords() {
   try {
-    const r = await fetch('/api/dividend');
-    const data = await r.json();
-    _divRecords = data.records || [];
-  } catch (e) {
+    const d = await _fetchBinData();
+    _divRecords = d.dividends ?? [];
+  } catch {
     _divRecords = [];
   }
   renderDivHistory();
@@ -4119,6 +4138,7 @@ async function saveDivEntry() {
       body: JSON.stringify({ record }),
     });
     if (!resp.ok) throw new Error('저장 실패');
+    _invalidateBinCache();
     _divRecords.push(record);
     // 포트폴리오 탭 _portDiv 동기화 후 관련 UI 갱신
     _portDiv.push(record);
@@ -4143,6 +4163,7 @@ async function deleteDivRecord(id) {
   try {
     const rec = _divRecords.find(r => String(r.id) === String(id));
     await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
+    _invalidateBinCache();
     _divRecords = _divRecords.filter(r => r.id != id);
     _portDiv    = _portDiv.filter(r => r.id != id);
     _renderPortKpi();
