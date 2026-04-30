@@ -291,7 +291,7 @@ export default async function handler(req, res) {
           ticker, name: kis.name, price: kis.price, chg: kis.chg, chgPct: kis.chgPct,
           divCycle, divMonths, annualDiv: 0, annualDivRate: 0, recentDiv: 0, recentDivRate: 0,
         });
-      } catch (_) { /* KIS도 실패 시 원래 에러 반환 */ }
+      } catch (kisErr) { return res.status(500).json({ error: naverErr.message, kis_error: kisErr.message, ticker }); }
     }
     return res.status(500).json({ error: naverErr.message, ticker });
   }
