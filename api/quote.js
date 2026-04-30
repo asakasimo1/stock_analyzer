@@ -4,6 +4,44 @@
  * Returns: { ticker, name, price, chg, chgPct, divCycle, divMonths, annualDiv, annualDivRate, recentDiv, recentDivRate }
  */
 
+/** KIS API 토큰 캐시 (Naver API 실패 시 폴백용) */
+let _kisTokenCache = null;
+
+async function getKisPrice(ticker, appKey, appSecret) {
+  const now = Date.now();
+  if (!_kisTokenCache || _kisTokenCache.expires <= now + 60_000) {
+    const r = await fetch('https://openapi.kis.or.kr/oauth2/tokenP', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret }),
+    });
+    if (!r.ok) throw new Error(`KIS 토큰 실패: ${r.status}`);
+    const d = await r.json();
+    _kisTokenCache = { token: d.access_token, expires: now + (d.expires_in ? d.expires_in * 1000 : 86_400_000) };
+  }
+  const params = new URLSearchParams({ FID_COND_MRKT_DIV_CODE: 'J', FID_INPUT_ISCD: ticker });
+  const r = await fetch(`https://openapi.kis.or.kr/uapi/domestic-stock/v1/quotations/inquire-price?${params}`, {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      authorization: `Bearer ${_kisTokenCache.token}`,
+      appkey: appKey,
+      appsecret: appSecret,
+      tr_id: 'FHKST01010100',
+      custtype: 'P',
+    },
+  });
+  if (!r.ok) throw new Error(`KIS API ${r.status}`);
+  const d = await r.json();
+  if (d.rt_cd !== '0') throw new Error(d.msg1 || 'KIS 조회 오류');
+  const o = d.output;
+  return {
+    price: Number(o.stck_prpr),
+    chg: Number(o.prdy_vrss),
+    chgPct: Number(o.prdy_ctrt),
+    name: o.hts_kor_isnm || '',
+  };
+}
+
 /** 알려진 ETF 배당주기 (Naver API가 단일월만 반환할 때 fallback) */
 const KNOWN_DIV_CYCLES = {
   // 월배당
@@ -229,7 +267,23 @@ export default async function handler(req, res) {
       ticker, name, price, chg, chgPct,
       divCycle, divMonths, annualDiv, annualDivRate, recentDiv, recentDivRate,
     });
-  } catch (e) {
-    return res.status(500).json({ error: e.message, ticker });
+  } catch (naverErr) {
+    // Naver API 실패 시 KIS API로 폴백 (일부 합성 ETF가 Naver에서 StockConflict 반환)
+    const appKey    = process.env.KIS_APP_KEY;
+    const appSecret = process.env.KIS_APP_SECRET;
+    if (appKey && appSecret) {
+      try {
+        const kis = await getKisPrice(ticker, appKey, appSecret);
+        if (!kis.price) throw new Error('KIS 가격 없음');
+        const divCycle  = KNOWN_DIV_CYCLES[ticker] || '';
+        const divMonths = divCycle === '월배당' ? '매월' : '';
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
+        return res.status(200).json({
+          ticker, name: kis.name, price: kis.price, chg: kis.chg, chgPct: kis.chgPct,
+          divCycle, divMonths, annualDiv: 0, annualDivRate: 0, recentDiv: 0, recentDivRate: 0,
+        });
+      } catch (_) { /* KIS도 실패 시 원래 에러 반환 */ }
+    }
+    return res.status(500).json({ error: naverErr.message, ticker });
   }
 }
