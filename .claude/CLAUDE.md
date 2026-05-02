@@ -66,7 +66,7 @@ Oracle VM 코드 저장소: `github.com/asakasimo1/stock-trader`
 ### Vercel 배포
 
 ```bash
-cd /Users/macbook/projects/stock_analyzer/stock_analyzer
+cd /Users/macbook/projects/stock-manager/frontend
 vercel --prod
 ```
 
