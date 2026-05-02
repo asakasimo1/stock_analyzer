@@ -234,30 +234,78 @@ function parseSchedule(plain, listingMap, demandMap, today) {
   return records;
 }
 
+// ── 사용자 입력 필드 추출 → ipo_user_actions 백업 키용 ────────
+const USER_ACTION_FIELDS = ['subscribed','shares_alloc','price_open','sell_qty','sell_date','direct_profit','direct_rate'];
+
+function extractUserActions(records) {
+  const ua = {};
+  for (const rec of records) {
+    if (!rec?.name) continue;
+    const hasAction = rec.subscribed || rec.shares_alloc != null ||
+                      (rec.price_open > 0) || rec.direct_profit != null;
+    if (!hasAction) continue;
+    const fields = {};
+    for (const f of USER_ACTION_FIELDS) { if (rec[f] != null) fields[f] = rec[f]; }
+    if (Object.keys(fields).length) ua[rec.name] = fields;
+  }
+  return ua;
+}
+
 // ── 병합: 사용자 입력 필드 보존 ──────────────────────────────
-function mergeIpo(fresh, existing) {
+// userActions = ipo_user_actions 백업 키 (크론이 건드리지 않는 격리 저장소)
+function mergeIpo(fresh, existing, userActions = {}) {
   const exMap = Object.fromEntries(existing.filter(r => r?.name).map(r => [r.name, r]));
-  const merged = fresh.map(rec => {
-    const old = exMap[rec.name];
-    if (!old) return rec;
-    if (old.subscribed)             rec.subscribed = old.subscribed;
-    if (old.shares_alloc != null)   rec.shares_alloc = old.shares_alloc;
-    if (old.status === '상장완료')   rec.status = '상장완료';
-    if (old.price_open)             rec.price_open = old.price_open;
-    if (old.sell_qty != null)       rec.sell_qty = old.sell_qty;
-    if (old.id)                     rec.id = old.id;
-    const oldNote = old.note || '', newNote = rec.note || '';
-    if (oldNote && !newNote.includes(oldNote)) rec.note = (newNote + ' / ' + oldNote).trim().replace(/^\/ /, '');
+
+  // 사용자 필드 적용: existing(ipo) 우선, 없으면 userActions(백업) 폴백
+  const applyUserFields = (rec, old, ua) => {
+    const g  = (f) => old[f] ?? ua[f];
+    const gs = (f) => old[f] || ua[f] || '';
+    const v_sub = g('subscribed');    if (v_sub)         rec.subscribed    = v_sub;
+    const v_al  = g('shares_alloc'); if (v_al  != null)  rec.shares_alloc  = v_al;
+    if ((old.status||ua.status) === '상장완료')            rec.status        = '상장완료';
+    const v_op  = gs('price_open');  if (v_op)           rec.price_open    = v_op;
+    const v_sq  = g('sell_qty');     if (v_sq  != null)  rec.sell_qty      = v_sq;
+    const v_sd  = gs('sell_date');   if (v_sd)           rec.sell_date     = v_sd;
+    const v_dp  = g('direct_profit');if (v_dp  != null)  rec.direct_profit = v_dp;
+    const v_dr  = g('direct_rate');  if (v_dr  != null)  rec.direct_rate   = v_dr;
+    const v_dl  = gs('date_list');   if (v_dl)           rec.date_list     = rec.date_list || v_dl;
+    if (old.id) rec.id = old.id;
+    const oldNote = old.note || '';
+    if (oldNote && !(rec.note||'').includes(oldNote))
+      rec.note = ((rec.note||'') + ' / ' + oldNote).trim().replace(/^\/ /, '');
     return rec;
-  });
+  };
+
+  const merged = fresh.map(rec =>
+    applyUserFields(rec, exMap[rec.name] || {}, userActions[rec.name] || {})
+  );
+
   const freshNames = new Set(fresh.map(r => r.name));
+
+  // 크롤에서 사라진 기존 레코드 — 사용자 액션 있으면 무조건 보존
   for (const old of existing) {
     if (!old?.name || freshNames.has(old.name)) continue;
-    if (!old.name || old.name.length > 30 || /[\n\r]/.test(old.name)) continue;
+    if (old.name.length > 30 || /[\n\r]/.test(old.name)) continue;
     if (!/[\uAC00-\uD7A3]/.test(old.name)) continue;
+    const ua = userActions[old.name] || {};
+    const hasUserData = old.subscribed || old.shares_alloc != null ||
+                        (old.price_open > 0) || old.direct_profit != null ||
+                        ua.subscribed || ua.direct_profit != null;
+    if (hasUserData) { merged.push(old); continue; }
     if (!old.date_sub_start || !old.price_band_high) continue;
-    if (['상장완료', '청약완료'].includes(old.status)) merged.push(old);
+    if (['상장완료','청약완료'].includes(old.status)) merged.push(old);
   }
+
+  // 최후 안전망: ipo_user_actions에만 있고 merged에 없는 레코드 복원
+  const mergedNames = new Set(merged.map(r => r.name));
+  for (const [name, ua] of Object.entries(userActions)) {
+    if (mergedNames.has(name)) continue;
+    if (ua.subscribed || ua.direct_profit != null) {
+      merged.push({ name, status: '상장완료', date_sub_start: '2020-01-01',
+                    price_band_high: 1, price_ipo: 0, price_open: 0, ...ua });
+    }
+  }
+
   return merged;
 }
 
@@ -276,10 +324,12 @@ async function runCronFetch(binId, key) {
   console.log(`[IPO Cron] 크롤링 완료: ${fresh.length}건`);
 
   const binData = await readBin(binId, key, true); // 크론 쓰기 전 fresh 읽기
-  const existing = binData.ipo || [];
-  const merged = mergeIpo(fresh, existing);
+  const existing    = binData.ipo              || [];
+  const userActions = binData.ipo_user_actions || {}; // 크론이 건드리지 않는 격리 백업
+  const merged = mergeIpo(fresh, existing, userActions);
   console.log(`[IPO Cron] 병합 완료: ${merged.length}건`);
 
+  // ipo_user_actions는 여기서 절대 수정하지 않음
   await writeBin(binId, key, { ...binData, ipo: merged });
   console.log('[IPO Cron] 저장 완료');
 
@@ -329,7 +379,11 @@ export default async function handler(req, res) {
       const { records } = req.body;
       if (!Array.isArray(records)) return res.status(400).json({ error: 'records 배열 필요' });
       const data = await readBin(binId, key, true); // 쓰기 전 fresh 읽기
-      await writeBin(binId, key, { ...data, ipo: records });
+      // 사용자 액션 필드를 ipo_user_actions에 누적 저장 (크론이 덮어쓰지 않는 격리 키)
+      const newUA      = extractUserActions(records);
+      const existingUA = data.ipo_user_actions || {};
+      const mergedUA   = { ...existingUA, ...newUA }; // 새 데이터가 기존을 덮어씀
+      await writeBin(binId, key, { ...data, ipo: records, ipo_user_actions: mergedUA });
       return res.status(200).json({ ok: true, count: records.length });
     } catch (e) {
       return res.status(500).json({ error: e.message });
