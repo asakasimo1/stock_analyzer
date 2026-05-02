@@ -62,6 +62,48 @@ export default async function handler(req, res) {
 
   const mode = req.query.mode || '';
 
+  // ── 관심종목 (watchlist) GET / POST ──────────────────────
+  if (mode === 'watchlist') {
+    if (req.method === 'GET') {
+      try {
+        let gist;
+        const now = Date.now();
+        if (_gistCache && now - _gistCacheAt < GIST_TTL) {
+          gist = _gistCache;
+        } else {
+          const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
+          if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+          gist = await r.json();
+          _gistCache = gist; _gistCacheAt = now;
+        }
+        const file   = gist.files?.['watchlist.json'];
+        const stocks = file ? JSON.parse(file.content) : [];
+        res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+        return res.status(200).json({ stocks: Array.isArray(stocks) ? stocks : [] });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+    if (req.method === 'POST') {
+      const { stocks } = req.body || {};
+      if (!Array.isArray(stocks)) return res.status(400).json({ error: 'stocks 배열 필요' });
+      const clean = stocks
+        .filter(s => s?.ticker && s?.name)
+        .map(s => ({ ticker: String(s.ticker).trim(), name: String(s.name).trim() }));
+      try {
+        await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: 'PATCH',
+          headers: { ...ghHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: { 'watchlist.json': { content: JSON.stringify(clean, null, 2) } } }),
+        });
+        _gistCache = null; _gistCacheAt = 0;
+        return res.status(200).json({ ok: true, count: clean.length });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+  }
+
   // ── 코인 runner 트리거 (coin-runner 서버사이드 호출) ─────────
   if (mode === 'trigger_coin_runner' || mode === 'trigger_coin_balance') {
     const host       = req.headers['x-forwarded-host'] || req.headers.host || '';

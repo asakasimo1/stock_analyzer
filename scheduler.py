@@ -78,6 +78,27 @@ def _signal_category(alert_text: str) -> str:
 
 
 def load_watchlist() -> list:
+    """Gist watchlist.json 우선 → 로컬 파일 fallback"""
+    try:
+        import requests as _req
+        gist_id  = getattr(config, "GIST_ID",  "") or os.environ.get("GIST_ID",  "")
+        gh_token = getattr(config, "GH_TOKEN", "") or os.environ.get("GH_TOKEN", "")
+        if gist_id and gh_token:
+            r = _req.get(
+                f"https://api.github.com/gists/{gist_id}",
+                headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json"},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                files = r.json().get("files", {})
+                if "watchlist.json" in files:
+                    stocks = json.loads(files["watchlist.json"]["content"])
+                    if isinstance(stocks, list) and stocks:
+                        log.info(f"[Watchlist] Gist에서 {len(stocks)}개 로드")
+                        return stocks
+    except Exception as e:
+        log.warning(f"[Watchlist] Gist 읽기 실패 — 로컬 파일로 fallback: {e}")
+
     if os.path.exists(WATCHLIST_FILE):
         with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
             return json.load(f).get("stocks", [])

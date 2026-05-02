@@ -782,6 +782,41 @@
     </div>
   </div>
 
+  <!-- 브리핑 관심종목 관리 -->
+  <div class="card dash-full" id="watchlist-card">
+    <div class="card-title" style="display:flex;align-items:center;gap:8px">
+      ⭐ 브리핑 관심종목
+      <span id="wl-count" style="font-size:11px;color:var(--muted);font-weight:400"></span>
+    </div>
+
+    <!-- 추가 입력 -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;position:relative">
+      <div style="position:relative;flex:1">
+        <input id="wl-name-input" type="text" placeholder="종목명 검색..."
+          style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);
+                 border-radius:8px;background:var(--card);color:var(--text);font-size:13px"
+          oninput="onWlNameInput(this.value)" onblur="hideWlAc()">
+        <div id="wl-ac-list" style="display:none;position:absolute;top:100%;left:0;right:0;
+          background:var(--card);border:1px solid var(--border);border-radius:8px;
+          box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:100;max-height:200px;overflow-y:auto"></div>
+      </div>
+      <input id="wl-ticker-input" type="text" placeholder="종목코드"
+        style="width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+               background:var(--card);color:var(--text);font-size:13px"
+        oninput="onWlTickerInput(this.value)">
+      <button onclick="addWlItem()"
+        style="padding:8px 16px;background:var(--primary);color:#fff;border:none;border-radius:8px;
+               font-size:13px;cursor:pointer;white-space:nowrap">
+        + 추가
+      </button>
+    </div>
+
+    <!-- 목록 -->
+    <div id="wl-list" style="display:flex;flex-direction:column;gap:6px">
+      <div class="empty-msg">로딩 중...</div>
+    </div>
+  </div>
+
 </div>
 </div><!-- /tab-dashboard -->
 
