@@ -1080,6 +1080,39 @@ function calMove(dir) {
 }
 
 // 영업일 계산 공통 함수 (calcAllotDate / calcAllotDateIpo / calcEstListDate 통합)
+// ── 한국 공휴일 (주말 제외, 별도 isHoliday에서 주말 병행 체크) ──
+const KR_HOLIDAYS = new Set([
+  // 2025
+  '2025-01-01',                                     // 신정
+  '2025-01-28','2025-01-29','2025-01-30',           // 설날 연휴 (설날=1/29)
+  '2025-03-01',                                     // 삼일절
+  '2025-05-05','2025-05-06',                        // 어린이날 + 대체(석가탄신일 겹침)
+  '2025-06-06',                                     // 현충일
+  '2025-08-15',                                     // 광복절
+  '2025-10-03',                                     // 개천절
+  '2025-10-05','2025-10-06','2025-10-07','2025-10-08', // 추석 연휴 + 대체
+  '2025-10-09',                                     // 한글날
+  '2025-12-25',                                     // 성탄절
+  // 2026
+  '2026-01-01',                                     // 신정
+  '2026-02-16','2026-02-17','2026-02-18',           // 설날 연휴 (설날=2/17)
+  '2026-03-01','2026-03-02',                        // 삼일절(일) + 대체
+  '2026-05-05',                                     // 어린이날
+  '2026-05-24',                                     // 부처님오신날
+  '2026-06-06','2026-06-08',                        // 현충일(토) + 대체
+  '2026-08-15','2026-08-17',                        // 광복절(토) + 대체
+  '2026-09-24','2026-09-25','2026-09-26','2026-09-28', // 추석 연휴 + 대체
+  '2026-10-03','2026-10-05',                        // 개천절(토) + 대체
+  '2026-10-09',                                     // 한글날
+  '2026-12-25',                                     // 성탄절
+]);
+
+function isHoliday(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay();
+  return dow === 0 || dow === 6 || KR_HOLIDAYS.has(dateStr);
+}
+
 function addBizDays(dateStr, n) {
   if (!dateStr) return '';
   try {
@@ -1087,7 +1120,8 @@ function addBizDays(dateStr, n) {
     let bdays = 0;
     while (bdays < n) {
       d.setDate(d.getDate() + 1);
-      if (d.getDay() >= 1 && d.getDay() <= 5) bdays++;
+      const key = d.toISOString().slice(0, 10);
+      if (!isHoliday(key)) bdays++;
     }
     return d.toISOString().slice(0, 10);
   } catch(_) { return ''; }
@@ -1118,7 +1152,7 @@ function renderCalendar(data) {
     const subscribed = ipo.subscribed;
     const status = ipo.status || '';
 
-    // 청약 기간 (시작~마감 전체 날짜에 표시)
+    // 청약 기간 (시작~마감 중 영업일만 표시 — 주말·공휴일 제외)
     if (ipo.date_sub_start && ipo.date_sub_end) {
       let cur = new Date(ipo.date_sub_start + 'T00:00:00');
       const end = new Date(ipo.date_sub_end + 'T00:00:00');
@@ -1127,13 +1161,15 @@ function renderCalendar(data) {
         const cm = String(cur.getMonth()+1).padStart(2,'0');
         const cd = String(cur.getDate()).padStart(2,'0');
         const key = `${cy}-${cm}-${cd}`;
-        if (subscribed) {
-          add(key, 'ipo-sub-done', `✅ ${name} 청약완료`, ipo);
-        } else if (!['상장완료','청약포기'].includes(status)) {
-          const sc = ipo.score;
-          const star = sc >= 70 ? '⭐' : sc >= 50 ? '🔹' : '';
-          const scoreTag = sc != null ? ` ${star}${sc}점` : '';
-          add(key, 'ipo-sub', `🏢 ${name}${scoreTag}`, ipo);
+        if (!isHoliday(key)) { // 주말·공휴일 제외
+          if (subscribed) {
+            add(key, 'ipo-sub-done', `✅ ${name} 청약완료`, ipo);
+          } else if (!['상장완료','청약포기'].includes(status)) {
+            const sc = ipo.score;
+            const star = sc >= 70 ? '⭐' : sc >= 50 ? '🔹' : '';
+            const scoreTag = sc != null ? ` ${star}${sc}점` : '';
+            add(key, 'ipo-sub', `🏢 ${name}${scoreTag}`, ipo);
+          }
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -1159,13 +1195,11 @@ function renderCalendar(data) {
     }
   });
 
-  // 스케줄 (평일 고정 이벤트)
+  // 스케줄 (영업일 고정 이벤트 — 주말·공휴일 제외)
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   for (let d = 1; d <= daysInMonth; d++) {
-    const dt = new Date(y, m, d);
-    const dow = dt.getDay();
     const key = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    if (dow >= 1 && dow <= 5) { // 평일
+    if (!isHoliday(key)) { // 주말·공휴일 제외
       if (!events[key]) events[key] = [];
       events[key].unshift({ type: 'briefing', text: '⏰ 07:30 브리핑', detail: null });
     }
