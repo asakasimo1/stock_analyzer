@@ -1,0 +1,266 @@
+
+// ══════════════════════════════════════════════════════════
+// 설정
+// ══════════════════════════════════════════════════════════
+const SETTINGS_KEY = 'app-settings-v1';
+const TAB_LABELS = {
+  dashboard:'📊 대시보드', portfolio:'📈 포트폴리오', market:'📊 시장현황',
+  etf:'💹 ETF', stocks:'📊 개별주', autotrade:'🤖 자동매매', cointrade:'🪙 자동코인매매',
+};
+let _settings = { hiddenTabs:[], darkMode:false, defaultTab:'dashboard', autoRefreshSec:0 };
+let _autoRefreshTimer = null;
+
+function _loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (s) _settings = { ..._settings, ...s };
+  } catch(_) {}
+}
+
+function _saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settings)); } catch(_) {}
+}
+
+function _applySettingsState() {
+  document.body.classList.toggle('dark', !!_settings.darkMode);
+  _applyTabVisibility();
+  clearInterval(_autoRefreshTimer);
+  if (_settings.autoRefreshSec > 0) {
+    _autoRefreshTimer = setInterval(() => {
+      const cur = document.querySelector('.tab-btn.active')
+        ?.getAttribute('onclick')?.match(/switchTab\('(\w+)'\)/)?.[1];
+      if (cur === 'dashboard') initDashboard();
+    }, _settings.autoRefreshSec * 1000);
+  }
+}
+
+function _applyTabVisibility() {
+  TAB_ORDER.forEach(tab => {
+    const btn = document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`);
+    if (btn) btn.style.display = _settings.hiddenTabs.includes(tab) ? 'none' : '';
+  });
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    const first = TAB_ORDER.find(t => !_settings.hiddenTabs.includes(t));
+    if (first) switchTab(first);
+  }
+}
+
+function applySettings() {
+  const darkEl = document.getElementById('set-dark');
+  if (darkEl) _settings.darkMode = darkEl.checked;
+  const dtEl = document.getElementById('set-default-tab');
+  if (dtEl) _settings.defaultTab = dtEl.value;
+  const arEl = document.getElementById('set-auto-refresh');
+  if (arEl) _settings.autoRefreshSec = +arEl.value;
+  _settings.hiddenTabs = [];
+  document.querySelectorAll('.set-tab-toggle').forEach(cb => {
+    if (!cb.checked) _settings.hiddenTabs.push(cb.dataset.tab);
+  });
+  _saveSettings();
+  _applySettingsState();
+}
+
+const SETTINGS_PW_KEY = 'settings-pw-v1';
+const DEFAULT_PW_HASH = '1234';
+
+function _hashPw(pw) { return pw; }
+
+function openSettingsWithAuth() {
+  const stored = localStorage.getItem(SETTINGS_PW_KEY);
+  if (!stored) {
+    openSettings();
+    return;
+  }
+  const el = document.getElementById('pw-overlay');
+  if (el) {
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-error').style.display = 'none';
+    el.classList.add('open');
+    setTimeout(() => document.getElementById('pw-input').focus(), 100);
+  }
+}
+
+function checkSettingsPw() {
+  const stored = localStorage.getItem(SETTINGS_PW_KEY) || DEFAULT_PW_HASH;
+  const input = document.getElementById('pw-input').value;
+  if (_hashPw(input) === stored) {
+    closePwModal();
+    openSettings();
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function closePwModal() {
+  const el = document.getElementById('pw-overlay');
+  if (el) el.classList.remove('open');
+}
+
+function openSettings() {
+  const darkEl = document.getElementById('set-dark');
+  if (darkEl) darkEl.checked = !!_settings.darkMode;
+  const dtEl = document.getElementById('set-default-tab');
+  if (dtEl) dtEl.value = _settings.defaultTab || 'dashboard';
+  const arEl = document.getElementById('set-auto-refresh');
+  if (arEl) arEl.value = String(_settings.autoRefreshSec || 0);
+  const list = document.getElementById('set-tabs-list');
+  if (list) {
+    list.innerHTML = TAB_ORDER.map(tab => `
+      <div class="settings-row">
+        <div class="settings-row-label">${TAB_LABELS[tab]}</div>
+        <label class="toggle">
+          <input type="checkbox" class="set-tab-toggle" data-tab="${tab}"
+            ${_settings.hiddenTabs.includes(tab) ? '' : 'checked'}
+            onchange="applySettings()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`).join('');
+  }
+  document.getElementById('settings-overlay').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+function saveSettingsPw() {
+  const n = document.getElementById('set-pw-new').value;
+  const c = document.getElementById('set-pw-confirm').value;
+  const msg = document.getElementById('set-pw-msg');
+  if (!n) {
+    localStorage.removeItem(SETTINGS_PW_KEY);
+    msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = '비밀번호가 제거되었습니다.';
+    document.getElementById('set-pw-new').value = '';
+    document.getElementById('set-pw-confirm').value = '';
+    return;
+  }
+  if (n !== c) {
+    msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = '비밀번호가 일치하지 않습니다.';
+    return;
+  }
+  localStorage.setItem(SETTINGS_PW_KEY, _hashPw(n));
+  msg.style.display = 'block'; msg.style.color = 'var(--green)'; msg.textContent = '비밀번호가 저장되었습니다.';
+  document.getElementById('set-pw-new').value = '';
+  document.getElementById('set-pw-confirm').value = '';
+}
+
+_loadSettings();
+
+// ══════════════════════════════════════════════════════════
+// 탭 전환
+// ══════════════════════════════════════════════════════════
+const TAB_ORDER = ['dashboard', 'portfolio', 'market', 'etf', 'stocks', 'autotrade', 'cointrade'];
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const btn = document.querySelector(`.tab-btn[onclick="switchTab('${name}')"]`);
+  if (btn) {
+    btn.classList.add('active');
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+  if (name === 'dashboard') initDashboard();
+  if (name === 'portfolio') initPortfolio();
+  if (name === 'ipo') loadIpoRecords();
+  if (name === 'market') loadMarketData();
+  if (name === 'etf') loadEtfRecords();
+  if (name === 'stocks') loadStockRecords();
+  if (name === 'autotrade') initAutoTrade();
+  if (name === 'cointrade') initCoinTrade();
+}
+
+// ── 탭 스와이프 (모바일) ──────────────────────────────────
+(function() {
+  let _sx = 0, _sy = 0, _multi = false;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length > 1) { _multi = true; return; }  // 핀치 줌 등 멀티터치 무시
+    _multi = false;
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchcancel', () => { _multi = true; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (_multi) return;                          // 멀티터치 후 탭 전환 차단
+    if (e.changedTouches.length !== 1) return;  // 손가락이 1개일 때만 스와이프 판정
+    const t = e.target;
+    // 버튼·입력·링크·인터랙티브 요소에서 끝난 경우 탭 전환 차단
+    
+    if (t.closest('button, a, input, select, textarea')) return;
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const active = document.querySelector('.tab-btn.active');
+    if (!active) return;
+    const cur = active.getAttribute('onclick').match(/switchTab\('(\w+)'\)/)?.[1];
+    const visible = TAB_ORDER.filter(t => !(_settings.hiddenTabs||[]).includes(t));
+    const idx = visible.indexOf(cur);
+    if (dx < 0 && idx < visible.length - 1) switchTab(visible[idx + 1]);
+    if (dx > 0 && idx > 0) switchTab(visible[idx - 1]);
+  }, { passive: true });
+})();
+
+// ══════════════════════════════════════════════════════════
+// /api/data 전역 공유 캐시 (5분 TTL) — 탭 전환 시 중복 Gist 호출 방지
+// ══════════════════════════════════════════════════════════
+let _sharedGistData = null;
+let _sharedGistAt   = 0;
+const GIST_CACHE_MS = 5 * 60 * 1000;
+let _gistFetchPromise = null; // 동시 호출 dedup
+
+async function _fetchGistData(force = false) {
+  const now = Date.now();
+  if (!force && _sharedGistData && now - _sharedGistAt < GIST_CACHE_MS) {
+    return _sharedGistData;
+  }
+  if (_gistFetchPromise) return _gistFetchPromise; // 진행 중인 요청 재사용
+  _gistFetchPromise = fetch('/api/data')
+    .then(r => r.ok ? r.json() : { briefing: [], picks: [], signals: [] })
+    .then(d => { _sharedGistData = d; _sharedGistAt = Date.now(); return d; })
+    .catch(() => _sharedGistData || { briefing: [], picks: [], signals: [] })
+    .finally(() => { _gistFetchPromise = null; });
+  return _gistFetchPromise;
+}
+
+// ══════════════════════════════════════════════════════════
+// JSONBin 번들 캐시 (5분 TTL) — 탭 전환 시 중복 API 호출 방지
+// ══════════════════════════════════════════════════════════
+let _binData = null, _binDataAt = 0, _binFetchPromise = null;
+const BIN_CACHE_MS = 5 * 60 * 1000;
+
+async function _fetchBinData(force = false) {
+  const now = Date.now();
+  if (!force && _binData && now - _binDataAt < BIN_CACHE_MS) return _binData;
+  if (_binFetchPromise) return _binFetchPromise;
+  _binFetchPromise = fetch('/api/etf?bundle=1')
+    .then(r => r.ok ? r.json() : {})
+    .then(d => { _binData = d; _binDataAt = Date.now(); return d; })
+    .catch(() => _binData || {})
+    .finally(() => { _binFetchPromise = null; });
+  return _binFetchPromise;
+}
+
+function _invalidateBinCache() { _binData = null; _binDataAt = 0; }
+
+// 동시 현재가 요청 개수 제한 (semaphore)
+function _makeSemaphore(limit) {
+  let running = 0;
+  const queue = [];
+  return function acquire() {
+    return new Promise(resolve => {
+      const run = () => { running++; resolve(() => { running--; if (queue.length) queue.shift()(); }); };
+      running < limit ? run() : queue.push(run);
+    });
+  };
+}
+const _priceSem = _makeSemaphore(5); // 동시 최대 5개 현재가 API 요청
+
+// ══════════════════════════════════════════════════════════
+// 대시보드 데이터 로드
+// ══════════════════════════════════════════════════════════
+let _dashData = null;
+let _ipoRecords = [];   // ← Script 1에서 선언: initDashboard·markSubscribed 모두 이 변수 공유
+

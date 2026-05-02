@@ -2,7 +2,7 @@
   "builds": [
     { "src": "stock_analyzer.html", "use": "@vercel/static" },
     { "src": "css/main.css", "use": "@vercel/static" },
-    { "src": "js/app.js", "use": "@vercel/static" },
+    { "src": "js/**", "use": "@vercel/static" },
     { "src": "api/analyze.js", "use": "@vercel/node" },
     { "src": "api/data.js", "use": "@vercel/node" },
     { "src": "api/ipo.js", "use": "@vercel/node" },
