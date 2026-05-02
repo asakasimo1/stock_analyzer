@@ -2,7 +2,7 @@ name: Daily Briefing
 
 on:
   schedule:
-    - cron: '30 22 * * *'   # 07:30 KST (UTC+9) — 매일
+    - cron: '30 22 * * 1-5'  # 07:30 KST (UTC+9) — 평일만
   workflow_dispatch:
 
 env:
