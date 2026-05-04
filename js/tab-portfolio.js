@@ -85,9 +85,14 @@ function renderPortfolio() {
 function _renderPortKpi() {
   const colorVal = (el, val) => { el.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--primary)'; };
   const fmtK = v => {
-    if (Math.abs(v) >= 1e8) return (v / 1e8).toFixed(1) + '억원';
-    if (Math.abs(v) >= 1e4) return Math.round(v / 1e4).toLocaleString() + '만원';
-    return v.toLocaleString() + '원';
+    const abs = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (abs >= 1e8) {
+      const uk = Math.floor(abs / 1e8);
+      const man = Math.round((abs % 1e8) / 1e4);
+      return sign + uk + '억' + (man > 0 ? ' ' + man.toLocaleString() + '만원' : '원');
+    }
+    if (abs >= 1e4) return sign + Math.round(abs / 1e4).toLocaleString() + '만원';
+    return sign + Math.round(abs).toLocaleString() + '원';
   };
   const signFmt  = v => (v > 0 ? '+' : '') + fmtK(v);
 
@@ -322,7 +327,7 @@ function _renderEtfDivChart() {
   }
 
   const maxRate = Math.max(...data.map(e => e.annRate));
-  const fmtN = v => v >= 1e8 ? (v/1e8).toFixed(1)+'억' : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString();
+  const fmtN = v => { const uk = Math.floor(v/1e8); const man = Math.round((v%1e8)/1e4); return v >= 1e8 ? uk+'억'+(man>0?' '+man.toLocaleString()+'만':'') : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString(); };
   const rateColor = r => r >= 9 ? '#00C853' : r >= 6 ? '#3D5AFE' : r >= 3 ? '#FF9100' : '#9EA3B0';
 
   el.innerHTML = data.map(e => {
@@ -372,7 +377,7 @@ function _renderPortAsset() {
 // ── 도넛 공통 렌더러 ──────────────────────────────────────
 function _drawDonut(el, slices, total, centerLabel, centerColor, signPrefix = false) {
   const W = 160, CX = 80, CY = 80, R = 64, r = 38;
-  const fmtN = v => v >= 1e8 ? (v/1e8).toFixed(1)+'억' : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : v.toLocaleString();
+  const fmtN = v => { const uk = Math.floor(v/1e8); const man = Math.round((v%1e8)/1e4); return v >= 1e8 ? uk+'억'+(man>0?' '+man.toLocaleString()+'만':'') : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : v.toLocaleString(); };
 
   let paths = '';
   if (slices.length === 1) {
@@ -462,7 +467,7 @@ function _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal) {
 
   // 도넛 SVG
   const W = 160, CX = 80, CY = 80, R = 64, r = 38;
-  const fmtN = v => v >= 1e8 ? (v/1e8).toFixed(1)+'억' : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString();
+  const fmtN = v => { const uk = Math.floor(v/1e8); const man = Math.round((v%1e8)/1e4); return v >= 1e8 ? uk+'억'+(man>0?' '+man.toLocaleString()+'만':'') : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString(); };
   let paths = '';
   if (slices.length === 1) {
     paths = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${slices[0].color}" opacity="0.9"/>
