@@ -633,8 +633,8 @@ async function handleCoinGrid(req, res, gistId, ghToken) {
     const list = Array.isArray(jobs) ? jobs : [];
     const idx  = list.findIndex(j => j.id === id);
     if (idx >= 0) {
-      // 활성 상태면 stopping으로 전환 (daemon이 주문 취소 처리)
-      if (list[idx].status === 'active') {
+      // 주문이 존재할 수 있는 상태면 stopping으로 전환 (daemon이 주문 취소 처리)
+      if (['active', 'init', 'reinit'].includes(list[idx].status)) {
         list[idx].status = 'stopping';
       } else {
         list.splice(idx, 1);

@@ -957,6 +957,7 @@ async function ctAddGridJob() {
   if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인명을 검색해서 선택하세요</span>'; return; }
   if (!lower || !upper || lower >= upper) { if (msg) msg.innerHTML = '<span style="color:var(--red)">하한가 < 상한가 조건 확인</span>'; return; }
   if (krw < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자당 금액 5,000원 이상</span>'; return; }
+  if (pct <= 0.1) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자 간격은 수수료(0.1%) 초과여야 합니다</span>'; return; }
 
   const finalTicker = ticker.startsWith('KRW-') ? ticker : `KRW-${ticker}`;
   if (msg) msg.innerHTML = '<span style="color:var(--muted)">등록 중...</span>';
@@ -1015,16 +1016,17 @@ function ctRenderGridJobs() {
     const total     = grids.length;
 
     const statusMap = {
-      init: ['초기화중', 'var(--muted)'],
-      active: ['활성', 'var(--green)'],
-      stopping: ['중단중', 'var(--red)'],
-      stopped: ['중단됨', 'var(--muted)'],
+      init:    ['초기화중',   'var(--muted)'],
+      reinit:  ['재초기화중', 'var(--muted)'],
+      active:  ['활성',       'var(--green)'],
+      stopping:['중단중',     'var(--red)'],
+      stopped: ['중단됨',     'var(--muted)'],
     };
     const [statusLabel, statusColor] = statusMap[j.status] || ['알 수 없음', 'var(--muted)'];
 
     const pnl    = j.total_profit_krw || 0;
     const pnlClr = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    const canStop = j.status === 'active' || j.status === 'init';
+    const canStop = ['active', 'init', 'reinit'].includes(j.status);
 
     // 그리드 미니 시각화 (최대 20칸)
     const visGrids = grids.slice(0, 20);
