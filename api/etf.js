@@ -110,8 +110,8 @@ export default async function handler(req, res) {
   // ── GET: 번들 (etf + stocks + transactions + dividends 한 번에) ──────────
   if (req.method === 'GET' && req.query.bundle !== undefined) {
     try {
-      const data = await readBin(binId, key);
-      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+      const data = await readBin(binId, key, true); // 항상 JSONBin 직접 읽기 (인스턴스 캐시 우회)
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
         etf:          data.etf          ?? [],
         stocks:       data.stocks       ?? [],

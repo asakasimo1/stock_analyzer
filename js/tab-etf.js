@@ -1,3 +1,18 @@
+// ETF 탭 현재가 TTL 캐시 (3분) — 탭 재방문 시 API 호출 스킵
+const _etfPriceCache     = {};
+const ETF_PRICE_CACHE_TTL = 3 * 60 * 1000;
+
+function _applyEtfPriceCache() {
+  const now = Date.now();
+  _etfRecords.forEach(r => {
+    const c = r.ticker && _etfPriceCache[r.ticker];
+    if (c && now - c.at < ETF_PRICE_CACHE_TTL) {
+      r.current_price = c.price;
+      r.price_chg_pct = c.chgPct ?? r.price_chg_pct;
+    }
+  });
+}
+
 async function loadEtfRecords() {
   try {
     const d = await _fetchBinData();
@@ -9,9 +24,10 @@ async function loadEtfRecords() {
   }
   if (ensureEtfIds(_etfRecords)) await saveEtfRecords();
 
+  _applyEtfPriceCache(); // 캐시 가격 즉시 적용 → Phase 1 렌더
   renderEtfCards();
   loadDivRecords();
-  refreshAllEtfPrices(true); // 탭 진입 시 즉시 현재가 업데이트
+  refreshAllEtfPrices(true); // 탭 진입 시 현재가 업데이트 (캐시 유효 시 스킵)
 
   // 20분 자동 현재가 업데이트 — 탭이 ETF일 때만 반복
   clearInterval(_etfAutoRefreshTimer);
@@ -628,10 +644,10 @@ async function saveTransaction() {
         newAvg = Math.round((oldQty * oldAvg + qty * price) / newQty);
       }
       _etfRecords[etfIdx] = { ...rec, qty: newQty, avg_price: newAvg };
-      // 대시보드 탭(_portEtf)도 동기화
-      const portIdx = _portEtf.findIndex(r => r.id == Number(etfId));
-      if (portIdx !== -1) {
-        _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
+      // 포트폴리오 탭 _portEtf 동기화 (Portfolio 탭 방문 전이면 undefined)
+      if (typeof _portEtf !== 'undefined' && Array.isArray(_portEtf)) {
+        const portIdx = _portEtf.findIndex(r => r.id == Number(etfId));
+        if (portIdx !== -1) _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
       }
       await saveEtfRecords();
     }
@@ -680,9 +696,9 @@ async function deleteTransaction(id) {
           if (newAvg < 0) newAvg = curAvg; // 음수 방어
         }
         _etfRecords[etfIdx] = { ...rec, qty: newQty, avg_price: newAvg };
-        const portIdx = _portEtf.findIndex(r => r.id == tx.etf_id);
-        if (portIdx !== -1) {
-          _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
+        if (typeof _portEtf !== 'undefined' && Array.isArray(_portEtf)) {
+          const portIdx = _portEtf.findIndex(r => r.id == tx.etf_id);
+          if (portIdx !== -1) _portEtf[portIdx] = { ..._portEtf[portIdx], qty: newQty, avg_price: newAvg };
         }
         await saveEtfRecords();
       }
@@ -707,13 +723,12 @@ async function deleteTransaction(id) {
   }
 }
 
-// 예수금 조정 헬퍼 — 서버에서 현재값을 읽어 delta 적용 후 저장 + UI 갱신
+// 예수금 조정 헬퍼 — in-memory 캐시 기준으로 delta 적용 후 저장 + UI 갱신
 async function _adjustCash(delta) {
   if (!delta) return;
   try {
-    // 항상 서버 최신값 기준으로 계산 (stale 방지)
-    const metaRes  = await fetch('/api/data').then(r => r.json());
-    const baseCash = (metaRes.portfolio_meta || {}).cash || 0;
+    // _portCash 또는 _sharedGistData 캐시에서 현재값 취득 (서버 GET 생략 → ~500ms 단축)
+    const baseCash = _portCash || (_sharedGistData?.portfolio_meta?.cash ?? 0);
     const newCash  = Math.max(0, baseCash + delta);
     const saveRes  = await fetch('/api/data', {
       method: 'POST',
@@ -902,6 +917,7 @@ async function saveDivSchedule() {
       body: JSON.stringify({ record }),
     });
     if (!resp.ok) throw new Error('저장 실패');
+    _invalidateBinCache();
     _divRecords.push(record);
     renderDivHistory();
     closeDivScheduleModal();
@@ -1069,10 +1085,10 @@ async function saveDivEntry() {
     if (!resp.ok) throw new Error('저장 실패');
     _invalidateBinCache();
     _divRecords.push(record);
-    // 포트폴리오 탭 _portDiv 동기화 후 관련 UI 갱신
-    _portDiv.push(record);
-    _renderPortKpi();
-    _renderEtfDivChart();
+    // 포트폴리오 탭 _portDiv 동기화 (Portfolio 탭 방문 전이면 undefined일 수 있으므로 방어)
+    if (Array.isArray(typeof _portDiv !== 'undefined' && _portDiv)) _portDiv.push(record);
+    if (typeof _renderPortKpi   === 'function') _renderPortKpi();
+    if (typeof _renderEtfDivChart === 'function') _renderEtfDivChart();
     // 세후 배당금을 예수금에 자동 합산
     await _adjustCash(net);
     const expandState = getDivExpandState();
@@ -1094,9 +1110,9 @@ async function deleteDivRecord(id) {
     await fetch(`/api/dividend?id=${id}`, { method: 'DELETE' });
     _invalidateBinCache();
     _divRecords = _divRecords.filter(r => r.id != id);
-    _portDiv    = _portDiv.filter(r => r.id != id);
-    _renderPortKpi();
-    _renderEtfDivChart();
+    if (typeof _portDiv !== 'undefined' && Array.isArray(_portDiv)) _portDiv = _portDiv.filter(r => r.id != id);
+    if (typeof _renderPortKpi   === 'function') _renderPortKpi();
+    if (typeof _renderEtfDivChart === 'function') _renderEtfDivChart();
     // 삭제 시 세후 배당금을 예수금에서 차감
     if (rec?.net) await _adjustCash(-rec.net);
     renderDivHistory();
@@ -1153,19 +1169,23 @@ function renderDivHistory() {
 
   const fmtW = v => v.toLocaleString() + '원';
 
-  list.innerHTML = Object.entries(byYear)
-    .sort(([a], [b]) => b.localeCompare(a))
+  const sortedYears = Object.entries(byYear).sort(([a], [b]) => b.localeCompare(a));
+  const latestYr = sortedYears[0]?.[0]; // 가장 최근 연도 → 기본 펼침
+
+  list.innerHTML = sortedYears
     .map(([yr, months]) => {
-      const yrGross = Object.values(months).flat().reduce((s, r) => s + (r.gross || 0), 0);
-      const yrNet   = Object.values(months).flat().reduce((s, r) => s + (r.net   || 0), 0);
+      const yrGross  = Object.values(months).flat().reduce((s, r) => s + (r.gross || 0), 0);
+      const yrNet    = Object.values(months).flat().reduce((s, r) => s + (r.net   || 0), 0);
+      const yrOpen   = yr === latestYr; // 최신 연도만 기본 펼침
 
       const monthBlocks = Object.entries(months)
         .sort(([a], [b]) => b.localeCompare(a))
-        .map(([ym, records]) => {
+        .map(([ym, records], mi) => {
           const mGross = records.reduce((s, r) => s + (r.gross || 0), 0);
           const mNet   = records.reduce((s, r) => s + (r.net   || 0), 0);
           const [y, m] = ym.split('-');
           const label  = y && m ? `${parseInt(m)}월` : ym;
+          const mOpen  = yrOpen && mi === 0; // 최신 연도의 첫 번째(최신) 월만 기본 펼침
 
           const rows = records.map(r => `
             <div class="div-record-row">
@@ -1183,27 +1203,27 @@ function renderDivHistory() {
           return `<div class="div-month-group">
             <div class="div-month-header" data-ym="${ym}" onclick="toggleDivMonth(this)">
               <span style="display:flex;align-items:center;gap:6px">
-                <span class="div-toggle-icon">▶</span>
+                <span class="div-toggle-icon">${mOpen ? '▼' : '▶'}</span>
                 <span>📅 ${label}</span>
                 <span style="font-size:10px;color:var(--muted)">(${records.length}건)</span>
               </span>
               <span class="div-month-total">세후 ${fmtW(mNet)} &nbsp;·&nbsp; 세전 ${fmtW(mGross)}</span>
             </div>
-            <div class="div-month-body" style="display:none">${rows}</div>
+            <div class="div-month-body" style="display:${mOpen ? '' : 'none'}">${rows}</div>
           </div>`;
         }).join('');
 
       return `<div class="div-year-group">
         <div class="div-year-header" data-yr="${yr}" onclick="toggleDivYear(this)">
           <span style="display:flex;align-items:center;gap:8px">
-            <span class="div-toggle-icon" style="font-size:11px">▶</span>
+            <span class="div-toggle-icon" style="font-size:11px">${yrOpen ? '▼' : '▶'}</span>
             <span>📆 ${yr}년</span>
           </span>
           <span style="font-size:12px;color:#60a5fa;font-weight:700">
             세후 ${fmtW(yrNet)} <span style="color:var(--muted);font-weight:400;margin-left:4px">/ 세전 ${fmtW(yrGross)}</span>
           </span>
         </div>
-        <div class="div-year-body" style="display:none">${monthBlocks}</div>
+        <div class="div-year-body" style="display:${yrOpen ? '' : 'none'}">${monthBlocks}</div>
       </div>`;
     }).join('');
 }
@@ -1434,9 +1454,16 @@ async function refreshAllEtfPrices(silent = false) {
   const btn = document.getElementById('etf-refresh-btn');
   if (!silent && btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
 
+  // 수동 업데이트(버튼 클릭): 캐시 무효화하여 강제 갱신
+  if (!silent) Object.keys(_etfPriceCache).forEach(k => delete _etfPriceCache[k]);
+
+  const now = Date.now();
   let updated = 0;
   await Promise.all(_etfRecords.map(async r => {
     if (!r.ticker) return;
+    // 캐시 유효한 티커는 건너뜀 (자동 갱신 시에만)
+    const c = _etfPriceCache[r.ticker];
+    if (c && now - c.at < ETF_PRICE_CACHE_TTL) return;
     const release = await _priceSem();
     try {
       const res = await fetch(`/api/quote?ticker=${r.ticker}`);
@@ -1453,6 +1480,7 @@ async function refreshAllEtfPrices(silent = false) {
             r.recent_div_rate = parseFloat((d.recentDiv / r.current_price * 100).toFixed(3));
         }
         if (d.annualDivRate) r.annual_div_rate  = d.annualDivRate;
+        _etfPriceCache[r.ticker] = { price: d.price, chgPct: d.chgPct, at: Date.now() };
         updated++;
       }
     } catch {} finally { release(); }
@@ -1463,6 +1491,7 @@ async function refreshAllEtfPrices(silent = false) {
     await saveEtfRecords();
     renderEtfCards();
   }
+  // updated === 0이면 loadEtfRecords의 _applyEtfPriceCache + renderEtfCards가 이미 처리
 
   if (!silent && btn) {
     btn.textContent = updated ? `✔ ${updated}개 업데이트됨` : '⟳ 현재가 업데이트';
@@ -1479,21 +1508,83 @@ async function refreshAllEtfPrices(silent = false) {
 setInterval(_updateRefreshBtnLabel, 60000);
 
 // ══════════════════════════════════════════════════════════════════
+// 시뮬레이터 공통 — 2025-03 이후 실투자 기록 기반 기본값 계산
+// ══════════════════════════════════════════════════════════════════
+function _calcSimDefaults() {
+  if (!_etfRecords || !_etfRecords.length) return null;
+  const totalBuy = _etfRecords.reduce((s, r) => s + (r.qty||0) * (r.avg_price||0), 0);
+  if (totalBuy <= 0) return null;
+
+  const START_YM = '2025-04';
+  const now = new Date();
+  const elapsedMonths = Math.max(1, (now.getFullYear() - 2025) * 12 + (now.getMonth() + 1 - 4));
+
+  // 연배당률: 2025-04 이후 월별 세후배당률 평균 × 12
+  // 월별로 합산 → 각 월의 (net / totalBuy) → 평균 → ×12
+  const recentDivs = (_divRecords || []).filter(r => (r.ym || '') >= START_YM);
+  const monthMap = {};
+  recentDivs.forEach(r => { monthMap[r.ym] = (monthMap[r.ym] || 0) + (r.net || 0); });
+  const monthYields = Object.values(monthMap).map(net => net / totalBuy);
+  let yieldPct = 0;
+  if (monthYields.length > 0) {
+    const avgMonthly = monthYields.reduce((s, v) => s + v, 0) / monthYields.length;
+    yieldPct = avgMonthly * 12 * 100;
+  } else {
+    // fallback: ETF annual_div_rate 가중평균
+    const wr = _etfRecords.reduce((s, r) => s + (r.annual_div_rate||0) * (r.qty||0) * (r.avg_price||0), 0);
+    yieldPct = wr / totalBuy;
+  }
+
+  // 연 주가 상승률: current_price vs avg_price 연환산 (가중평균)
+  const etfWithP = _etfRecords.filter(r => r.current_price && r.avg_price && r.qty);
+  let priceGrowPct = 0;
+  if (etfWithP.length > 0) {
+    const wT = etfWithP.reduce((s, r) => s + (r.qty||0) * (r.avg_price||0), 0);
+    const wR = etfWithP.reduce((s, r) => {
+      return s + (r.current_price / r.avg_price - 1) * (r.qty||0) * (r.avg_price||0);
+    }, 0);
+    const totalRet = wT > 0 ? wR / wT : 0;
+    priceGrowPct = (Math.pow(1 + totalRet, 12 / elapsedMonths) - 1) * 100;
+  }
+
+  // 연 배당상승률: ETF별 per_share 첫→끝 추세 가중평균
+  const divByEtf = {};
+  (_divRecords || [])
+    .filter(r => (r.ym || '') >= START_YM && r.per_share && r.etf_id)
+    .forEach(r => { (divByEtf[r.etf_id] = divByEtf[r.etf_id] || []).push({ ym: r.ym, ps: r.per_share }); });
+  let dgW = 0, dgSum = 0;
+  Object.keys(divByEtf).forEach(id => {
+    const recs = divByEtf[id].sort((a, b) => a.ym.localeCompare(b.ym));
+    if (recs.length < 2) return;
+    const first = recs[0], last = recs[recs.length - 1];
+    const [fy, fm] = first.ym.split('-').map(Number);
+    const [ly, lm] = last.ym.split('-').map(Number);
+    const gap = (ly - fy) * 12 + (lm - fm);
+    if (gap < 3 || first.ps <= 0) return;
+    const g = (Math.pow(last.ps / first.ps, 12 / gap) - 1) * 100;
+    const etf = _etfRecords.find(r => r.id == id);
+    const w = etf ? (etf.qty||0) * (etf.avg_price||0) : 1;
+    dgW += w; dgSum += g * w;
+  });
+  const divGrowPct = dgW > 0 ? Math.max(-5, Math.min(20, dgSum / dgW)) : 0;
+
+  return {
+    invest:       Math.round(totalBuy / 10000),
+    yieldPct:     Math.max(0, yieldPct).toFixed(1),
+    priceGrowPct: priceGrowPct.toFixed(1),
+    divGrowPct:   divGrowPct.toFixed(1),
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════
 // 월배당 목표 달성 시뮬레이터
 // ══════════════════════════════════════════════════════════════════
 function openMonthlySim() {
-  // 현재 포트폴리오 기본값 세팅
-  if (_etfRecords && _etfRecords.length > 0) {
-    const buyTotal = _etfRecords.reduce((s,r) => s + (r.qty||0)*(r.avg_price||0), 0);
-    const divPre   = _etfRecords.reduce((s,r) => {
-      if (!r.current_price || !r.annual_div_rate || r.div_cycle==='무배당') return s;
-      return s + r.current_price*(r.annual_div_rate/100)*(r.qty||0);
-    }, 0);
-    if (buyTotal > 0) {
-      document.getElementById('ms-invest').value = Math.round(buyTotal / 10000);
-      const yieldPct = divPre / buyTotal * 100;
-      if (yieldPct > 0) document.getElementById('ms-yield').value = yieldPct.toFixed(1);
-    }
+  const d = _calcSimDefaults();
+  if (d) {
+    document.getElementById('ms-invest').value     = d.invest;
+    document.getElementById('ms-yield').value      = d.yieldPct;
+    document.getElementById('ms-price-grow').value = d.priceGrowPct;
   }
   document.getElementById('msim-modal').style.display = 'block';
   calcMonthlySim();
@@ -1648,18 +1739,12 @@ function calcMonthlySim() {
 // ══════════════════════════════════════════════════════════════════
 
 function openDripModal() {
-  if (_etfRecords && _etfRecords.length > 0) {
-    const buyTotal = _etfRecords.reduce((s,r) => s + (r.qty||0)*(r.avg_price||0), 0);
-    const divPreTotal = _etfRecords.reduce((s,r) => {
-      if (!r.current_price || !r.annual_div_rate || r.div_cycle === '무배당') return s;
-      return s + r.current_price * (r.annual_div_rate/100) * (r.qty||0);
-    }, 0);
-    if (buyTotal > 0) {
-      document.getElementById('drip-invest').value = Math.round(buyTotal / 10000);
-      const divYieldPct = divPreTotal / buyTotal * 100;
-      if (divYieldPct > 0)
-        document.getElementById('drip-yield').value = divYieldPct.toFixed(1);
-    }
+  const d = _calcSimDefaults();
+  if (d) {
+    document.getElementById('drip-invest').value       = d.invest;
+    document.getElementById('drip-yield').value        = d.yieldPct;
+    document.getElementById('drip-price-growth').value = d.priceGrowPct;
+    document.getElementById('drip-div-growth').value   = d.divGrowPct;
   }
   document.getElementById('drip-modal').style.display = 'block';
   calcDrip();

@@ -1,10 +1,15 @@
+let _wlLoaded = false; // 첫 로딩 완료 후 재호출(대시보드 재방문) 시 불필요한 fetch 방지
+
 async function loadWatchlist() {
   const listEl = document.getElementById('wl-list');
   const countEl = document.getElementById('wl-count');
   if (!listEl) return;
+  // 이미 로드된 경우 재렌더만 수행 (API 재호출 생략)
+  if (_wlLoaded) { renderWlList(); if (countEl) countEl.textContent = `(${_wlItems.length}개)`; return; }
   try {
     const d = await fetch('/api/data?mode=watchlist').then(r => r.json());
     _wlItems = Array.isArray(d.stocks) ? d.stocks : [];
+    _wlLoaded = true;
   } catch {
     _wlItems = [];
   }

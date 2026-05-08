@@ -1,6 +1,7 @@
 async function initPortfolio() {
   _initPortCollapse();
-  _showPortLoading();
+  // 번들 캐시가 없을 때만 로딩 스피너 표시 (캐시 워밍 시 즉시 렌더 가능 → 깜빡임 방지)
+  if (!_binData) _showPortLoading();
   const gen = ++_portGeneration; // 이 호출의 세대 번호 — 이후 구 refresh가 덮어쓰지 못하도록
   _portRefreshing = false; // 이전 refresh 플래그 초기화 — 새 방문에서 반드시 실행되도록
   // 항상 최신 데이터로 갱신 (TDZ 에러 방지 + 타 탭 변경사항 반영)
@@ -22,13 +23,33 @@ async function initPortfolio() {
     _portCash     = (metaRes.portfolio_meta || {}).cash || 0;
     const ci = document.getElementById('cash-input');
     if (ci) ci.value = _portCash ? _portCash.toLocaleString() : '';
+    // 캐시된 현재가 즉시 적용 → Phase 1 렌더에서 avg_price 대신 사용
+    _applyPriceCache();
   } catch(e) {
     console.error('포트폴리오 데이터 로드 실패:', e);
   }
-  // 현재가 조회 완료 후 한 번만 렌더 — avg_price→current_price 전환 깜빡임 방지
+  // Phase 1: 캐시 가격(또는 avg_price)으로 즉시 렌더 — 사용자 대기 없음
+  if (gen === _portGeneration) renderPortfolio();
+  // Phase 2: 실시간 가격 조회 후 재렌더
   await _refreshPortfolioRealtime(gen);
   if (gen === _portGeneration) renderPortfolio();
   _startPortAutoRefresh();
+}
+
+// 포트폴리오 탭 — 현재가 TTL 캐시 (3분)
+const _portPriceCache = {};
+const _PORT_PRICE_TTL = 3 * 60 * 1000;
+
+function _applyPriceCache() {
+  const now = Date.now();
+  _portEtf.forEach(r => {
+    const c = r.ticker && _portPriceCache[r.ticker];
+    if (c && now - c.at < _PORT_PRICE_TTL) { r.current_price = c.price; r.chg = c.chg; r.chgPct = c.chgPct; }
+  });
+  _stockRecords.forEach(r => {
+    const c = r.ticker && _portPriceCache[r.ticker];
+    if (c && now - c.at < _PORT_PRICE_TTL) { r.current_price = c.price; r.chg = c.chg; r.chgPct = c.chgPct; }
+  });
 }
 
 // 포트폴리오 탭 — 실시간 현재가 일괄 조회 (Gist 저장 없이 화면만 갱신)
@@ -37,25 +58,36 @@ async function _refreshPortfolioRealtime(gen) {
   if (_portRefreshing) return;   // 중복 실행 차단
   _portRefreshing = true;
   try {
+    const now = Date.now();
     const etfSnap = [..._portEtf];      // 이 시점의 배열 스냅샷 — 교체돼도 구 fetch 결과 무시
     const stkSnap = [..._stockRecords];
     const etfFetches = etfSnap
       .filter(r => r.ticker)
       .map(async r => {
+        const c = _portPriceCache[r.ticker];
+        if (c && now - c.at < _PORT_PRICE_TTL) return; // 캐시 유효 → 건너뜀
         const release = await _priceSem();
         try {
           const d = await fetch(`/api/quote?ticker=${r.ticker}`).then(x => x.json());
-          if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; }
+          if (d.price) {
+            r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null;
+            _portPriceCache[r.ticker] = { price: d.price, chg: d.chg ?? null, chgPct: d.chgPct ?? null, at: Date.now() };
+          }
         } catch {} finally { release(); }
       });
 
     const stkFetches = stkSnap
       .filter(r => r.ticker)
       .map(async r => {
+        const c = _portPriceCache[r.ticker];
+        if (c && now - c.at < _PORT_PRICE_TTL) return; // 캐시 유효 → 건너뜀
         const release = await _priceSem();
         try {
           const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
-          if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; }
+          if (d.price) {
+            r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null;
+            _portPriceCache[r.ticker] = { price: d.price, chg: d.chg ?? null, chgPct: d.chgPct ?? null, at: Date.now() };
+          }
         } catch {} finally { release(); }
       });
 
@@ -81,20 +113,22 @@ function renderPortfolio() {
   _renderPortStock();
 }
 
+// ── 금액 포맷 (자산현황·수익배분 도넛 차트용: 만원 단위) ─────
+const fmtK = v => {
+  const abs = Math.abs(v), sign = v < 0 ? '-' : '';
+  if (abs >= 1e8) {
+    const uk = Math.floor(abs / 1e8);
+    const man = Math.round((abs % 1e8) / 1e4);
+    return sign + uk + '억' + (man > 0 ? ' ' + man.toLocaleString() + '만원' : '원');
+  }
+  if (abs >= 1e4) return sign + Math.round(abs / 1e4).toLocaleString() + '만원';
+  return sign + Math.round(abs).toLocaleString() + '원';
+};
+const signFmt = v => (v > 0 ? '+' : '') + fmtK(v);
+
 // ── KPI ────────────────────────────────────────────────────
 function _renderPortKpi() {
   const colorVal = (el, val) => { el.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--primary)'; };
-  const fmtK = v => {
-    const abs = Math.abs(v), sign = v < 0 ? '-' : '';
-    if (abs >= 1e8) {
-      const uk = Math.floor(abs / 1e8);
-      const man = Math.round((abs % 1e8) / 1e4);
-      return sign + uk + '억' + (man > 0 ? ' ' + man.toLocaleString() + '만원' : '원');
-    }
-    if (abs >= 1e4) return sign + Math.round(abs / 1e4).toLocaleString() + '만원';
-    return sign + Math.round(abs).toLocaleString() + '원';
-  };
-  const signFmt  = v => (v > 0 ? '+' : '') + fmtK(v);
 
   // 개별주 평가손익 (현재가 있는 것만, 테이블 합계와 동일 기준)
   const stkProfit = _stockRecords.reduce((s, r) => {
@@ -102,7 +136,8 @@ function _renderPortKpi() {
     return s + (r.current_price - (r.avg_price||0)) * (r.qty||0);
   }, 0);
   const stkEl = document.getElementById('pk-stk-eval');
-  stkEl.textContent = _stockRecords.some(r => r.current_price) ? signFmt(stkProfit) : '-';
+  const wSign = v => (v > 0 ? '+' : '') + Math.round(v).toLocaleString() + '원';
+  stkEl.textContent = _stockRecords.some(r => r.current_price) ? wSign(stkProfit) : '-';
   colorVal(stkEl, stkProfit);
 
   // ETF 평가손익 (현재가 있는 것만)
@@ -111,7 +146,7 @@ function _renderPortKpi() {
     return s + (r.current_price - (r.avg_price||0)) * (r.qty||0);
   }, 0);
   const etfEl = document.getElementById('pk-etf-eval');
-  etfEl.textContent = _portEtf.some(r => r.current_price) ? signFmt(etfProfit) : '-';
+  etfEl.textContent = _portEtf.some(r => r.current_price) ? wSign(etfProfit) : '-';
   colorVal(etfEl, etfProfit);
 
   // 공모주 누적 수익 (매도 완료된 것만 — direct_profit 우선)
@@ -122,13 +157,13 @@ function _renderPortKpi() {
       : (r.price_open - r.price_ipo) * (r.sell_qty || r.shares_alloc || 0) - 2000), 0);
   const ipoEl = document.getElementById('pk-ipo-profit');
   const hasIpoData = _portIpo.some(r => r.direct_profit != null || r.price_open > 0);
-  ipoEl.textContent = hasIpoData ? signFmt(ipoProfit) : '-';
+  ipoEl.textContent = hasIpoData ? wSign(ipoProfit) : '-';
   colorVal(ipoEl, ipoProfit);
 
   // 세후 배당 누적
   const divTotal = _portDiv.reduce((s, r) => s + (r.net || 0), 0);
   const divEl = document.getElementById('pk-div-total');
-  divEl.textContent = divTotal ? fmtK(divTotal) : '-';
+  divEl.textContent = divTotal ? Math.round(divTotal).toLocaleString() + '원' : '-';
   colorVal(divEl, divTotal);
 
   // 차트
@@ -440,7 +475,7 @@ function _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal) {
   // 합산 (양수+음수 포함)
   const netTotal = allItems.reduce((s, i) => s + (i.val || 0), 0);
 
-  const fmtV = v => (v > 0 ? '+' : '') + Math.round(v).toLocaleString() + '원';
+  const fmtV = signFmt;
   const valColor = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--muted)';
 
   // 범례: 4개 항목 항상 표시
@@ -467,7 +502,6 @@ function _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal) {
 
   // 도넛 SVG
   const W = 160, CX = 80, CY = 80, R = 64, r = 38;
-  const fmtN = v => { const uk = Math.floor(v/1e8); const man = Math.round((v%1e8)/1e4); return v >= 1e8 ? uk+'억'+(man>0?' '+man.toLocaleString()+'만':'') : v >= 1e4 ? Math.round(v/1e4).toLocaleString()+'만' : Math.round(v).toLocaleString(); };
   let paths = '';
   if (slices.length === 1) {
     paths = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${slices[0].color}" opacity="0.9"/>
@@ -486,12 +520,11 @@ function _renderPortDonut(etfProfit, stkProfit, ipoProfit, divTotal) {
       ang = ea;
     });
   }
-  const netSign = netTotal >= 0 ? '+' : '';
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
       <svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${paths}
         <text x="${CX}" y="${CY-6}" text-anchor="middle" font-size="10" fill="var(--muted)">총 수익</text>
-        <text x="${CX}" y="${CY+10}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--green)">${netSign}${fmtN(netTotal)}원</text>
+        <text x="${CX}" y="${CY+10}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--green)">${signFmt(netTotal)}</text>
       </svg>
       <div style="width:100%">${legend}</div>
     </div>`;

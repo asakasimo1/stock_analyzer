@@ -9,7 +9,7 @@
 // ── Gist 전체 읽기 캐시 (warm 인스턴스 간 재사용, 30초 TTL) ──
 let _gistCache   = null;
 let _gistCacheAt = 0;
-const GIST_TTL   = 30_000;
+const GIST_TTL   = 300_000; // 5분 (프론트 _fetchGistData TTL과 동일)
 
 // ── KIS 토큰 캐시 (warm 인스턴스 간 재사용) ─────────────────
 let _tokenCache = null;
@@ -192,9 +192,16 @@ export default async function handler(req, res) {
   // ── Gist account_balance만 ────────────────────────────────
   if (mode === 'account') {
     try {
-      const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
-      if (!r.ok) return res.status(r.status).json({ error: `GitHub API error: ${r.status}` });
-      const gist = await r.json();
+      let gist;
+      const now = Date.now();
+      if (_gistCache && now - _gistCacheAt < GIST_TTL) {
+        gist = _gistCache;
+      } else {
+        const r = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
+        if (!r.ok) return res.status(r.status).json({ error: `GitHub API error: ${r.status}` });
+        gist = await r.json();
+        _gistCache = gist; _gistCacheAt = now;
+      }
       const file = (gist.files || {})['account_balance.json'];
       const data = file ? JSON.parse(file.content || 'null') : null;
       res.setHeader('Cache-Control', 'no-store');
@@ -215,6 +222,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ files: { 'portfolio_meta.json': { content: JSON.stringify(meta, null, 2) } } }),
       });
       if (!r.ok) return res.status(r.status).json({ error: `Gist 저장 실패 ${r.status}` });
+      _gistCache = null; _gistCacheAt = 0; // 캐시 무효화 (POST 직후 GET이 최신값 반환하도록)
       return res.status(200).json({ ok: true });
     } catch (e) {
       return res.status(500).json({ error: e.message });

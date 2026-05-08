@@ -213,10 +213,19 @@ let _gistFetchPromise = null; // 동시 호출 dedup
 
 async function _fetchGistData(force = false) {
   const now = Date.now();
-  if (!force && _sharedGistData && now - _sharedGistAt < GIST_CACHE_MS) {
+  if (!force && _sharedGistData && now - _sharedGistAt < GIST_CACHE_MS) return _sharedGistData;
+  // 캐시가 만료됐지만 데이터 있음 → stale 즉시 반환 + 백그라운드 갱신
+  if (!force && _sharedGistData) {
+    if (!_gistFetchPromise) {
+      _gistFetchPromise = fetch('/api/data')
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => { _sharedGistData = d; _sharedGistAt = Date.now(); })
+        .catch(() => {})
+        .finally(() => { _gistFetchPromise = null; });
+    }
     return _sharedGistData;
   }
-  if (_gistFetchPromise) return _gistFetchPromise; // 진행 중인 요청 재사용
+  if (_gistFetchPromise) return _gistFetchPromise;
   _gistFetchPromise = fetch('/api/data')
     .then(r => r.ok ? r.json() : { briefing: [], picks: [], signals: [] })
     .then(d => { _sharedGistData = d; _sharedGistAt = Date.now(); return d; })
@@ -234,9 +243,20 @@ const BIN_CACHE_MS = 5 * 60 * 1000;
 async function _fetchBinData(force = false) {
   const now = Date.now();
   if (!force && _binData && now - _binDataAt < BIN_CACHE_MS) return _binData;
+  // 캐시가 만료됐지만 데이터 있음 → stale 즉시 반환 + 백그라운드 갱신
+  if (!force && _binData) {
+    if (!_binFetchPromise) {
+      _binFetchPromise = fetch(`/api/etf?bundle=1&_t=${now}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
+        .then(d => { _binData = d; _binDataAt = Date.now(); })
+        .catch(() => {})
+        .finally(() => { _binFetchPromise = null; });
+    }
+    return _binData;
+  }
   if (_binFetchPromise) return _binFetchPromise;
-  _binFetchPromise = fetch('/api/etf?bundle=1')
-    .then(r => r.ok ? r.json() : {})
+  _binFetchPromise = fetch(`/api/etf?bundle=1&_t=${now}`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
     .then(d => { _binData = d; _binDataAt = Date.now(); return d; })
     .catch(() => _binData || {})
     .finally(() => { _binFetchPromise = null; });
@@ -257,6 +277,9 @@ function _makeSemaphore(limit) {
   };
 }
 const _priceSem = _makeSemaphore(5); // 동시 최대 5개 현재가 API 요청
+
+// 페이지 로드 직후 캐시 워밍 (첫 탭 진입 시 대기시간 제거)
+setTimeout(() => { _fetchGistData(); _fetchBinData(); }, 0);
 
 // ══════════════════════════════════════════════════════════
 // 대시보드 데이터 로드

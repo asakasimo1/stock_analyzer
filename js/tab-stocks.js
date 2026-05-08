@@ -1,3 +1,15 @@
+// 개별주 탭 현재가 TTL 캐시 (3분) — 탭 재방문 시 API 호출 스킵
+const _stkPriceCache      = {};
+const STK_PRICE_CACHE_TTL = 3 * 60 * 1000;
+
+function _applyStkPriceCache() {
+  const now = Date.now();
+  _stockRecords.forEach(r => {
+    const c = r.ticker && _stkPriceCache[r.ticker];
+    if (c && now - c.at < STK_PRICE_CACHE_TTL) { r.current_price = c.price; r.chg = c.chg; r.chgPct = c.chgPct; }
+  });
+}
+
 async function loadStockRecords() {
   try {
     const d = await _fetchBinData();
@@ -7,8 +19,9 @@ async function loadStockRecords() {
     _stockRecords = [];
     _stkTransactions = [];
   }
+  _applyStkPriceCache(); // 캐시 가격 즉시 적용 → Phase 1 렌더
   renderStockCards();
-  refreshAllStockPrices(true); // 탭 진입 시 즉시 현재가 업데이트
+  refreshAllStockPrices(true); // 탭 진입 시 현재가 업데이트 (캐시 유효 시 스킵)
 }
 
 function renderStockCards() {
@@ -157,13 +170,23 @@ async function refreshAllStockPrices(silent = false) {
   const btn = document.getElementById('stk-refresh-btn');
   if (!silent && btn) { btn.textContent = '⟳ 업데이트 중...'; btn.disabled = true; }
 
+  // 수동 업데이트(버튼 클릭): 캐시 무효화하여 강제 갱신
+  if (!silent) Object.keys(_stkPriceCache).forEach(k => delete _stkPriceCache[k]);
+
+  const now = Date.now();
   let updated = 0;
   await Promise.all(_stockRecords.map(async r => {
     if (!r.ticker) return;
+    const c = _stkPriceCache[r.ticker];
+    if (c && now - c.at < STK_PRICE_CACHE_TTL) return; // 캐시 유효 → 건너뜀
     const release = await _priceSem();
     try {
       const d = await fetch(`/api/stock?ticker=${r.ticker}`).then(x => x.json());
-      if (d.price) { r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null; updated++; }
+      if (d.price) {
+        r.current_price = d.price; r.chg = d.chg ?? null; r.chgPct = d.chgPct ?? null;
+        _stkPriceCache[r.ticker] = { price: d.price, chg: d.chg ?? null, chgPct: d.chgPct ?? null, at: Date.now() };
+        updated++;
+      }
     } catch {} finally { release(); }
   }));
 

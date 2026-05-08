@@ -1,5 +1,15 @@
 async function initDashboard() {
-  if (_dashData) { renderDashboard(_dashData); return; }
+  // 재방문: _sharedGistData가 백그라운드 갱신됐으면 _dashData에 동기화 후 즉시 렌더
+  if (_dashData) {
+    if (_sharedGistData && _sharedGistData !== _dashData) {
+      _dashData = { ..._sharedGistData, ipo: _ipoRecords };
+    }
+    renderDashboard(_dashData);
+    startAccountPolling();
+    loadWatchlist();
+    return;
+  }
+  // 첫 방문: 데이터 fetch (stale-while-revalidate → 캐시 있으면 즉시 반환)
   try {
     // 대시보드 데이터와 IPO 레코드를 동시에 로드
     // (_ipoRecords가 없으면 캘린더 모달의 청약완료·배정입력 버튼이 동작하지 않음)
