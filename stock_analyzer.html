@@ -1590,23 +1590,27 @@
       <input id="cg-ticker" type="hidden">
       <div id="cg-price-hint" style="font-size:11px;color:var(--primary);margin-top:4px;min-height:14px"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">하한가 (원)</div>
-        <input id="cg-lower" type="number" placeholder="자동 입력" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">상한가 (원)</div>
-        <input id="cg-upper" type="number" placeholder="자동 입력" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">격자 수</div>
+        <input id="cg-count" type="number" value="20" min="4" max="100" oninput="ctGridPreview()"
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
       </div>
       <div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:3px">그리드 간격 (%)</div>
-        <input id="cg-pct" type="number" value="1.5" step="0.1" min="0.5" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+        <input id="cg-pct" type="number" value="1.0" step="0.1" min="0.2" oninput="ctGridPreview()"
+          style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
       </div>
     </div>
-    <div style="margin-bottom:8px">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:3px">격자당 매수금액 (원)</div>
-      <input id="cg-krw" type="number" placeholder="예: 10000" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">격자당 매수금액 (원)</div>
+        <input id="cg-krw" type="number" placeholder="예: 10000" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">범위이탈 재설정 (분, 선택)</div>
+        <input id="cg-reinit" type="number" placeholder="미입력 시 알림만" min="10" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
     </div>
     <div id="cg-preview" style="font-size:11px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px;margin-bottom:10px"></div>
     <div style="display:flex;gap:8px">

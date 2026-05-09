@@ -869,6 +869,7 @@ async function ctCancelJob(type, ticker, createdAt) {
 // ══════════════════════════════════════════════════════════
 // 그리드 트레이딩
 // ══════════════════════════════════════════════════════════
+let _cgCurrentPrice = 0;
 
 function onCgNameFocus() { onCgNameInput(document.getElementById('cg-name')?.value || ''); }
 function onCgNameInput(v) {
@@ -891,15 +892,8 @@ async function _cgFetchAndAutoFill(ticker) {
     const d = await r.json();
     const price = d?.[0]?.trade_price;
     if (!price) { if (hint) hint.textContent = ''; return; }
-    const lower = Math.round(price * 0.85);
-    const upper = Math.round(price * 1.15);
-    document.getElementById('cg-lower').value = lower;
-    document.getElementById('cg-upper').value = upper;
-    // 10개 격자가 나오도록 grid_pct 자동 계산
-    // lower * (1+pct)^9 = upper  →  pct = (upper/lower)^(1/9) - 1
-    const autoPct = ((Math.pow(upper / lower, 1 / 9) - 1) * 100).toFixed(1);
-    document.getElementById('cg-pct').value = autoPct;
-    if (hint) hint.textContent = `${price.toLocaleString()}원 기준 → 하한 ×0.85 / 상한 ×1.15 / 간격 ${autoPct}% (10개 격자) 자동설정`;
+    _cgCurrentPrice = price;
+    if (hint) hint.textContent = `현재가 ${price.toLocaleString()}원 — 격자 수와 간격을 설정하면 범위가 자동 계산됩니다`;
     ctGridPreview();
   } catch (e) {
     if (hint) hint.textContent = '';
@@ -912,11 +906,13 @@ function ctToggleGridForm() {
   const opening = form.style.display === 'none';
   form.style.display = opening ? 'block' : 'none';
   if (opening) {
-    ['cg-name','cg-ticker','cg-lower','cg-upper','cg-krw'].forEach(id => {
+    ['cg-name','cg-ticker','cg-krw','cg-reinit'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    document.getElementById('cg-pct').value = '1.5';
+    document.getElementById('cg-count').value = '20';
+    document.getElementById('cg-pct').value = '1.0';
+    _cgCurrentPrice = 0;
     const tickerDisp = document.getElementById('cg-ticker-display');
     if (tickerDisp) tickerDisp.textContent = '—';
     const priceWrap = document.getElementById('cg-cur-price-wrap');
@@ -928,52 +924,65 @@ function ctToggleGridForm() {
   }
 }
 
+function _cgCalcRange(count, pct, curPrice) {
+  const nBelow = Math.ceil(count / 2);
+  const nAbove = count - nBelow;
+  const lower  = Math.round(curPrice / Math.pow(1 + pct / 100, nBelow));
+  const upper  = Math.round(curPrice * Math.pow(1 + pct / 100, nAbove + 1));
+  return { lower, upper };
+}
+
 function ctGridPreview() {
-  const lower  = +document.getElementById('cg-lower')?.value || 0;
-  const upper  = +document.getElementById('cg-upper')?.value || 0;
-  const pct    = +document.getElementById('cg-pct')?.value   || 1.5;
-  const krw    = +document.getElementById('cg-krw')?.value   || 0;
-  const el     = document.getElementById('cg-preview');
+  const count = +document.getElementById('cg-count')?.value || 0;
+  const pct   = +document.getElementById('cg-pct')?.value   || 1.0;
+  const krw   = +document.getElementById('cg-krw')?.value   || 0;
+  const el    = document.getElementById('cg-preview');
   if (!el) return;
-  if (!lower || !upper || lower >= upper) { el.textContent = ''; return; }
+  if (!count || !_cgCurrentPrice) { el.textContent = _cgCurrentPrice ? '' : '코인을 먼저 선택하세요'; return; }
+  if (pct <= 0.1) { el.textContent = '간격은 0.1% 초과여야 합니다'; return; }
 
-  let count = 0, price = lower;
-  while (price <= upper * 1.0001) { count++; price *= (1 + pct / 100); }
-
-  const totalKrw  = count * krw;
+  const { lower, upper } = _cgCalcRange(count, pct, _cgCurrentPrice);
+  const totalKrw   = count * krw;
   const netPerGrid = (pct - 0.1).toFixed(2);
-  el.innerHTML = `격자 수: <b>${count}개</b> &nbsp;|&nbsp; 총 투자금: <b>${totalKrw.toLocaleString()}원</b> &nbsp;|&nbsp; 격자당 순이익: <b>≈${netPerGrid}%</b> (수수료 0.1% 제외)`;
+  el.innerHTML = `범위: <b>${lower.toLocaleString()}~${upper.toLocaleString()}원</b> &nbsp;|&nbsp; 총 투자금: <b>${totalKrw.toLocaleString()}원</b> &nbsp;|&nbsp; 격자당 순이익: <b>≈${netPerGrid}%</b>`;
 }
 
 async function ctAddGridJob() {
   const msg    = document.getElementById('cg-msg');
   const ticker = (document.getElementById('cg-ticker')?.value || '').trim().toUpperCase();
   const name   = (document.getElementById('cg-name')?.value   || '').trim();
-  const lower  = +document.getElementById('cg-lower')?.value || 0;
-  const upper  = +document.getElementById('cg-upper')?.value || 0;
-  const pct    = +document.getElementById('cg-pct')?.value   || 1.5;
-  const krw    = +document.getElementById('cg-krw')?.value   || 0;
+  const count  = +document.getElementById('cg-count')?.value  || 0;
+  const pct    = +document.getElementById('cg-pct')?.value    || 1.0;
+  const krw    = +document.getElementById('cg-krw')?.value    || 0;
 
   if (!ticker) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인명을 검색해서 선택하세요</span>'; return; }
-  if (!lower || !upper || lower >= upper) { if (msg) msg.innerHTML = '<span style="color:var(--red)">하한가 < 상한가 조건 확인</span>'; return; }
+  if (!_cgCurrentPrice) { if (msg) msg.innerHTML = '<span style="color:var(--red)">코인명을 다시 선택해 현재가를 조회하세요</span>'; return; }
+  if (count < 4) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자 수는 4개 이상이어야 합니다</span>'; return; }
   if (krw < 5000) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자당 금액 5,000원 이상</span>'; return; }
   if (pct <= 0.1) { if (msg) msg.innerHTML = '<span style="color:var(--red)">격자 간격은 수수료(0.1%) 초과여야 합니다</span>'; return; }
 
+  const { lower, upper } = _cgCalcRange(count, pct, _cgCurrentPrice);
+
+  const reinitMin = +document.getElementById('cg-reinit')?.value || 0;
+
   const finalTicker = ticker.startsWith('KRW-') ? ticker : `KRW-${ticker}`;
   if (msg) msg.innerHTML = '<span style="color:var(--muted)">등록 중...</span>';
+
+  const payload = {
+    name:         name || `${finalTicker} 그리드`,
+    ticker:       finalTicker,
+    grid_pct:     pct,
+    lower_price:  lower,
+    upper_price:  upper,
+    krw_per_grid: krw,
+  };
+  if (reinitMin >= 10) payload.auto_reinit_minutes = reinitMin;
 
   try {
     const r = await fetch('/api/coin-grid', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name:         name || `${finalTicker} 그리드`,
-        ticker:       finalTicker,
-        grid_pct:     pct,
-        lower_price:  lower,
-        upper_price:  upper,
-        krw_per_grid: krw,
-      }),
+      body: JSON.stringify(payload),
     });
     const d = await r.json();
     if (r.ok && !d.error) {
@@ -996,6 +1005,58 @@ async function ctStopGridJob(id, name) {
     if (d.ok) { await ctLoadAll(); }
     else alert('중단 실패: ' + (d.error || ''));
   } catch (e) { alert('오류: ' + e.message); }
+}
+
+let _cgEditingId = null;
+
+function ctToggleGridEdit(id) {
+  _cgEditingId = (_cgEditingId === id) ? null : id;
+  ctRenderGridJobs();
+}
+
+async function ctSaveGridEdit(id) {
+  const job = (_ctGridJobs || []).find(j => j.id === id);
+  if (!job) return;
+
+  const lower   = +document.getElementById(`cg-edit-lower-${id}`)?.value || 0;
+  const upper   = +document.getElementById(`cg-edit-upper-${id}`)?.value || 0;
+  const reinitV = document.getElementById(`cg-edit-reinit-${id}`)?.value;
+  const reinit  = reinitV !== '' ? +reinitV : null;
+
+  if (lower && upper && lower >= upper) {
+    alert('하한가는 상한가보다 작아야 합니다');
+    return;
+  }
+
+  const patch = {};
+  const rangeChanged = lower && upper && (lower !== +job.lower_price || upper !== +job.upper_price);
+
+  if (lower && upper) {
+    patch.lower_price = lower;
+    patch.upper_price = upper;
+    if (rangeChanged && ['active', 'init'].includes(job.status)) {
+      patch.status = 'reinit';
+    }
+  }
+
+  patch.auto_reinit_minutes = (reinit >= 10) ? reinit : null;
+
+  try {
+    const r = await fetch(`/api/coin-grid?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const d = await r.json();
+    if (r.ok && !d.error) {
+      _cgEditingId = null;
+      await ctLoadAll();
+    } else {
+      alert('저장 실패: ' + (d.error || ''));
+    }
+  } catch (e) {
+    alert('오류: ' + e.message);
+  }
 }
 
 function ctRenderGridJobs() {
@@ -1046,6 +1107,8 @@ function ctRenderGridJobs() {
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span style="color:${statusColor};font-size:12px;font-weight:600">${statusLabel}</span>
+          ${canStop ? `<button onclick="ctToggleGridEdit('${j.id}')"
+            style="padding:2px 9px;border:1px solid var(--border);border-radius:5px;background:none;font-size:11px;color:var(--muted);cursor:pointer">${_cgEditingId === j.id ? '닫기' : '편집'}</button>` : ''}
           ${canStop ? `<button onclick="ctStopGridJob('${j.id}','${j.name}')"
             style="padding:2px 9px;border:1px solid var(--red);border-radius:5px;background:none;font-size:11px;color:var(--red);cursor:pointer">중단</button>` : ''}
         </div>
@@ -1054,6 +1117,7 @@ function ctRenderGridJobs() {
         범위: ${Number(j.lower_price).toLocaleString()} ~ ${Number(j.upper_price).toLocaleString()}원
         &nbsp;|&nbsp; 간격: ${j.grid_pct}%
         &nbsp;|&nbsp; 격자당: ${Number(j.krw_per_grid).toLocaleString()}원
+        ${j.auto_reinit_minutes ? `&nbsp;|&nbsp; <span style="color:var(--primary)">이탈재설정 ${j.auto_reinit_minutes}분</span>` : ''}
       </div>
       <div style="display:flex;gap:3px;margin-bottom:6px" title="파랑=매수대기 / 노랑=매도대기 / 회색=미활성">${barHtml}</div>
       <div style="display:flex;justify-content:space-between;font-size:12px">
@@ -1068,6 +1132,34 @@ function ctRenderGridJobs() {
           <span style="color:var(--muted);margin-left:8px">${j.trade_count||0}회</span>
         </div>
       </div>
+      ${_cgEditingId === j.id ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">하한가 (원)</div>
+            <input id="cg-edit-lower-${j.id}" type="number" value="${j.lower_price}"
+              style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">상한가 (원)</div>
+            <input id="cg-edit-upper-${j.id}" type="number" value="${j.upper_price}"
+              style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">이탈재설정 (분)</div>
+            <input id="cg-edit-reinit-${j.id}" type="number" min="10" placeholder="미설정"
+              value="${j.auto_reinit_minutes || ''}"
+              style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">* 하한/상한 변경 시 기존 주문 전부 취소 후 재초기화됩니다</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="ctSaveGridEdit('${j.id}')"
+            style="flex:1;padding:6px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">저장</button>
+          <button onclick="ctToggleGridEdit('${j.id}')"
+            style="padding:6px 14px;background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted);cursor:pointer">취소</button>
+        </div>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
