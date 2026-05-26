@@ -56,7 +56,7 @@ function parseFrgnRows(html, maxRows = 30) {
   return rows;
 }
 
-import { readBin } from './_jsonbin.js';
+import { readBin } from './_oracle.js';
 
 /** JSONBin에서 특정 키 읽기 헬퍼 */
 async function readBinKey(binId, key, field) {

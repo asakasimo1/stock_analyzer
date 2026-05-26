@@ -5,7 +5,7 @@
  * POST /api/etf             → body: { records: [...] }  → 저장
  */
 
-import { readBin, writeBin } from './_jsonbin.js';
+import { readBin, writeBin } from './_oracle.js';
 
 const ETF_LIST = [
   { t: '069500', n: 'KODEX 200',                              c: '분기배당' },

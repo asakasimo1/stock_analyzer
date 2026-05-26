@@ -5,7 +5,7 @@
  * GET  /api/ipo  + Authorization: Bearer <CRON_SECRET> → 크롤링 후 저장 (Vercel Cron)
  */
 
-import { readBin, writeBin } from './_jsonbin.js';
+import { readBin, writeBin } from './_oracle.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36';
 const TODAY = () => new Date().toISOString().slice(0, 10);

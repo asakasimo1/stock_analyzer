@@ -6,7 +6,7 @@
  * GET    /api/dividend-schedule?ticker=161510 → { items:[...], source }
  */
 
-import { readBin, writeBin } from './_jsonbin.js';
+import { readBin, writeBin } from './_oracle.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

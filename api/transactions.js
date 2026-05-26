@@ -8,7 +8,7 @@
  * JSONBin에 transactions 키가 없으면 Gist의 transactions.json에서 자동 이전 (1회)
  */
 
-import { readBin, writeBin } from './_jsonbin.js';
+import { readBin, writeBin } from './_oracle.js';
 
 /** Gist에서 transactions.json 읽기 (마이그레이션 전용) */
 async function readGistTransactions() {
