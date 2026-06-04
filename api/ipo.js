@@ -323,14 +323,20 @@ async function runCronFetch(binId, key) {
   const fresh = parseSchedule(plain, listingMap, demandMap, today);
   console.log(`[IPO Cron] 크롤링 완료: ${fresh.length}건`);
 
-  const binData = await readBin(binId, key, true); // 크론 쓰기 전 fresh 읽기
+  if (fresh.length === 0) throw new Error('크롤링 결과 0건 — 사이트 구조 변경 또는 접근 오류');
+
+  const binData = await readBin(binId, key, true);
   const existing    = binData.ipo              || [];
-  const userActions = binData.ipo_user_actions || {}; // 크론이 건드리지 않는 격리 백업
+  const userActions = binData.ipo_user_actions || {};
   const merged = mergeIpo(fresh, existing, userActions);
   console.log(`[IPO Cron] 병합 완료: ${merged.length}건`);
 
   // ipo_user_actions는 여기서 절대 수정하지 않음
-  await writeBin(binId, key, { ...binData, ipo: merged });
+  await writeBin(binId, key, {
+    ...binData,
+    ipo: merged,
+    ipo_last_sync: { ok: true, date: today, count: fresh.length },
+  });
   console.log('[IPO Cron] 저장 완료');
 
   return { count: merged.length, date: today };
@@ -360,6 +366,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, ...result });
     } catch (e) {
       console.error('[IPO Cron] 오류:', e.message);
+      // 실패 상태를 Oracle VM에 기록 (프론트에서 경고 배너 표시용)
+      try {
+        const data = await readBin(binId, key, true);
+        await writeBin(binId, key, {
+          ...data,
+          ipo_last_sync: { ok: false, error: e.message, date: TODAY() },
+        });
+      } catch (_) {}
       return res.status(500).json({ error: e.message });
     }
   }
@@ -368,7 +382,10 @@ export default async function handler(req, res) {
     try {
       const data = await readBin(binId, key);
       res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-      return res.status(200).json({ records: data.ipo ?? [] });
+      return res.status(200).json({
+        records: data.ipo ?? [],
+        last_sync: data.ipo_last_sync ?? null,
+      });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
