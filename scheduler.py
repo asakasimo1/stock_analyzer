@@ -317,7 +317,7 @@ def daily_briefing():
             market_news = []
 
         msg = format_daily_report(us_data, stock_results, market_news)
-        _send(msg)
+        # _send(msg)  # 일일 브리핑 텔레그램 알림 제외
 
         # Gist에 결과 저장 (웹 대시보드용)
         try:
@@ -403,12 +403,12 @@ def check_signals(force: bool = False):
                     else:
                         log.debug(f"  RSI 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
 
-                # MACD 크로스 (이벤트성 → 조건 없이 유지)
-                macd_sig = signals.get("MACD", "")
-                if "골든크로스" in str(macd_sig):
-                    raw_alerts.append(f"🟢 MACD 골든크로스 발생!")
-                elif "데드크로스" in str(macd_sig):
-                    raw_alerts.append(f"🔴 MACD 데드크로스 발생!")
+                # MACD 크로스 — 알림 제외 (너무 잦음)
+                # macd_sig = signals.get("MACD", "")
+                # if "골든크로스" in str(macd_sig):
+                #     raw_alerts.append(f"🟢 MACD 골든크로스 발생!")
+                # elif "데드크로스" in str(macd_sig):
+                #     raw_alerts.append(f"🔴 MACD 데드크로스 발생!")
 
                 # 볼린저밴드 돌파 — 주가 ±2% 이상 + 거래량 1.5배 이상 동반 시만 알림
                 bb_sig = signals.get("볼린저밴드", "")
@@ -419,10 +419,10 @@ def check_signals(force: bool = False):
                     else:
                         log.debug(f"  BB 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
 
-                # MA 골든/데드크로스 (이벤트성 → 조건 없이 유지)
-                cross_sig = signals.get("크로스", "")
-                if cross_sig:
-                    raw_alerts.append(f"🚨 {cross_sig}")
+                # MA 골든/데드크로스 — 알림 제외 (너무 잦음)
+                # cross_sig = signals.get("크로스", "")
+                # if cross_sig:
+                #     raw_alerts.append(f"🚨 {cross_sig}")
 
                 if not raw_alerts:
                     continue
