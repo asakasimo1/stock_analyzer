@@ -394,32 +394,28 @@ def check_signals(force: bool = False):
                 signals = tech.get("signals", {})
                 raw_alerts = []
 
-                # RSI 과매수/과매도 — 주가 ±2% 이상 + 거래량 1.5배 이상 동반 시만 알림
-                rsi_sig = signals.get("RSI", "")
-                if "과매수" in str(rsi_sig) or "과매도" in str(rsi_sig):
-                    if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
-                        tag = "🔴 RSI 과매수" if "과매수" in str(rsi_sig) else "🟢 RSI 과매도"
-                        raw_alerts.append(f"{tag} — {rsi_sig} (거래량 {vol_ratio:.1f}x)")
-                    else:
-                        log.debug(f"  RSI 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
+                # RSI 과매수/과매도 — 알림 제외
+                # rsi_sig = signals.get("RSI", "")
+                # if "과매수" in str(rsi_sig) or "과매도" in str(rsi_sig):
+                #     if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
+                #         tag = "🔴 RSI 과매수" if "과매수" in str(rsi_sig) else "🟢 RSI 과매도"
+                #         raw_alerts.append(f"{tag} — {rsi_sig} (거래량 {vol_ratio:.1f}x)")
 
-                # MACD 크로스 — 알림 제외 (너무 잦음)
+                # MACD 크로스 — 알림 제외
                 # macd_sig = signals.get("MACD", "")
                 # if "골든크로스" in str(macd_sig):
                 #     raw_alerts.append(f"🟢 MACD 골든크로스 발생!")
                 # elif "데드크로스" in str(macd_sig):
                 #     raw_alerts.append(f"🔴 MACD 데드크로스 발생!")
 
-                # 볼린저밴드 돌파 — 주가 ±2% 이상 + 거래량 1.5배 이상 동반 시만 알림
-                bb_sig = signals.get("볼린저밴드", "")
-                if "상단 돌파" in str(bb_sig) or "하단 이탈" in str(bb_sig):
-                    if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
-                        tag = "⚠️ 볼린저밴드 상단 돌파" if "상단 돌파" in str(bb_sig) else "⚠️ 볼린저밴드 하단 이탈"
-                        raw_alerts.append(f"{tag} — {bb_sig} (거래량 {vol_ratio:.1f}x)")
-                    else:
-                        log.debug(f"  BB 신호 스킵: {name} chg={chg_p:.1f}% vol={vol_ratio:.1f}x")
+                # 볼린저밴드 돌파 — 알림 제외
+                # bb_sig = signals.get("볼린저밴드", "")
+                # if "상단 돌파" in str(bb_sig) or "하단 이탈" in str(bb_sig):
+                #     if abs(chg_p) >= _RSI_BB_MIN_CHG_PCT and vol_ratio >= _RSI_BB_MIN_VOL_RATIO:
+                #         tag = "⚠️ 볼린저밴드 상단 돌파" if "상단 돌파" in str(bb_sig) else "⚠️ 볼린저밴드 하단 이탈"
+                #         raw_alerts.append(f"{tag} — {bb_sig} (거래량 {vol_ratio:.1f}x)")
 
-                # MA 골든/데드크로스 — 알림 제외 (너무 잦음)
+                # MA 골든/데드크로스 — 알림 제외
                 # cross_sig = signals.get("크로스", "")
                 # if cross_sig:
                 #     raw_alerts.append(f"🚨 {cross_sig}")
