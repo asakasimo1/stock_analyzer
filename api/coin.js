@@ -513,6 +513,67 @@ async function handleCoinRunner(req, res, gistId, ghToken) {
 // ══════════════════════════════════════════════════════════
 // 금일 코인 체결 내역 (Upbit 체결 주문 조회)
 // ══════════════════════════════════════════════════════════
+async function handleCoinDate(req, res) {
+  const accessKey = process.env.UPBIT_ACCESS_KEY;
+  const secretKey = process.env.UPBIT_SECRET_KEY;
+  if (!accessKey || !secretKey)
+    return res.status(500).json({ error: 'UPBIT_ACCESS_KEY / UPBIT_SECRET_KEY 미설정' });
+
+  const date = (req.query && req.query.date) || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    return res.status(400).json({ error: 'date 파라미터 필요 (YYYY-MM-DD)' });
+
+  try {
+    const allOrders = [];
+    for (let page = 1; page <= 15; page++) {
+      const params = { limit: '100', order_by: 'desc', state: 'done', page: String(page) };
+      const token  = makeJwt(accessKey, secretKey, params);
+      const qs     = new URLSearchParams(params).toString();
+      const r      = await fetch(`${UPBIT_BASE}/orders?${qs}`,
+                                 { headers: { Authorization: token } });
+      if (!r.ok) break;
+      const orders = await r.json();
+      if (!Array.isArray(orders) || !orders.length) break;
+      const dayOrders = orders.filter(o => (o.created_at || '').startsWith(date));
+      allOrders.push(...dayOrders);
+      // created_at이 date보다 이전이면 더 이상 없음
+      const oldest = orders[orders.length - 1]?.created_at || '';
+      if (oldest && oldest.slice(0, 10) < date) break;
+      if (dayOrders.length === 0 && orders[0]?.created_at?.slice(0, 10) < date) break;
+    }
+    const buys  = allOrders.filter(o => o.side === 'bid');
+    const sells = allOrders.filter(o => o.side === 'ask');
+    const sumAmt = arr => arr.reduce((s, o) => s + parseFloat(o.avg_price) * parseFloat(o.executed_volume), 0);
+    const sumFee = arr => arr.reduce((s, o) => s + parseFloat(o.paid_fee), 0);
+    const buyAmt  = sumAmt(buys),  buyFee  = sumFee(buys);
+    const sellAmt = sumAmt(sells), sellFee = sumFee(sells);
+    const net = (sellAmt - sellFee) - (buyAmt + buyFee);
+    const fmt = o => ({
+      time:   (o.created_at || '').slice(11, 16),
+      market: o.market,
+      name:   COIN_NAMES[o.market] || o.market.replace('KRW-', ''),
+      price:  Math.round(parseFloat(o.avg_price) * 100) / 100,
+      volume: parseFloat(o.executed_volume),
+      amount: Math.round(parseFloat(o.avg_price) * parseFloat(o.executed_volume)),
+      fee:    Math.round(parseFloat(o.paid_fee) * 100) / 100,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({
+      date,
+      buys:         buys.map(fmt),
+      sells:        sells.map(fmt),
+      totalBuyAmt:  Math.round(buyAmt),
+      totalBuyFee:  Math.round(buyFee * 100) / 100,
+      totalSellAmt: Math.round(sellAmt),
+      totalSellFee: Math.round(sellFee * 100) / 100,
+      totalFee:     Math.round((buyFee + sellFee) * 100) / 100,
+      netProfit:    Math.round(net),
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 async function handleCoinToday(req, res) {
   const accessKey = process.env.UPBIT_ACCESS_KEY;
   const secretKey = process.env.UPBIT_SECRET_KEY;
@@ -751,6 +812,7 @@ export default async function handler(req, res) {
   if (url.includes('coin-runner')) return handleCoinRunner(req, res, gistId, ghToken);
   if (url.includes('coin-ip'))     return handleCoinIp(res);
   if (url.includes('coin-price'))  return handleCoinPrice(req, res);
+  if (url.includes('coin-date'))   return handleCoinDate(req, res);
   if (url.includes('coin-today'))  return handleCoinToday(req, res);
   if (url.includes('coin-signal')) return handleCoinSignal(req, res, gistId, ghToken);
   if (url.includes('coin-grid'))   return handleCoinGrid(req, res, gistId, ghToken);
