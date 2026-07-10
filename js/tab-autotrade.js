@@ -102,6 +102,7 @@ async function atLoadAll() {
   abRenderJobs();
   acRenderJobs();
   atRenderJobs();
+  atLoadToday();
 }
 
 // ── 잔고 새로고침 (GitHub Actions balance job 트리거 → 30초 후 Gist 재조회) ──
@@ -1528,3 +1529,127 @@ function ctCheckDaemonStatus() {
   }
 }
 
+// ── 자동 주식매매 일별 수익 현황 ──────────────────────────────────
+
+function atCalcDayProfit(dateStr) {
+  const sells = (_atJobs || []).filter(j =>
+    j.status === 'done' && (j.executed_at || '').startsWith(dateStr)
+  );
+  const items = sells.map(j => {
+    const sellPrice = j.sell_price || j.exec_price || j.target_price || 0;
+    const buyPrice  = j.buy_price  || 0;
+    const qty       = j.qty        || 0;
+    return {
+      name:      j.name || j.ticker,
+      ticker:    j.ticker,
+      qty,
+      buyPrice,
+      sellPrice,
+      profit:    Math.round((sellPrice - buyPrice) * qty),
+      time:      (j.executed_at || '').slice(11, 16),
+    };
+  });
+  return {
+    date:      dateStr,
+    sells:     items,
+    netProfit: items.reduce((s, o) => s + o.profit, 0),
+  };
+}
+
+function atRenderDailyCard(data, idx) {
+  const card = document.getElementById(`at-day-card-${idx}`);
+  if (!card) return;
+
+  if (!data || !data.sells.length) {
+    card.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">체결 없음</div>';
+    return;
+  }
+  const net    = data.netProfit;
+  const netCls = net > 0 ? '#22c55e' : net < 0 ? '#ef4444' : 'var(--muted)';
+  const netStr = (net >= 0 ? '+' : '') + net.toLocaleString() + '원';
+  const cnt    = data.sells.length;
+
+  card.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <div style="text-align:center">
+        <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">순수익</div>
+        <div style="font-size:17px;font-weight:800;color:${netCls}">${netStr}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">매도 체결</div>
+        <div style="font-size:17px;font-weight:800;color:var(--text)">${cnt}건</div>
+      </div>
+    </div>
+    <div id="at-day-detail-${idx}" style="display:none;margin-top:10px">
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr style="background:var(--surface)">
+            <th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;font-weight:700">시각</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;font-weight:700">종목</th>
+            <th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">수량</th>
+            <th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">매수가</th>
+            <th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">매도가</th>
+            <th style="padding:6px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">손익</th>
+          </tr></thead>
+          <tbody>
+            ${data.sells.map(o => `<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 8px;color:var(--muted)">${o.time}</td>
+              <td style="padding:6px 8px;color:var(--text)">${o.name}</td>
+              <td style="padding:6px 8px;text-align:right;color:var(--text)">${o.qty}</td>
+              <td style="padding:6px 8px;text-align:right;color:var(--muted)">${o.buyPrice.toLocaleString()}</td>
+              <td style="padding:6px 8px;text-align:right;color:var(--text)">${o.sellPrice.toLocaleString()}</td>
+              <td style="padding:6px 8px;text-align:right;color:${o.profit>=0?'#22c55e':'#ef4444'}">${(o.profit>=0?'+':'')+o.profit.toLocaleString()}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <button onclick="atToggleDayDetail(${idx})" id="at-day-toggle-${idx}"
+      style="margin-top:8px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0">▼ 상세 보기</button>
+  `;
+}
+
+function atToggleDayDetail(idx) {
+  const el  = document.getElementById(`at-day-detail-${idx}`);
+  const btn = document.getElementById(`at-day-toggle-${idx}`);
+  if (!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? '▲ 접기' : '▼ 상세 보기';
+}
+
+function atLoadToday() {
+  const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
+  const dates  = [null];
+  for (let i = 1; i <= 2; i++) {
+    const d = new Date(kstNow.getTime() - i * 86400000);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  const mm = String(kstNow.getMonth() + 1).padStart(2, '0');
+  const dd = String(kstNow.getDate()).padStart(2, '0');
+  const labels = [`오늘 (${mm}/${dd})`];
+  for (let i = 1; i <= 2; i++) {
+    const d = new Date(kstNow.getTime() - i * 86400000);
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    labels.push(`${i===1?'어제':'그제'} (${m}/${day})`);
+  }
+
+  const wrap = document.getElementById('at-daily-wrap');
+  if (!wrap) return;
+  const todayStr = kstNow.toISOString().slice(0, 10);
+  wrap.innerHTML = dates.map((_, i) => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="text-transform:uppercase;letter-spacing:.06em">${labels[i]}</span>
+      </div>
+      <div id="at-day-card-${i}"></div>
+    </div>
+  `).join('');
+
+  dates.forEach((date, i) => {
+    const targetDate = date === null ? todayStr : date;
+    const dayData = atCalcDayProfit(targetDate);
+    atRenderDailyCard(dayData, i);
+  });
+}
