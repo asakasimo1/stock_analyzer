@@ -1193,6 +1193,45 @@
 <div id="tab-cointrade" class="tab-page">
 <div class="etf-wrap" style="max-width:800px">
 
+
+  <!-- 금일 매매 수익 요약 -->
+  <div id="ct-today-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 12px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">금일 순수익</div>
+      <div id="ct-today-net" style="font-size:20px;font-weight:800;color:var(--green)">—</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 12px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">체결</div>
+      <div id="ct-today-count" style="font-size:20px;font-weight:800;color:var(--text)">—</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 12px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">수수료</div>
+      <div id="ct-today-fee" style="font-size:20px;font-weight:800;color:var(--muted)">—</div>
+    </div>
+  </div>
+  <!-- 매수/매도 상세 (접기/펼치기) -->
+  <div id="ct-today-detail" style="display:none;margin-bottom:16px">
+    <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--surface)">
+            <th style="padding:8px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700">구분</th>
+            <th style="padding:8px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700">시각</th>
+            <th style="padding:8px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700">종목</th>
+            <th style="padding:8px 10px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">체결가</th>
+            <th style="padding:8px 10px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">체결액</th>
+            <th style="padding:8px 10px;text-align:right;color:var(--muted);font-size:10px;font-weight:700">수수료</th>
+          </tr>
+        </thead>
+        <tbody id="ct-today-rows"></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <button onclick="ctToggleTodayDetail()"
+      id="ct-today-toggle-btn"
+      style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0">▼ 상세 보기</button>
+
   <!-- 상단 잔고 새로고침 -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
     <button id="ct-balance-refresh-btn" onclick="ctRefreshBalance()"
