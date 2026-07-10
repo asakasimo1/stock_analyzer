@@ -34,6 +34,7 @@ async function initCoinTrade() {
   }
 
   ctCheckDaemonStatus();
+  ctLoadToday();
 }
 
 async function ctLoadAll() {
