@@ -62,6 +62,10 @@ function ctRenderDailyCard(data, idx) {
   const buyCnt  = data.buys?.length  || 0;
   const sellCnt = data.sells?.length || 0;
   const fee     = data.totalFee || 0;
+  const unmatched = data.unmatchedBuyCnt || 0;
+  const matchedStr = unmatched > 0
+    ? `매수 ${buyCnt} · 매도 ${sellCnt} <span style="font-size:10px;font-weight:600;color:#f59e0b">(보유중 ${unmatched})</span>`
+    : `매수 ${buyCnt} · 매도 ${sellCnt}`;
 
   card.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -71,7 +75,7 @@ function ctRenderDailyCard(data, idx) {
       </div>
       <div style="text-align:center">
         <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">체결</div>
-        <div style="font-size:17px;font-weight:800;color:var(--text)">매수 ${buyCnt} · 매도 ${sellCnt}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text)">${matchedStr}</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">수수료</div>
