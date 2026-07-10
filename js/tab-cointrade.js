@@ -34,9 +34,10 @@ async function initCoinTrade() {
   }
 
   ctCheckDaemonStatus();
-// ── 일별 수익 현황 ────────────────────────────────────────────
-const _CT_DAY_LABELS = ['오늘', '어제', '그제'];
+  ctLoadToday();
+}
 
+// ── 일별 수익 현황 ────────────────────────────────────────────
 async function ctFetchDay(date) {
   const action = date === null ? 'coin-today' : `coin-date&date=${date}`;
   try {
@@ -48,7 +49,7 @@ async function ctFetchDay(date) {
 function ctRenderDailyCard(data, idx) {
   const wrap = document.getElementById('ct-daily-wrap');
   if (!wrap) return;
-  let card = document.getElementById(`ct-day-card-${idx}`);
+  const card = document.getElementById(`ct-day-card-${idx}`);
   if (!card) return;
 
   if (!data || data.error) {
@@ -124,13 +125,11 @@ function ctToggleDayDetail(idx) {
 
 async function ctLoadToday() {
   const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
-  const dates  = [null]; // null = 오늘(coin-today)
+  const dates  = [null];
   for (let i = 1; i <= 2; i++) {
     const d = new Date(kstNow.getTime() - i * 86400000);
     dates.push(d.toISOString().slice(0, 10));
   }
-
-  // 날짜 레이블 계산
   const mm = String(kstNow.getMonth() + 1).padStart(2, '0');
   const dd = String(kstNow.getDate()).padStart(2, '0');
   const labels = [`오늘 (${mm}/${dd})`];
@@ -140,8 +139,6 @@ async function ctLoadToday() {
     const day = String(d.getDate()).padStart(2,'0');
     labels.push(`${i===1?'어제':'그제'} (${m}/${day})`);
   }
-
-  // 카드 초기화
   const wrap = document.getElementById('ct-daily-wrap');
   if (!wrap) return;
   wrap.innerHTML = dates.map((_, i) => `
@@ -153,17 +150,12 @@ async function ctLoadToday() {
       <div id="ct-day-card-${i}"></div>
     </div>
   `).join('');
-
-  // 병렬 로드
   await Promise.all(dates.map(async (date, i) => {
     const data = await ctFetchDay(date);
     const loadEl = document.getElementById(`ct-day-loading-${i}`);
     if (loadEl) loadEl.remove();
     ctRenderDailyCard(data, i);
   }));
-}
-
-  ctLoadToday();
 }
 
 async function ctLoadAll() {
