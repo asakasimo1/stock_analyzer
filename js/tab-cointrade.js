@@ -39,9 +39,9 @@ async function initCoinTrade() {
 
 // ── 일별 수익 현황 ────────────────────────────────────────────
 async function ctFetchDay(date) {
-  const action = date === null ? 'coin-today' : `coin-date&date=${date}`;
+  const url = date === null ? '/api/coin-today' : `/api/coin-date?date=${date}`;
   try {
-    const r = await fetch(`/api/coin?action=${action}`);
+    const r = await fetch(url);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
