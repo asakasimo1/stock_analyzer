@@ -62,10 +62,13 @@ function ctRenderDailyCard(data, idx) {
   const buyCnt  = data.buys?.length  || 0;
   const sellCnt = data.sells?.length || 0;
   const fee     = data.totalFee || 0;
-  const unmatched = data.unmatchedBuyCnt || 0;
-  const matchedStr = unmatched > 0
-    ? `매수 ${buyCnt} · 매도 ${sellCnt} <span style="font-size:10px;font-weight:600;color:#f59e0b">(보유중 ${unmatched})</span>`
-    : `매수 ${buyCnt} · 매도 ${sellCnt}`;
+  const unmatched  = data.unmatchedBuyCnt  || 0;
+  const carryover  = data.carryoverSellCnt || 0;
+  let matchedStr = `매수 ${buyCnt} · 매도 ${sellCnt}`;
+  if (unmatched > 0)
+    matchedStr += ` <span style="font-size:10px;font-weight:600;color:#f59e0b">(보유중 ${unmatched})</span>`;
+  if (carryover > 0)
+    matchedStr += ` <span style="font-size:10px;font-weight:600;color:var(--muted)">(이월 ${carryover})</span>`;
 
   card.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
