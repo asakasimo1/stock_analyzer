@@ -655,6 +655,135 @@ function atRenderJobs() {
 
 
 // ══════════════════════════════════════════════════════════
+// 코인 탭 공유 함수 / 전역 변수 (tab-cointrade.js에서 참조)
+// ══════════════════════════════════════════════════════════
+
+function toggleTradeSection(id) {
+  const body = document.getElementById(id + '-body');
+  const icon = document.getElementById(id + '-toggle-icon');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (icon) icon.textContent = isOpen ? '▶' : '▼';
+  try { localStorage.setItem('trade-section-' + id, isOpen ? '0' : '1'); } catch (_) {}
+}
+
+function _restoreTradeSection(id, defaultOpen) {
+  try {
+    const saved = localStorage.getItem('trade-section-' + id);
+    const open  = saved !== null ? saved === '1' : defaultOpen;
+    const body  = document.getElementById(id + '-body');
+    const icon  = document.getElementById(id + '-toggle-icon');
+    if (body) body.style.display = open ? 'block' : 'none';
+    if (icon) icon.textContent   = open ? '▼' : '▶';
+  } catch (_) {}
+}
+
+const COIN_LIST = [
+  {ticker:'KRW-BTC',  name:'비트코인',       symbol:'BTC'},
+  {ticker:'KRW-ETH',  name:'이더리움',        symbol:'ETH'},
+  {ticker:'KRW-XRP',  name:'리플',            symbol:'XRP'},
+  {ticker:'KRW-SOL',  name:'솔라나',          symbol:'SOL'},
+  {ticker:'KRW-USDT', name:'테더',            symbol:'USDT'},
+  {ticker:'KRW-DOGE', name:'도지코인',        symbol:'DOGE'},
+  {ticker:'KRW-ADA',  name:'에이다',          symbol:'ADA'},
+  {ticker:'KRW-AVAX', name:'아발란체',        symbol:'AVAX'},
+  {ticker:'KRW-DOT',  name:'폴카닷',          symbol:'DOT'},
+  {ticker:'KRW-LINK', name:'체인링크',        symbol:'LINK'},
+  {ticker:'KRW-ATOM', name:'코스모스',        symbol:'ATOM'},
+  {ticker:'KRW-MATIC',name:'폴리곤',          symbol:'MATIC'},
+  {ticker:'KRW-TRX',  name:'트론',            symbol:'TRX'},
+  {ticker:'KRW-SHIB', name:'시바이누',        symbol:'SHIB'},
+  {ticker:'KRW-LTC',  name:'라이트코인',      symbol:'LTC'},
+  {ticker:'KRW-BCH',  name:'비트코인캐시',    symbol:'BCH'},
+  {ticker:'KRW-ETC',  name:'이더리움클래식',  symbol:'ETC'},
+  {ticker:'KRW-NEAR', name:'니어프로토콜',    symbol:'NEAR'},
+  {ticker:'KRW-AAVE', name:'에이브',          symbol:'AAVE'},
+  {ticker:'KRW-UNI',  name:'유니스왑',        symbol:'UNI'},
+  {ticker:'KRW-SAND', name:'샌드박스',        symbol:'SAND'},
+  {ticker:'KRW-SUI',  name:'수이',            symbol:'SUI'},
+  {ticker:'KRW-HBAR', name:'헤데라',          symbol:'HBAR'},
+  {ticker:'KRW-ARB',  name:'아비트럼',        symbol:'ARB'},
+  {ticker:'KRW-OP',   name:'옵티미즘',        symbol:'OP'},
+  {ticker:'KRW-XLM',  name:'스텔라루멘',      symbol:'XLM'},
+  {ticker:'KRW-ALGO', name:'알고랜드',        symbol:'ALGO'},
+  {ticker:'KRW-FLOW', name:'플로우',          symbol:'FLOW'},
+  {ticker:'KRW-MANA', name:'디센트럴랜드',    symbol:'MANA'},
+  {ticker:'KRW-CHZ',  name:'칠리즈',          symbol:'CHZ'},
+  {ticker:'KRW-KLAY', name:'클레이튼',        symbol:'KLAY'},
+  {ticker:'KRW-FIL',  name:'파일코인',        symbol:'FIL'},
+  {ticker:'KRW-ICP',  name:'인터넷컴퓨터',    symbol:'ICP'},
+  {ticker:'KRW-SEI',  name:'세이',            symbol:'SEI'},
+];
+
+const COIN_FEE = 0.0005;
+
+let _ctBuyJobs    = [];
+let _ctSellJobs   = [];
+let _ctCycleJobs  = [];
+let _ctSignalJobs = [];
+let _ctGridJobs   = [];
+let _ctAccount    = null;
+let _ctRefreshTimer = null;
+let _ctPriceTimer   = null;
+let _ctBalanceTimer = null;
+let _ctPriceCache   = {};
+let _ctConfig = { autoRefreshSec: 0 };
+
+function ctLoadConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ct_config') || '{}');
+    _ctConfig = { autoRefreshSec: 0, ...saved };
+  } catch (_) {}
+  const arEl = document.getElementById('ct-cfg-auto-refresh');
+  if (arEl) arEl.value = _ctConfig.autoRefreshSec;
+}
+
+function ctSaveConfig() {
+  _ctConfig.autoRefreshSec = parseInt(document.getElementById('ct-cfg-auto-refresh')?.value) || 0;
+  localStorage.setItem('ct_config', JSON.stringify(_ctConfig));
+  clearInterval(_ctBalanceTimer);
+  if (_ctConfig.autoRefreshSec > 0) {
+    _ctBalanceTimer = setInterval(() => {
+      if (document.querySelector('.tab-btn.active')?.getAttribute('onclick')?.includes('cointrade')) {
+        ctRefreshBalance();
+      } else {
+        clearInterval(_ctBalanceTimer);
+      }
+    }, _ctConfig.autoRefreshSec * 1000);
+  }
+  const msg = document.getElementById('ct-cfg-msg');
+  if (msg) { msg.textContent = '✓ 저장 완료'; msg.style.color = 'var(--green)'; setTimeout(() => { msg.textContent = ''; }, 2000); }
+}
+
+function ctCheckDaemonStatus() {
+  const label = document.getElementById('ct-daemon-status-label');
+  const updEl = document.getElementById('ct-daemon-updated-at');
+  if (!_ctAccount) {
+    if (label) { label.textContent = '데이터 없음'; label.style.color = 'var(--muted)'; }
+    if (updEl) updEl.textContent = '잔고 새로고침 후 확인하세요';
+    return;
+  }
+  const updatedAt = _ctAccount.updated_at || '';
+  if (!updatedAt) {
+    if (label) { label.textContent = '갱신 시각 없음'; label.style.color = 'var(--muted)'; }
+    return;
+  }
+  try {
+    const last = new Date(updatedAt.replace(' ', 'T') + '+09:00');
+    const diffMin = Math.floor((Date.now() - last.getTime()) / 60000);
+    const isAlive = diffMin < 10;
+    if (label) {
+      label.textContent = isAlive ? '● 정상 동작 중' : '● 응답 없음 (10분 이상 경과)';
+      label.style.color = isAlive ? 'var(--green)' : 'var(--red)';
+    }
+    if (updEl) updEl.textContent = `마지막 갱신: ${updatedAt} (${diffMin}분 전)`;
+  } catch (_) {
+    if (label) { label.textContent = updatedAt; label.style.color = 'var(--text)'; }
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // 주식 그리드 트레이딩 (sg = stock grid)
 // ══════════════════════════════════════════════════════════
 let _sgGridJobs  = [];
