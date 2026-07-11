@@ -800,8 +800,29 @@ export default async function handler(req, res) {
   if (url.includes('coin-signal')) return handleCoinSignal(req, res, gistId, ghToken);
   if (url.includes('coin-grid'))   return handleCoinGrid(req, res, gistId, ghToken);
   if (url.includes('stock-grid'))  return handleStockGrid(req, res, gistId, ghToken);
+  if (url.includes('sync-hook'))   return handleSyncHook(req, res);
   if (url.includes('coin-'))       return handleCoinJobs(req, res, url, gistId, ghToken);
   if (url.includes('profit-'))     return handleStockJobs(req, res, url, gistId, ghToken);
 
   return res.status(404).json({ error: '알 수 없는 경로' });
+}
+
+async function handleSyncHook(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  try {
+    const r = await fetch('http://158.180.84.109:8765/sync-source', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Hub-Signature-256': req.headers['x-hub-signature-256'] || '',
+        'X-GitHub-Event':      req.headers['x-github-event'] || '',
+      },
+      body: JSON.stringify(req.body || {}),
+      signal: AbortSignal.timeout(8000),
+    });
+    const d = await r.json();
+    return res.status(200).json(d);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 }
