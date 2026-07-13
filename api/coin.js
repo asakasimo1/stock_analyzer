@@ -5,6 +5,7 @@
  * GET/POST/DELETE /api/profit-sell   → profit_sell_jobs.json
  * GET/POST/DELETE /api/profit-buy    → profit_buy_jobs.json
  * GET/POST/DELETE /api/profit-cycle  → profit_cycle_jobs.json
+ * GET/POST/DELETE/PATCH /api/stock-grid → stock_grid_jobs.json
  *
  * ── 코인 자동매매 잡 CRUD ──
  * GET/POST/DELETE /api/coin-buy      → coin_buy_jobs.json
@@ -682,6 +683,80 @@ async function handleCoinGrid(req, res, gistId, ghToken) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+// ══════════════════════════════════════════════════════════
+// 주식 그리드 트레이딩  /api/stock-grid
+// ══════════════════════════════════════════════════════════
+async function handleStockGrid(req, res, gistId, ghToken) {
+  const FILENAME = 'stock_grid_jobs.json';
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (req.method === 'GET') {
+    return res.status(200).json(await readGistFile(gistId, ghToken, FILENAME));
+  }
+
+  if (req.method === 'POST') {
+    const b = req.body || {};
+    if (!b.ticker)       return res.status(400).json({ error: 'ticker 필수' });
+    if (!b.lower_price)  return res.status(400).json({ error: 'lower_price 필수' });
+    if (!b.upper_price)  return res.status(400).json({ error: 'upper_price 필수' });
+    if (!b.krw_per_grid) return res.status(400).json({ error: 'krw_per_grid 필수' });
+
+    const jobs = await readGistFile(gistId, ghToken, FILENAME);
+    const list = Array.isArray(jobs) ? jobs : [];
+    const newJob = {
+      id:              Date.now().toString(36),
+      name:            b.name || `${b.ticker} 그리드`,
+      ticker:          b.ticker,
+      status:          'init',
+      grid_pct:        +b.grid_pct     || 1.5,
+      lower_price:     +b.lower_price,
+      upper_price:     +b.upper_price,
+      krw_per_grid:    +b.krw_per_grid,
+      auto_reinit_minutes: +b.auto_reinit_minutes || 0,
+      grids:           [],
+      total_profit_krw: 0,
+      trade_count:     0,
+      created_at:      nowKst(),
+    };
+    // 기존 동일 ticker 비활성 항목 제거 후 unshift
+    const filtered = list.filter(j => !(j.ticker === b.ticker && ['stopped','init'].includes(j.status)));
+    filtered.unshift(newJob);
+    const ok = await writeGistFile(gistId, ghToken, FILENAME, filtered);
+    return res.status(ok ? 200 : 500).json(ok ? newJob : { error: '저장 실패' });
+  }
+
+  if (req.method === 'PATCH') {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: 'id 필수' });
+    const jobs = await readGistFile(gistId, ghToken, FILENAME);
+    const list = Array.isArray(jobs) ? jobs : [];
+    const idx  = list.findIndex(j => j.id === id);
+    if (idx < 0) return res.status(404).json({ error: '잡 없음' });
+    list[idx] = { ...list[idx], ...req.body };
+    const ok = await writeGistFile(gistId, ghToken, FILENAME, list);
+    return res.status(ok ? 200 : 500).json(ok ? list[idx] : { error: '저장 실패' });
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: 'id 필수' });
+    const jobs = await readGistFile(gistId, ghToken, FILENAME);
+    const list = Array.isArray(jobs) ? jobs : [];
+    const idx  = list.findIndex(j => j.id === id);
+    if (idx >= 0) {
+      if (['active', 'init', 'reinit'].includes(list[idx].status)) {
+        list[idx].status = 'stopping';
+      } else {
+        list.splice(idx, 1);
+      }
+    }
+    const ok = await writeGistFile(gistId, ghToken, FILENAME, list);
+    return res.status(ok ? 200 : 500).json(ok ? { ok: true } : { error: '처리 실패' });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
 async function handleCoinPrice(req, res) {
   const { markets } = req.query;
   if (!markets) return res.status(400).json({ error: 'markets 파라미터 필요' });
@@ -803,6 +878,7 @@ export default async function handler(req, res) {
   if (url.includes('sync-hook'))   return handleSyncHook(req, res);
   if (url.includes('coin-'))       return handleCoinJobs(req, res, url, gistId, ghToken);
   if (url.includes('profit-'))     return handleStockJobs(req, res, url, gistId, ghToken);
+  if (url.includes('stock-grid'))  return handleStockGrid(req, res, gistId, ghToken);
 
   return res.status(404).json({ error: '알 수 없는 경로' });
 }
