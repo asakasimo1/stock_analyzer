@@ -349,9 +349,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const binId = process.env.JSONBIN_BIN_ID;
-  const key   = process.env.JSONBIN_KEY;
-  if (!binId || !key) return res.status(500).json({ error: 'JSONBIN 환경변수 미설정' });
+  const binId = process.env.JSONBIN_BIN_ID || 'unused';
+  const key   = process.env.JSONBIN_KEY   || 'unused';
 
   // Vercel Cron 호출 감지 (Authorization 헤더)
   const cronSecret = process.env.CRON_SECRET;
