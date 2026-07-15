@@ -108,7 +108,7 @@
   <button class="tab-btn" onclick="switchTab('market')">📊 시장현황</button>
   <button class="tab-btn" onclick="switchTab('etf')">💹 ETF</button>
   <button class="tab-btn" onclick="switchTab('stocks')">📊 개별주</button>
-  <button class="tab-btn" onclick="switchTab('autotrade')">🤖 자동매매</button>
+  <button class="tab-btn" onclick="switchTab('autotrade')">🤖 자동 주식매매</button>
   <button class="tab-btn" onclick="switchTab('cointrade')">🪙 자동코인매매</button>
 </nav>
 
@@ -832,6 +832,12 @@
     </button>
   </div>
   <div id="at-account" style="margin-bottom:20px"></div>
+
+  <!-- 최근 3일 매매 수익 현황 -->
+  <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">📊 일별 수익 현황</div>
+  <div id="at-daily-wrap" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+    <!-- JS(atLoadToday)가 채움 -->
+  </div>
 
   <!-- ── 매수 섹션 ─────────────────────────────────────── -->
   <div style="background:var(--surface);border:2px solid #2563eb;border-radius:14px;overflow:hidden;margin-bottom:10px">
