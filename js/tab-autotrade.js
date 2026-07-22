@@ -1542,17 +1542,26 @@ let _agAcTimer = null;
 
 // ── 종목 자동완성 ──────────────────────────────────────────────
 function onAgNameInput(val) {
-  if (!val || val.length < 1) { hideAgAc(); return; }
-  const results = (_stockList || []).filter(s =>
-    s.name.includes(val) || s.ticker.startsWith(val)
-  ).slice(0, 8);
+  clearTimeout(_agAcTimer);
+  if (!val || !val.trim()) { hideAgAc(); return; }
+  _agAcTimer = setTimeout(() => fetchAgAc(val.trim()), 220);
+}
+async function fetchAgAc(q) {
+  try {
+    const r = await fetch(`/api/stock?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    showAgAc(d.items || []);
+  } catch { hideAgAc(); }
+}
+function showAgAc(items) {
   const box = document.getElementById('ag-ac-list');
   if (!box) return;
-  if (!results.length) { box.style.display = 'none'; return; }
-  box.innerHTML = results.map(s =>
-    `<div style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-       onmousedown="selectAgStock('${s.ticker}','${s.name}')">${s.name} <span style="color:var(--muted);font-size:11px">${s.ticker}</span></div>`
-  ).join('');
+  if (!items.length) { box.style.display = 'none'; return; }
+  box.innerHTML = items.map(it => {
+    const safeN = it.name.replace(/'/g, "\\'");
+    return `<div style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+       onmousedown="selectAgStock('${it.ticker}','${safeN}')">${it.name} <span style="color:var(--muted);font-size:11px">${it.ticker}</span></div>`;
+  }).join('');
   box.style.display = 'block';
 }
 function hideAgAc() { setTimeout(() => { const b = document.getElementById('ag-ac-list'); if(b) b.style.display='none'; }, 150); }
